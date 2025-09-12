@@ -1,6 +1,8 @@
 # HRMS - Hệ thống Quản lý Nhân sự
 
-Hệ thống quản lý nhân sự toàn diện được phát triển bằng Python Flask.
+**🎯 Frontend + Backend 100% Python với Streamlit**
+
+Hệ thống quản lý nhân sự toàn diện đáp ứng đầy đủ 11 yêu cầu nghiệp vụ.
 
 ## Tính năng chính
 
@@ -42,11 +44,11 @@ pip install -r requirements.txt
 
 2. **Chạy ứng dụng:**
 ```bash
-python run.py
+python run_streamlit.py
 ```
 
 3. **Truy cập hệ thống:**
-- Mở trình duyệt: http://localhost:5000
+- Mở trình duyệt: http://localhost:8501
 - Đăng nhập:
   - **Tên đăng nhập:** admin
   - **Mật khẩu:** admin123
@@ -55,18 +57,23 @@ python run.py
 
 ```
 HRMS/
-├── app.py              # Ứng dụng Flask chính
-├── run.py              # File khởi chạy
-├── config.py           # Cấu hình ứng dụng
-├── models.py           # Database models
-├── utils.py            # Hàm tiện ích
-├── requirements.txt    # Dependencies
-├── templates/          # HTML templates
-├── static/            # CSS, JS files
-├── tests/             # Test files
-├── exports/           # File xuất ra
-└── instance/         # Database file
+├── streamlit_app.py      # Ứng dụng Streamlit chính (100% Python)
+├── run_streamlit.py      # Script khởi chạy
+├── models_streamlit.py   # Database models đầy đủ
+├── utils_streamlit.py    # Logic nghiệp vụ
+├── requirements.txt      # Dependencies Streamlit
+├── exports/             # File xuất ra
+└── hrms_streamlit.db    # SQLite database
 ```
+
+## ✨ Đặc điểm nổi bật
+
+- 🎯 **100% Python**: Frontend Streamlit + Backend Python
+- 📋 **Đầy đủ 11 chức năng**: Theo đúng yêu cầu nghiệp vụ
+- 💰 **Logic nâng lương phức tạp**: 36/24 tháng + phụ cấp thâm niên 
+- ⏰ **Cảnh báo thông minh**: Nghỉ hưu, nâng lương theo lịch
+- 📊 **Giao diện hiện đại**: Responsive, biểu đồ tương tác
+- 📄 **Xuất file chuyên nghiệp**: Word, Excel theo mẫu chuẩn
 
 ## Testing
 
