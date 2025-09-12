@@ -1401,124 +1401,873 @@ class HRMSDesktop:
                     fg_color=COLORS['success']).pack(side="left", padx=10)
     
     def show_work_history(self):
-        """Show work history interface"""
+        """Show comprehensive work history management with timeline"""
         self.clear_main_content()
         
-        title = ctk.CTkLabel(self.main_content, text="💼 Quá trình công tác", 
-                           font=ctk.CTkFont(size=20, weight="bold"))
-        title.pack(pady=20)
+        # Header
+        header_frame = ctk.CTkFrame(self.main_content, height=80, fg_color="#8b5cf6")
+        header_frame.pack(fill="x", padx=20, pady=20)
+        header_frame.pack_propagate(False)
         
-        content = ctk.CTkLabel(self.main_content, 
-                             text="🔧 Chức năng đang được phát triển...\n\n"
-                                  "Sẽ bao gồm:\n"
-                                  "• Timeline view\n"
-                                  "• Thêm/Sửa/Xóa giai đoạn\n"
-                                  "• Xuất Word/Excel",
-                             font=ctk.CTkFont(size=14))
-        content.pack(expand=True)
+        title = ctk.CTkLabel(header_frame, text="💼 Quá trình công tác", 
+                           font=ctk.CTkFont(size=24, weight="bold"), text_color="white")
+        title.pack(side="left", padx=20, pady=20)
+        
+        info_label = ctk.CTkLabel(header_frame, text="Timeline công tác | Thêm/Sửa/Xóa giai đoạn | Xuất hồ sơ", 
+                                font=ctk.CTkFont(size=11), text_color="white")
+        info_label.pack(side="right", padx=20, pady=20)
+        
+        # Employee selector
+        selector_frame = ctk.CTkFrame(self.main_content, height=60, fg_color=COLORS['background'])
+        selector_frame.pack(fill="x", padx=20, pady=10)
+        selector_frame.pack_propagate(False)
+        
+        ctk.CTkLabel(selector_frame, text="Chọn nhân viên:", font=ctk.CTkFont(size=14, weight="bold")).pack(side="left", padx=20, pady=15)
+        emp_combo = ctk.CTkOptionMenu(selector_frame, values=["NV001 - Nguyễn Văn A", "NV002 - Trần Thị B", "NV003 - Lê Văn C"], width=250)
+        emp_combo.pack(side="left", padx=10)
+        ctk.CTkButton(selector_frame, text="📋 Xem timeline", width=120).pack(side="right", padx=20)
+        
+        # Main content
+        content_frame = ctk.CTkScrollableFrame(self.main_content)
+        content_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        
+        # Work history timeline
+        timeline_title = ctk.CTkLabel(content_frame, text="📅 Timeline công tác - Nguyễn Văn A", 
+                                    font=ctk.CTkFont(size=16, weight="bold"))
+        timeline_title.pack(pady=(10, 20))
+        
+        # Timeline data
+        timeline_data = [
+            ("2024-01-15", "Hiện tại", "Chuyên viên chính", "Phòng TCHC", "Quản lý hồ sơ cán bộ", "Đang làm việc", "active"),
+            ("2022-03-01", "2023-12-31", "Chuyên viên", "Phòng TCHC", "Hỗ trợ công tác nhân sự", "Hoàn thành tốt", "completed"),
+            ("2020-08-15", "2022-02-28", "Nhân viên", "Phòng TCKT", "Công tác kế toán tổng hợp", "Chuyển phòng", "completed"),
+            ("2018-06-01", "2020-08-14", "Nhân viên", "Phòng TCKT", "Thực tập sinh → Nhân viên", "Kết thúc thử việc", "completed")
+        ]
+        
+        for i, (start_date, end_date, position, dept, duties, result, status) in enumerate(timeline_data):
+            # Timeline item
+            timeline_item = ctk.CTkFrame(content_frame, fg_color=COLORS['surface'], border_width=1, border_color=COLORS['background'])
+            timeline_item.pack(fill="x", pady=8)
+            
+            # Timeline connector
+            if i == 0:  # Current position
+                connector_color = COLORS['success']
+                status_icon = "🟢"
+            else:
+                connector_color = COLORS['primary']
+                status_icon = "🔵"
+            
+            connector_frame = ctk.CTkFrame(timeline_item, width=20, fg_color="transparent")
+            connector_frame.pack(side="left", fill="y", padx=(10, 0))
+            
+            ctk.CTkLabel(connector_frame, text=status_icon, font=ctk.CTkFont(size=16)).pack(pady=15)
+            
+            if i < len(timeline_data) - 1:  # Not the last item
+                ctk.CTkFrame(connector_frame, width=3, height=50, fg_color=connector_color).pack()
+            
+            # Timeline content
+            content_frame_inner = ctk.CTkFrame(timeline_item, fg_color="transparent")
+            content_frame_inner.pack(side="left", fill="both", expand=True, padx=15, pady=12)
+            
+            # Row 1: Period and position
+            row1 = ctk.CTkFrame(content_frame_inner, fg_color="transparent")
+            row1.pack(fill="x")
+            
+            period_text = f"{start_date} - {end_date}" if end_date != "Hiện tại" else f"{start_date} - Hiện tại"
+            ctk.CTkLabel(row1, text=period_text, font=ctk.CTkFont(size=11, weight="bold"), text_color=connector_color).pack(side="left")
+            ctk.CTkLabel(row1, text=f"{position} - {dept}", font=ctk.CTkFont(size=12, weight="bold")).pack(side="left", padx=(20, 0))
+            ctk.CTkLabel(row1, text=result, font=ctk.CTkFont(size=10), text_color=COLORS['text_secondary']).pack(side="right")
+            
+            # Row 2: Duties
+            row2 = ctk.CTkFrame(content_frame_inner, fg_color="transparent")
+            row2.pack(fill="x", pady=(3, 0))
+            
+            ctk.CTkLabel(row2, text=f"Nhiệm vụ: {duties}", font=ctk.CTkFont(size=10), text_color=COLORS['text_secondary']).pack(side="left")
+            
+            # Action buttons
+            actions_frame = ctk.CTkFrame(timeline_item, fg_color="transparent", width=100)
+            actions_frame.pack(side="right", padx=15)
+            actions_frame.pack_propagate(False)
+            
+            ctk.CTkButton(actions_frame, text="Sửa", width=60, height=25, font=ctk.CTkFont(size=9)).pack(pady=2)
+            if status != "active":
+                ctk.CTkButton(actions_frame, text="Xóa", width=60, height=25, fg_color=COLORS['error'], font=ctk.CTkFont(size=9)).pack(pady=2)
+        
+        # Add new period section
+        add_section = ctk.CTkFrame(content_frame, height=100, fg_color=COLORS['background'])
+        add_section.pack(fill="x", pady=20)
+        add_section.pack_propagate(False)
+        
+        add_title = ctk.CTkLabel(add_section, text="➕ Thêm giai đoạn mới", font=ctk.CTkFont(size=14, weight="bold"))
+        add_title.pack(pady=10)
+        
+        add_form = ctk.CTkFrame(add_section, fg_color="transparent")
+        add_form.pack(expand=True)
+        
+        # Form fields in a row
+        form_row = ctk.CTkFrame(add_form, fg_color="transparent")
+        form_row.pack()
+        
+        ctk.CTkEntry(form_row, placeholder_text="Từ ngày", width=100).pack(side="left", padx=5)
+        ctk.CTkEntry(form_row, placeholder_text="Đến ngày", width=100).pack(side="left", padx=5)
+        ctk.CTkEntry(form_row, placeholder_text="Chức vụ", width=120).pack(side="left", padx=5)
+        ctk.CTkEntry(form_row, placeholder_text="Đơn vị", width=100).pack(side="left", padx=5)
+        ctk.CTkButton(form_row, text="Thêm", width=80, fg_color=COLORS['success']).pack(side="left", padx=10)
+        
+        # Export section
+        export_frame = ctk.CTkFrame(content_frame, height=60)
+        export_frame.pack(fill="x", pady=20)
+        export_frame.pack_propagate(False)
+        
+        export_title = ctk.CTkLabel(export_frame, text="📤 Xuất hồ sơ công tác", font=ctk.CTkFont(size=14, weight="bold"))
+        export_title.pack(pady=10)
+        
+        export_buttons = ctk.CTkFrame(export_frame, fg_color="transparent")
+        export_buttons.pack()
+        
+        ctk.CTkButton(export_buttons, text="📄 Sơ yếu lý lịch", width=140).pack(side="left", padx=10)
+        ctk.CTkButton(export_buttons, text="📋 Quá trình công tác", width=140, fg_color=COLORS['primary']).pack(side="left", padx=10)
+        ctk.CTkButton(export_buttons, text="📊 Excel timeline", width=140, fg_color=COLORS['success']).pack(side="left", padx=10)
     
     def show_contracts(self):
-        """Show contracts interface"""
+        """Show comprehensive contract management for BKS and employees"""
         self.clear_main_content()
         
-        title = ctk.CTkLabel(self.main_content, text="📄 Hợp đồng lao động", 
-                           font=ctk.CTkFont(size=20, weight="bold"))
-        title.pack(pady=20)
+        # Header
+        header_frame = ctk.CTkFrame(self.main_content, height=80, fg_color="#f59e0b")
+        header_frame.pack(fill="x", padx=20, pady=20)
+        header_frame.pack_propagate(False)
         
-        content = ctk.CTkLabel(self.main_content, 
-                             text="🔧 Chức năng đang được phát triển...\n\n"
-                                  "Sẽ bao gồm:\n"
-                                  "• Quản lý BKS + nhân viên\n"
-                                  "• Cảnh báo hết hạn\n"
-                                  "• Gia hạn/Tạo mới",
-                             font=ctk.CTkFont(size=14))
-        content.pack(expand=True)
+        title = ctk.CTkLabel(header_frame, text="📄 Hợp đồng lao động", 
+                           font=ctk.CTkFont(size=24, weight="bold"), text_color="white")
+        title.pack(side="left", padx=20, pady=20)
+        
+        info_label = ctk.CTkLabel(header_frame, text="BKS + Nhân viên | Cảnh báo hết hạn | Gia hạn tự động", 
+                                font=ctk.CTkFont(size=11), text_color="white")
+        info_label.pack(side="right", padx=20, pady=20)
+        
+        content_frame = ctk.CTkScrollableFrame(self.main_content)
+        content_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        
+        # Contract statistics
+        stats_frame = ctk.CTkFrame(content_frame, height=120)
+        stats_frame.pack(fill="x", pady=15)
+        stats_frame.pack_propagate(False)
+        
+        contract_stats = [
+            ("Tổng HĐ", "156", COLORS['primary']),
+            ("Còn hiệu lực", "142", COLORS['success']),
+            ("Sắp hết hạn", "8", COLORS['warning']),
+            ("HĐ BKS", "14", "#f59e0b")
+        ]
+        
+        for i, (label, value, color) in enumerate(contract_stats):
+            card = ctk.CTkFrame(stats_frame, fg_color=color)
+            card.grid(row=0, column=i, padx=12, pady=10, sticky="ew")
+            ctk.CTkLabel(card, text=value, font=ctk.CTkFont(size=28, weight="bold"), text_color="white").pack(pady=8)
+            ctk.CTkLabel(card, text=label, font=ctk.CTkFont(size=10), text_color="white").pack(pady=5)
+        
+        for i in range(4):
+            stats_frame.grid_columnconfigure(i, weight=1)
+        
+        # Contract list
+        contract_title = ctk.CTkLabel(content_frame, text="📋 Danh sách hợp đồng", 
+                                    font=ctk.CTkFont(size=16, weight="bold"))
+        contract_title.pack(pady=(20, 10))
+        
+        contracts_data = [
+            ("NV001", "Nguyễn Văn A", "HĐ không xác định thời hạn", "2020-08-01", "Vô thời hạn", "Còn hiệu lực", "✅"),
+            ("BKS01", "Trần Thị B", "HĐ Ban kiểm soát", "2023-01-15", "2025-01-14", "Sắp hết hạn", "⚠️"),
+            ("NV025", "Lê Văn C", "HĐ có thời hạn 2 năm", "2022-06-01", "2024-05-31", "Hết hạn", "🚫"),
+            ("BKS02", "Phạm Thị D", "HĐ Ban kiểm soát", "2022-08-20", "2024-08-19", "Cần gia hạn", "⚠️"),
+            ("NV050", "Hoàng Văn E", "HĐ thử việc", "2024-01-10", "2024-03-09", "Chuyển chính thức", "✅")
+        ]
+        
+        for contract in contracts_data:
+            contract_frame = ctk.CTkFrame(content_frame, fg_color=COLORS['surface'], border_width=1, border_color=COLORS['background'])
+            contract_frame.pack(fill="x", pady=5)
+            
+            # Status indicator
+            status = contract[6]
+            if status == "✅":
+                indicator_color = COLORS['success']
+            elif status == "⚠️":
+                indicator_color = COLORS['warning']
+            else:
+                indicator_color = COLORS['error']
+            
+            ctk.CTkFrame(contract_frame, width=6, fg_color=indicator_color).pack(side="left", fill="y")
+            
+            # Contract info
+            info_frame = ctk.CTkFrame(contract_frame, fg_color="transparent")
+            info_frame.pack(side="left", fill="both", expand=True, padx=15, pady=10)
+            
+            # Row 1: Basic info
+            row1 = ctk.CTkFrame(info_frame, fg_color="transparent")
+            row1.pack(fill="x")
+            
+            employee_text = f"{contract[0]} - {contract[1]}"
+            if "BKS" in contract[0]:
+                employee_text += " (Ban kiểm soát)"
+            
+            ctk.CTkLabel(row1, text=employee_text, font=ctk.CTkFont(size=12, weight="bold")).pack(side="left")
+            ctk.CTkLabel(row1, text=f"{status} {contract[5]}", font=ctk.CTkFont(size=10, weight="bold"), text_color=indicator_color).pack(side="right")
+            
+            # Row 2: Contract details
+            row2 = ctk.CTkFrame(info_frame, fg_color="transparent")
+            row2.pack(fill="x", pady=(3, 0))
+            
+            contract_detail = f"{contract[2]} | {contract[3]} → {contract[4]}"
+            ctk.CTkLabel(row2, text=contract_detail, font=ctk.CTkFont(size=10), text_color=COLORS['text_secondary']).pack(side="left")
+            
+            # Action buttons
+            actions_frame = ctk.CTkFrame(contract_frame, fg_color="transparent", width=120)
+            actions_frame.pack(side="right", padx=15)
+            actions_frame.pack_propagate(False)
+            
+            ctk.CTkButton(actions_frame, text="Chi tiết", width=80, height=25, font=ctk.CTkFont(size=9)).pack(pady=2)
+            
+            if "Sắp hết hạn" in contract[5] or "Cần gia hạn" in contract[5]:
+                ctk.CTkButton(actions_frame, text="Gia hạn", width=80, height=25, fg_color=COLORS['warning'], font=ctk.CTkFont(size=9)).pack(pady=2)
+            elif "Hết hạn" in contract[5]:
+                ctk.CTkButton(actions_frame, text="Tạo mới", width=80, height=25, fg_color=COLORS['success'], font=ctk.CTkFont(size=9)).pack(pady=2)
+        
+        # Export section
+        export_frame = ctk.CTkFrame(content_frame, height=60)
+        export_frame.pack(fill="x", pady=20)
+        export_frame.pack_propagate(False)
+        
+        export_title = ctk.CTkLabel(export_frame, text="📤 Báo cáo hợp đồng", font=ctk.CTkFont(size=14, weight="bold"))
+        export_title.pack(pady=10)
+        
+        export_buttons = ctk.CTkFrame(export_frame, fg_color="transparent")
+        export_buttons.pack()
+        
+        ctk.CTkButton(export_buttons, text="📊 Tổng hợp HĐ", width=140).pack(side="left", padx=10)
+        ctk.CTkButton(export_buttons, text="⚠️ Cảnh báo hết hạn", width=140, fg_color=COLORS['warning']).pack(side="left", padx=10)
+        ctk.CTkButton(export_buttons, text="📈 Excel BKS", width=140, fg_color="#f59e0b").pack(side="left", padx=10)
     
     def show_appointment_check(self):
-        """Show appointment check interface"""
+        """Show comprehensive appointment condition checking"""
         self.clear_main_content()
         
-        title = ctk.CTkLabel(self.main_content, text="✅ Điều kiện bổ nhiệm", 
-                           font=ctk.CTkFont(size=20, weight="bold"))
-        title.pack(pady=20)
+        # Header
+        header_frame = ctk.CTkFrame(self.main_content, height=80, fg_color=COLORS['success'])
+        header_frame.pack(fill="x", padx=20, pady=20)
+        header_frame.pack_propagate(False)
         
-        content = ctk.CTkLabel(self.main_content, 
-                             text="🔧 Chức năng đang được phát triển...\n\n"
-                                  "Sẽ bao gồm:\n"
-                                  "• Kiểm tra đầy đủ điều kiện\n"
-                                  "• Cảnh báo bổ nhiệm lại 90 ngày\n"
-                                  "• Thống kê và báo cáo",
-                             font=ctk.CTkFont(size=14))
-        content.pack(expand=True)
+        title = ctk.CTkLabel(header_frame, text="✅ Điều kiện bổ nhiệm", 
+                           font=ctk.CTkFont(size=24, weight="bold"), text_color="white")
+        title.pack(side="left", padx=20, pady=20)
+        
+        info_label = ctk.CTkLabel(header_frame, text="Kiểm tra đầy đủ | Cảnh báo 90 ngày | Hồ sơ đề xuất", 
+                                font=ctk.CTkFont(size=11), text_color="white")
+        info_label.pack(side="right", padx=20, pady=20)
+        
+        content_frame = ctk.CTkScrollableFrame(self.main_content)
+        content_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        
+        # Check form
+        check_frame = ctk.CTkFrame(content_frame, height=100, fg_color=COLORS['background'])
+        check_frame.pack(fill="x", pady=15)
+        check_frame.pack_propagate(False)
+        
+        ctk.CTkLabel(check_frame, text="🔍 Kiểm tra điều kiện bổ nhiệm", font=ctk.CTkFont(size=14, weight="bold")).pack(pady=10)
+        
+        form_row = ctk.CTkFrame(check_frame, fg_color="transparent")
+        form_row.pack()
+        
+        ctk.CTkLabel(form_row, text="Nhân viên:").pack(side="left", padx=10)
+        emp_combo = ctk.CTkOptionMenu(form_row, values=["NV001 - Nguyễn Văn A", "NV002 - Trần Thị B"], width=200)
+        emp_combo.pack(side="left", padx=10)
+        
+        ctk.CTkLabel(form_row, text="Vị trí:").pack(side="left", padx=10)
+        pos_combo = ctk.CTkOptionMenu(form_row, values=["Trưởng phòng", "Phó Trưởng phòng", "Chuyên viên chính"], width=150)
+        pos_combo.pack(side="left", padx=10)
+        
+        ctk.CTkButton(form_row, text="🔍 Kiểm tra", width=100, fg_color=COLORS['primary']).pack(side="left", padx=20)
+        
+        # Check results
+        results_title = ctk.CTkLabel(content_frame, text="📋 Kết quả kiểm tra - Nguyễn Văn A → Trưởng phòng", 
+                                   font=ctk.CTkFont(size=16, weight="bold"))
+        results_title.pack(pady=(20, 10))
+        
+        conditions = [
+            ("✅", "Quy hoạch", "Có trong quy hoạch Trưởng phòng (2022-2027)", COLORS['success']),
+            ("✅", "Học vấn", "Thạc sĩ Luật - Đạt yêu cầu tối thiểu Đại học", COLORS['success']),
+            ("✅", "Chứng chỉ", "Có chứng chỉ Quản lý Nhà nước hạng III", COLORS['success']),
+            ("✅", "Kinh nghiệm", "8 năm kinh nghiệm (≥5 năm yêu cầu)", COLORS['success']),
+            ("⚠️", "Tuổi", "38 tuổi - Gần giới hạn tối đa 40 tuổi", COLORS['warning']),
+            ("✅", "Đánh giá", "Hoàn thành tốt nhiệm vụ 3 năm liên tiếp", COLORS['success'])
+        ]
+        
+        for status, condition, detail, color in conditions:
+            cond_frame = ctk.CTkFrame(content_frame, fg_color=COLORS['surface'], border_width=1, border_color=color)
+            cond_frame.pack(fill="x", pady=3)
+            
+            ctk.CTkFrame(cond_frame, width=5, fg_color=color).pack(side="left", fill="y")
+            
+            info_frame = ctk.CTkFrame(cond_frame, fg_color="transparent")
+            info_frame.pack(fill="both", expand=True, padx=15, pady=8)
+            
+            row = ctk.CTkFrame(info_frame, fg_color="transparent")
+            row.pack(fill="x")
+            
+            ctk.CTkLabel(row, text=status, font=ctk.CTkFont(size=14)).pack(side="left")
+            ctk.CTkLabel(row, text=condition, font=ctk.CTkFont(size=12, weight="bold")).pack(side="left", padx=(10, 0))
+            ctk.CTkLabel(row, text=detail, font=ctk.CTkFont(size=10), text_color=COLORS['text_secondary']).pack(side="left", padx=(20, 0))
+        
+        # Overall result
+        result_frame = ctk.CTkFrame(content_frame, height=60, fg_color=COLORS['success'])
+        result_frame.pack(fill="x", pady=20)
+        result_frame.pack_propagate(False)
+        
+        ctk.CTkLabel(result_frame, text="🎉 ĐỦ ĐIỀU KIỆN BỔ NHIỆM", font=ctk.CTkFont(size=16, weight="bold"), text_color="white").pack(pady=15)
+        
+        # Reappointment alerts
+        alerts_title = ctk.CTkLabel(content_frame, text="⏰ Cảnh báo bổ nhiệm lại (90 ngày)", 
+                                  font=ctk.CTkFont(size=16, weight="bold"))
+        alerts_title.pack(pady=(20, 10))
+        
+        reappointments = [
+            ("NV010", "Lê Thị Mai", "Phó Trưởng phòng", "2024-03-15", "45 ngày", "🚨"),
+            ("NV015", "Phạm Văn Đức", "Trưởng phòng", "2024-04-20", "78 ngày", "⚠️"),
+            ("NV020", "Hoàng Thị Lan", "Chuyên viên chính", "2024-05-10", "98 ngày", "📢")
+        ]
+        
+        for emp_id, name, position, reappoint_date, days_left, priority in reappointments:
+            alert_frame = ctk.CTkFrame(content_frame, fg_color=COLORS['background'], height=50)
+            alert_frame.pack(fill="x", pady=3)
+            alert_frame.pack_propagate(False)
+            
+            content_frame_inner = ctk.CTkFrame(alert_frame, fg_color="transparent")
+            content_frame_inner.pack(fill="both", expand=True, padx=15, pady=8)
+            
+            ctk.CTkLabel(content_frame_inner, text=priority, font=ctk.CTkFont(size=14)).pack(side="left")
+            ctk.CTkLabel(content_frame_inner, text=f"{emp_id} - {name}", font=ctk.CTkFont(size=11, weight="bold")).pack(side="left", padx=(10, 0))
+            ctk.CTkLabel(content_frame_inner, text=f"{position} - Còn {days_left}", font=ctk.CTkFont(size=10), text_color=COLORS['text_secondary']).pack(side="left", padx=(15, 0))
+            ctk.CTkButton(content_frame_inner, text="Kiểm tra", width=80, height=25, font=ctk.CTkFont(size=9)).pack(side="right")
+        
+        # Export section
+        export_frame = ctk.CTkFrame(content_frame, height=60)
+        export_frame.pack(fill="x", pady=20)
+        export_frame.pack_propagate(False)
+        
+        export_title = ctk.CTkLabel(export_frame, text="📤 Hồ sơ đề xuất", font=ctk.CTkFont(size=14, weight="bold"))
+        export_title.pack(pady=10)
+        
+        export_buttons = ctk.CTkFrame(export_frame, fg_color="transparent")
+        export_buttons.pack()
+        
+        ctk.CTkButton(export_buttons, text="📋 Tờ trình đề xuất", width=140).pack(side="left", padx=10)
+        ctk.CTkButton(export_buttons, text="📊 Báo cáo điều kiện", width=140, fg_color=COLORS['primary']).pack(side="left", padx=10)
+        ctk.CTkButton(export_buttons, text="📈 Thống kê BN", width=140, fg_color=COLORS['success']).pack(side="left", padx=10)
     
     def show_award_check(self):
-        """Show award check interface"""
+        """Show comprehensive award condition checking"""
         self.clear_main_content()
         
-        title = ctk.CTkLabel(self.main_content, text="🏆 Điều kiện khen thưởng", 
-                           font=ctk.CTkFont(size=20, weight="bold"))
-        title.pack(pady=20)
+        # Header
+        header_frame = ctk.CTkFrame(self.main_content, height=80, fg_color="#8b5cf6")
+        header_frame.pack(fill="x", padx=20, pady=20)
+        header_frame.pack_propagate(False)
         
-        content = ctk.CTkLabel(self.main_content, 
-                             text="🔧 Chức năng đang được phát triển...\n\n"
-                                  "Sẽ bao gồm:\n"
-                                  "• Kiểm tra tiêu chí khen thưởng\n"
-                                  "• Đánh giá đầy đủ điều kiện\n"
-                                  "• Đề xuất khen thưởng",
-                             font=ctk.CTkFont(size=14))
-        content.pack(expand=True)
+        title = ctk.CTkLabel(header_frame, text="🏆 Điều kiện khen thưởng", 
+                           font=ctk.CTkFont(size=24, weight="bold"), text_color="white")
+        title.pack(side="left", padx=20, pady=20)
+        
+        info_label = ctk.CTkLabel(header_frame, text="Tiêu chí khen thưởng | Đánh giá thành tích | Đề xuất", 
+                                font=ctk.CTkFont(size=11), text_color="white")
+        info_label.pack(side="right", padx=20, pady=20)
+        
+        content_frame = ctk.CTkScrollableFrame(self.main_content)
+        content_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        
+        # Award form
+        form_frame = ctk.CTkFrame(content_frame, height=80, fg_color=COLORS['background'])
+        form_frame.pack(fill="x", pady=15)
+        form_frame.pack_propagate(False)
+        
+        ctk.CTkLabel(form_frame, text="🔍 Kiểm tra tiêu chuẩn khen thưởng", font=ctk.CTkFont(size=14, weight="bold")).pack(pady=10)
+        
+        form_row = ctk.CTkFrame(form_frame, fg_color="transparent")
+        form_row.pack()
+        
+        ctk.CTkLabel(form_row, text="Nhân viên:").pack(side="left", padx=10)
+        ctk.CTkOptionMenu(form_row, values=["NV001 - Nguyễn Văn A", "NV002 - Trần Thị B"], width=180).pack(side="left", padx=10)
+        
+        ctk.CTkLabel(form_row, text="Loại khen thưởng:").pack(side="left", padx=10)
+        ctk.CTkOptionMenu(form_row, values=["Giấy khen cá nhân", "Bằng khen cục trưởng", "Lao động tiên tiến"], width=150).pack(side="left", padx=10)
+        
+        ctk.CTkButton(form_row, text="🔍 Kiểm tra", width=100, fg_color="#8b5cf6").pack(side="left", padx=20)
+        
+        # Award criteria results
+        criteria_title = ctk.CTkLabel(content_frame, text="📋 Tiêu chí đánh giá - Nguyễn Văn A (Giấy khen cá nhân)", 
+                                    font=ctk.CTkFont(size=16, weight="bold"))
+        criteria_title.pack(pady=(20, 10))
+        
+        award_criteria = [
+            ("✅", "Hoàn thành nhiệm vụ", "Hoàn thành xuất sắc nhiệm vụ được giao năm 2023", COLORS['success']),
+            ("✅", "Không vi phạm kỷ luật", "Không có hình thức kỷ luật nào trong 12 tháng qua", COLORS['success']),
+            ("✅", "Thành tích nổi bật", "Tổ chức thành công dự án số hóa hồ sơ nhân sự", COLORS['success']),
+            ("✅", "Thời gian công tác", "6 năm kinh nghiệm làm việc (≥1 năm yêu cầu)", COLORS['success']),
+            ("⚠️", "Lần khen thưởng gần nhất", "Lần cuối nhận khen thưởng: 8 tháng trước (khuyến khích ít nhất 12 tháng)", COLORS['warning'])
+        ]
+        
+        for status, criterion, detail, color in award_criteria:
+            criteria_frame = ctk.CTkFrame(content_frame, fg_color=COLORS['surface'], border_width=1, border_color=color)
+            criteria_frame.pack(fill="x", pady=3)
+            
+            ctk.CTkFrame(criteria_frame, width=5, fg_color=color).pack(side="left", fill="y")
+            
+            info_frame = ctk.CTkFrame(criteria_frame, fg_color="transparent")
+            info_frame.pack(fill="both", expand=True, padx=15, pady=8)
+            
+            row = ctk.CTkFrame(info_frame, fg_color="transparent")
+            row.pack(fill="x")
+            
+            ctk.CTkLabel(row, text=status, font=ctk.CTkFont(size=14)).pack(side="left")
+            ctk.CTkLabel(row, text=criterion, font=ctk.CTkFont(size=12, weight="bold")).pack(side="left", padx=(10, 0))
+            ctk.CTkLabel(row, text=detail, font=ctk.CTkFont(size=10), text_color=COLORS['text_secondary']).pack(side="left", padx=(20, 0))
+        
+        # Award result
+        result_frame = ctk.CTkFrame(content_frame, height=60, fg_color=COLORS['warning'])
+        result_frame.pack(fill="x", pady=20)
+        result_frame.pack_propagate(False)
+        
+        ctk.CTkLabel(result_frame, text="⚠️ CầN XÂN NHẮC THỜI GIAN KHEN THƯỜNG LẦN TRƯỚC", 
+                    font=ctk.CTkFont(size=14, weight="bold"), text_color="white").pack(pady=15)
+        
+        # Award candidates list
+        candidates_title = ctk.CTkLabel(content_frame, text="🎖️ Ưu tiên khen thưởng năm 2024", 
+                                      font=ctk.CTkFont(size=16, weight="bold"))
+        candidates_title.pack(pady=(20, 10))
+        
+        candidates = [
+            ("NV005", "Hoàng Văn Tâm", "Sáng kiến cải tiến quy trình", "Giấy khen", "✅"),
+            ("NV012", "Nguyễn Thị Họng", "Dẫn đầu dự án ISO 9001:2015", "Bằng khen", "✅"),
+            ("NV018", "Lê Văn Quân", "10 năm không nghỉ phép", "Lao động tiên tiến", "✅"),
+            ("NV025", "Trần Thị Mai", "Hỗ trợ đồng nghiệp vượt khó COVID", "Giấy khen", "⚠️")
+        ]
+        
+        for emp_id, name, achievement, award_type, status in candidates:
+            cand_frame = ctk.CTkFrame(content_frame, fg_color=COLORS['background'], height=50)
+            cand_frame.pack(fill="x", pady=3)
+            cand_frame.pack_propagate(False)
+            
+            content_frame_inner = ctk.CTkFrame(cand_frame, fg_color="transparent")
+            content_frame_inner.pack(fill="both", expand=True, padx=15, pady=8)
+            
+            ctk.CTkLabel(content_frame_inner, text=status, font=ctk.CTkFont(size=14)).pack(side="left")
+            ctk.CTkLabel(content_frame_inner, text=f"{emp_id} - {name}", font=ctk.CTkFont(size=11, weight="bold")).pack(side="left", padx=(10, 0))
+            ctk.CTkLabel(content_frame_inner, text=achievement, font=ctk.CTkFont(size=10), text_color=COLORS['text_secondary']).pack(side="left", padx=(15, 0))
+            ctk.CTkLabel(content_frame_inner, text=award_type, font=ctk.CTkFont(size=10, weight="bold"), text_color="#8b5cf6").pack(side="right", padx=(0, 10))
+            
+            if status == "✅":
+                ctk.CTkButton(content_frame_inner, text="Đề xuất", width=80, height=25, fg_color="#8b5cf6", font=ctk.CTkFont(size=9)).pack(side="right")
+        
+        # Export section
+        export_frame = ctk.CTkFrame(content_frame, height=60)
+        export_frame.pack(fill="x", pady=20)
+        export_frame.pack_propagate(False)
+        
+        export_title = ctk.CTkLabel(export_frame, text="📤 Đề xuất khen thưởng", font=ctk.CTkFont(size=14, weight="bold"))
+        export_title.pack(pady=10)
+        
+        export_buttons = ctk.CTkFrame(export_frame, fg_color="transparent")
+        export_buttons.pack()
+        
+        ctk.CTkButton(export_buttons, text="📋 Tờ trình đề xuất", width=140).pack(side="left", padx=10)
+        ctk.CTkButton(export_buttons, text="🏆 Danh sách ưu tiên", width=140, fg_color="#8b5cf6").pack(side="left", padx=10)
+        ctk.CTkButton(export_buttons, text="📈 Thống kê KT", width=140, fg_color=COLORS['success']).pack(side="left", padx=10)
     
     def show_early_salary(self):
-        """Show early salary interface"""
+        """Show early salary increase management for outstanding achievements"""
         self.clear_main_content()
         
-        title = ctk.CTkLabel(self.main_content, text="⚡ Nâng lương trước hạn", 
-                           font=ctk.CTkFont(size=20, weight="bold"))
-        title.pack(pady=20)
+        # Header
+        header_frame = ctk.CTkFrame(self.main_content, height=80, fg_color="#f59e0b")
+        header_frame.pack(fill="x", padx=20, pady=20)
+        header_frame.pack_propagate(False)
         
-        content = ctk.CTkLabel(self.main_content, 
-                             text="🔧 Chức năng đang được phát triển...\n\n"
-                                  "Sẽ bao gồm:\n"
-                                  "• Quản lý đề xuất\n"
-                                  "• Phê duyệt thành tích\n"
-                                  "• Xuất quyết định",
-                             font=ctk.CTkFont(size=14))
-        content.pack(expand=True)
+        title = ctk.CTkLabel(header_frame, text="⚡ Nâng lương trước hạn", 
+                           font=ctk.CTkFont(size=24, weight="bold"), text_color="white")
+        title.pack(side="left", padx=20, pady=20)
+        
+        info_label = ctk.CTkLabel(header_frame, text="Thành tích xuất sắc | Đánh giá đặc biệt | Quyết định nâng lương", 
+                                font=ctk.CTkFont(size=11), text_color="white")
+        info_label.pack(side="right", padx=20, pady=20)
+        
+        content_frame = ctk.CTkScrollableFrame(self.main_content)
+        content_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        
+        # Early salary statistics
+        stats_frame = ctk.CTkFrame(content_frame, height=100)
+        stats_frame.pack(fill="x", pady=15)
+        stats_frame.pack_propagate(False)
+        
+        early_stats = [
+            ("Đề xuất mới", "6", COLORS['primary']),
+            ("Đang xét duyệt", "4", COLORS['warning']),
+            ("Đã phê duyệt", "8", COLORS['success']),
+            ("Từ chối", "2", COLORS['error'])
+        ]
+        
+        for i, (label, value, color) in enumerate(early_stats):
+            card = ctk.CTkFrame(stats_frame, fg_color=color)
+            card.grid(row=0, column=i, padx=12, pady=10, sticky="ew")
+            ctk.CTkLabel(card, text=value, font=ctk.CTkFont(size=24, weight="bold"), text_color="white").pack(pady=8)
+            ctk.CTkLabel(card, text=label, font=ctk.CTkFont(size=10), text_color="white").pack(pady=5)
+        
+        for i in range(4):
+            stats_frame.grid_columnconfigure(i, weight=1)
+        
+        # Early salary candidates
+        candidates_title = ctk.CTkLabel(content_frame, text="🎆 Ứng viên nâng lương trước hạn", 
+                                      font=ctk.CTkFont(size=16, weight="bold"))
+        candidates_title.pack(pady=(20, 10))
+        
+        early_candidates = [
+            ("NV008", "Nguyễn Thị Linh", "A1/2.67", "A2/3.0", "Sáng kiến tiết kiệm 50M/năm", "Chờ duyệt", "⚡"),
+            ("NV015", "Trần Văn Minh", "A2/3.33", "A2/3.66", "Lãnh đạo dự án thành công", "Đã duyệt", "✅"),
+            ("NV022", "Lê Thị Hoa", "B1/2.1", "B1/2.34", "Giải nhất sáng kiến cấp Bộ", "Đã duyệt", "✅"),
+            ("NV035", "Phạm Văn Đức", "A1/2.34", "A1/2.67", "Nghiên cứu khoa học được ứng dụng", "Chờ duyệt", "⚡"),
+            ("NV041", "Hoàng Thị Mai", "A2/3.0", "A2/3.33", "Giải quyết sự cố nghiêm trọng", "Từ chối", "❌")
+        ]
+        
+        for emp_id, name, current_salary, proposed_salary, achievement, status, icon in early_candidates:
+            candidate_frame = ctk.CTkFrame(content_frame, fg_color=COLORS['surface'], border_width=1, border_color=COLORS['background'])
+            candidate_frame.pack(fill="x", pady=5)
+            
+            # Status indicator
+            if "✅" in icon:
+                indicator_color = COLORS['success']
+            elif "⚡" in icon:
+                indicator_color = "#f59e0b"
+            else:
+                indicator_color = COLORS['error']
+            
+            ctk.CTkFrame(candidate_frame, width=6, fg_color=indicator_color).pack(side="left", fill="y")
+            
+            # Candidate info
+            info_frame = ctk.CTkFrame(candidate_frame, fg_color="transparent")
+            info_frame.pack(side="left", fill="both", expand=True, padx=15, pady=10)
+            
+            # Row 1: Basic info
+            row1 = ctk.CTkFrame(info_frame, fg_color="transparent")
+            row1.pack(fill="x")
+            
+            ctk.CTkLabel(row1, text=icon, font=ctk.CTkFont(size=14)).pack(side="left")
+            ctk.CTkLabel(row1, text=f"{emp_id} - {name}", font=ctk.CTkFont(size=12, weight="bold")).pack(side="left", padx=(10, 0))
+            ctk.CTkLabel(row1, text=status, font=ctk.CTkFont(size=10, weight="bold"), text_color=indicator_color).pack(side="right")
+            
+            # Row 2: Salary and achievement
+            row2 = ctk.CTkFrame(info_frame, fg_color="transparent")
+            row2.pack(fill="x", pady=(3, 0))
+            
+            salary_text = f"{current_salary} → {proposed_salary}"
+            ctk.CTkLabel(row2, text=salary_text, font=ctk.CTkFont(size=10, weight="bold"), text_color=COLORS['success']).pack(side="left")
+            ctk.CTkLabel(row2, text=achievement, font=ctk.CTkFont(size=10), text_color=COLORS['text_secondary']).pack(side="left", padx=(20, 0))
+            
+            # Action buttons
+            actions_frame = ctk.CTkFrame(candidate_frame, fg_color="transparent", width=120)
+            actions_frame.pack(side="right", padx=15)
+            actions_frame.pack_propagate(False)
+            
+            if "Chờ duyệt" in status:
+                ctk.CTkButton(actions_frame, text="Phê duyệt", width=80, height=25, fg_color=COLORS['success'], font=ctk.CTkFont(size=9)).pack(pady=2)
+                ctk.CTkButton(actions_frame, text="Từ chối", width=80, height=25, fg_color=COLORS['error'], font=ctk.CTkFont(size=9)).pack(pady=2)
+            elif "Đã duyệt" in status:
+                ctk.CTkButton(actions_frame, text="Xuất QĐ", width=80, height=25, fg_color="#f59e0b", font=ctk.CTkFont(size=9)).pack(pady=2)
+                ctk.CTkButton(actions_frame, text="Chi tiết", width=80, height=25, font=ctk.CTkFont(size=9)).pack(pady=2)
+            else:
+                ctk.CTkButton(actions_frame, text="Lý do", width=80, height=25, font=ctk.CTkFont(size=9)).pack(pady=2)
+                ctk.CTkButton(actions_frame, text="Xét lại", width=80, height=25, fg_color=COLORS['warning'], font=ctk.CTkFont(size=9)).pack(pady=2)
+        
+        # Add new nomination
+        add_frame = ctk.CTkFrame(content_frame, height=80, fg_color=COLORS['background'])
+        add_frame.pack(fill="x", pady=20)
+        add_frame.pack_propagate(False)
+        
+        ctk.CTkLabel(add_frame, text="➕ Đề xuất nâng lương trước hạn mới", font=ctk.CTkFont(size=14, weight="bold")).pack(pady=10)
+        
+        add_row = ctk.CTkFrame(add_frame, fg_color="transparent")
+        add_row.pack()
+        
+        ctk.CTkOptionMenu(add_row, values=["NV050 - Nguyễn Văn Tân", "NV055 - Trần Thị Lan"], width=180).pack(side="left", padx=10)
+        ctk.CTkEntry(add_row, placeholder_text="Thành tích xuất sắc", width=200).pack(side="left", padx=10)
+        ctk.CTkButton(add_row, text="Đề xuất", width=100, fg_color="#f59e0b").pack(side="left", padx=10)
+        
+        # Export section
+        export_frame = ctk.CTkFrame(content_frame, height=60)
+        export_frame.pack(fill="x", pady=20)
+        export_frame.pack_propagate(False)
+        
+        export_title = ctk.CTkLabel(export_frame, text="📤 Quyết định nâng lương", font=ctk.CTkFont(size=14, weight="bold"))
+        export_title.pack(pady=10)
+        
+        export_buttons = ctk.CTkFrame(export_frame, fg_color="transparent")
+        export_buttons.pack()
+        
+        ctk.CTkButton(export_buttons, text="📋 Tờ trình đề xuất", width=140).pack(side="left", padx=10)
+        ctk.CTkButton(export_buttons, text="📄 Quyết định", width=140, fg_color="#f59e0b").pack(side="left", padx=10)
+        ctk.CTkButton(export_buttons, text="📈 Báo cáo năm", width=140, fg_color=COLORS['success']).pack(side="left", padx=10)
     
     def show_reports(self):
-        """Show reports interface"""
+        """Show comprehensive statistical reports and analysis"""
         self.clear_main_content()
         
-        title = ctk.CTkLabel(self.main_content, text="📊 Báo cáo thống kê", 
-                           font=ctk.CTkFont(size=20, weight="bold"))
-        title.pack(pady=20)
+        # Header
+        header_frame = ctk.CTkFrame(self.main_content, height=80, fg_color=COLORS['primary'])
+        header_frame.pack(fill="x", padx=20, pady=20)
+        header_frame.pack_propagate(False)
         
-        content = ctk.CTkLabel(self.main_content, 
-                             text="🔧 Chức năng đang được phát triển...\n\n"
-                                  "Sẽ bao gồm:\n"
-                                  "• Thống kê toàn diện\n"
-                                  "• Phân tích thôi việc\n"
-                                  "• Cơ cấu nhân sự\n"
-                                  "• Charts tương tác",
-                             font=ctk.CTkFont(size=14))
-        content.pack(expand=True)
+        title = ctk.CTkLabel(header_frame, text="📊 Báo cáo thống kê", 
+                           font=ctk.CTkFont(size=24, weight="bold"), text_color="white")
+        title.pack(side="left", padx=20, pady=20)
+        
+        info_label = ctk.CTkLabel(header_frame, text="Charts | Phân tích cơ cấu | Báo cáo toàn diện", 
+                                font=ctk.CTkFont(size=11), text_color="white")
+        info_label.pack(side="right", padx=20, pady=20)
+        
+        content_frame = ctk.CTkScrollableFrame(self.main_content)
+        content_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        
+        # Key statistics
+        key_stats = ctk.CTkFrame(content_frame, height=160)
+        key_stats.pack(fill="x", pady=15)
+        key_stats.pack_propagate(False)
+        
+        ctk.CTkLabel(key_stats, text="📋 Tổng quan chỉ tiêu chính", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=10)
+        
+        stats_grid = ctk.CTkFrame(key_stats, fg_color="transparent")
+        stats_grid.pack(fill="x", padx=20, pady=10)
+        
+        key_metrics = [
+            ("Tổng nhân sự", "156", COLORS['primary']), ("Nâng lương 2024", "43", COLORS['success']),
+            ("Nghỉ hưu 2024", "8", COLORS['warning']), ("Thôi việc", "12", COLORS['error']),
+            ("Khen thưởng", "25", "#8b5cf6"), ("HĐ hết hạn", "14", "#f59e0b")
+        ]
+        
+        for i, (label, value, color) in enumerate(key_metrics):
+            card = ctk.CTkFrame(stats_grid, fg_color=color, width=180)
+            card.grid(row=i//3, column=i%3, padx=8, pady=5, sticky="ew")
+            
+            ctk.CTkLabel(card, text=value, font=ctk.CTkFont(size=24, weight="bold"), text_color="white").pack(pady=8)
+            ctk.CTkLabel(card, text=label, font=ctk.CTkFont(size=11), text_color="white").pack(pady=5)
+        
+        for i in range(3):
+            stats_grid.grid_columnconfigure(i, weight=1)
+        
+        # Age structure
+        age_section = ctk.CTkFrame(content_frame, fg_color=COLORS['surface'])
+        age_section.pack(fill="x", pady=20)
+        
+        age_header = ctk.CTkFrame(age_section, height=40, fg_color="#8b5cf6")
+        age_header.pack(fill="x")
+        age_header.pack_propagate(False)
+        
+        ctk.CTkLabel(age_header, text="🎂 Phân tích cơ cấu tuổi", font=ctk.CTkFont(size=14, weight="bold"), text_color="white").pack(side="left", padx=15, pady=10)
+        
+        age_content = ctk.CTkFrame(age_section, fg_color="transparent")
+        age_content.pack(fill="x", padx=15, pady=15)
+        
+        age_groups = [
+            ("Dưới 30 tuổi", "28 người (18%)", COLORS['success']),
+            ("30-40 tuổi", "52 người (33%)", COLORS['primary']),
+            ("40-50 tuổi", "45 người (29%)", COLORS['warning']),
+            ("Trên 50 tuổi", "31 người (20%)", COLORS['error'])
+        ]
+        
+        for group, count, color in age_groups:
+            group_frame = ctk.CTkFrame(age_content, fg_color=COLORS['background'], height=35)
+            group_frame.pack(fill="x", pady=3)
+            group_frame.pack_propagate(False)
+            
+            info_frame = ctk.CTkFrame(group_frame, fg_color="transparent")
+            info_frame.pack(fill="both", expand=True, padx=15, pady=5)
+            
+            ctk.CTkLabel(info_frame, text=group, font=ctk.CTkFont(size=11, weight="bold")).pack(side="left")
+            ctk.CTkLabel(info_frame, text=count, font=ctk.CTkFont(size=11), text_color=color).pack(side="right")
+        
+        # Qualifications
+        qual_section = ctk.CTkFrame(content_frame, fg_color=COLORS['surface'])
+        qual_section.pack(fill="x", pady=20)
+        
+        qual_header = ctk.CTkFrame(qual_section, height=40, fg_color=COLORS['success'])
+        qual_header.pack(fill="x")
+        qual_header.pack_propagate(False)
+        
+        ctk.CTkLabel(qual_header, text="🎓 Cơ cấu học vấn", font=ctk.CTkFont(size=14, weight="bold"), text_color="white").pack(side="left", padx=15, pady=10)
+        
+        qual_grid = ctk.CTkFrame(qual_section, fg_color="transparent")
+        qual_grid.pack(fill="x", padx=15, pady=15)
+        
+        qualifications = [
+            ("Tiến sĩ: 8 (5%)", COLORS['error']), ("Thạc sĩ: 45 (29%)", COLORS['success']),
+            ("Đại học: 85 (54%)", COLORS['primary']), ("Cao đẳng: 15 (10%)", COLORS['warning']),
+            ("Lý luật III: 65", "#8b5cf6"), ("An ninh III: 32", "#f59e0b")
+        ]
+        
+        for i, (qual, color) in enumerate(qualifications):
+            qual_item = ctk.CTkFrame(qual_grid, fg_color=COLORS['background'], height=35)
+            qual_item.grid(row=i//3, column=i%3, padx=5, pady=3, sticky="ew")
+            qual_item.pack_propagate(False)
+            
+            ctk.CTkLabel(qual_item, text=qual, font=ctk.CTkFont(size=10), text_color=color).pack(pady=8)
+        
+        for i in range(3):
+            qual_grid.grid_columnconfigure(i, weight=1)
+        
+        # Export buttons
+        export_frame = ctk.CTkFrame(content_frame, height=80)
+        export_frame.pack(fill="x", pady=20)
+        export_frame.pack_propagate(False)
+        
+        export_title = ctk.CTkLabel(export_frame, text="📤 Xuất báo cáo", font=ctk.CTkFont(size=14, weight="bold"))
+        export_title.pack(pady=10)
+        
+        export_buttons = ctk.CTkFrame(export_frame, fg_color="transparent")
+        export_buttons.pack()
+        
+        ctk.CTkButton(export_buttons, text="📈 Tháng", width=120, fg_color=COLORS['primary']).pack(side="left", padx=10)
+        ctk.CTkButton(export_buttons, text="📊 Quý", width=120, fg_color=COLORS['success']).pack(side="left", padx=10)
+        ctk.CTkButton(export_buttons, text="📉 Năm", width=120, fg_color=COLORS['warning']).pack(side="left", padx=10)
+        ctk.CTkButton(export_buttons, text="📊 Excel", width=120, fg_color=COLORS['success']).pack(side="left", padx=10)
     
     def show_insurance(self):
-        """Show insurance interface"""
+        """Show comprehensive social insurance management"""
         self.clear_main_content()
         
-        title = ctk.CTkLabel(self.main_content, text="🏥 Báo bảo hiểm", 
-                           font=ctk.CTkFont(size=20, weight="bold"))
-        title.pack(pady=20)
+        # Header
+        header_frame = ctk.CTkFrame(self.main_content, height=80, fg_color="#dc2626")
+        header_frame.pack(fill="x", padx=20, pady=20)
+        header_frame.pack_propagate(False)
         
-        content = ctk.CTkLabel(self.main_content, 
-                             text="🔧 Chức năng đang được phát triển...\n\n"
-                                  "Sẽ bao gồm:\n"
-                                  "• Nhắc nhở BHXH\n"
-                                  "• Xuất Excel\n"
-                                  "• Quản lý thay đổi",
-                             font=ctk.CTkFont(size=14))
-        content.pack(expand=True)
+        title = ctk.CTkLabel(header_frame, text="🏥 Báo bảo hiểm xã hội", 
+                           font=ctk.CTkFont(size=24, weight="bold"), text_color="white")
+        title.pack(side="left", padx=20, pady=20)
+        
+        info_label = ctk.CTkLabel(header_frame, text="BHXH | Xuất Excel | Nhắc nhở tự động", 
+                                font=ctk.CTkFont(size=11), text_color="white")
+        info_label.pack(side="right", padx=20, pady=20)
+        
+        content_frame = ctk.CTkScrollableFrame(self.main_content)
+        content_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        
+        # Insurance alerts
+        alerts_frame = ctk.CTkFrame(content_frame, height=120)
+        alerts_frame.pack(fill="x", pady=15)
+        alerts_frame.pack_propagate(False)
+        
+        insurance_alerts = [
+            ("Cần điều chỉnh", "12", "#dc2626"),
+            ("Nghỉ thai sản", "3", COLORS['warning']),
+            ("Nghỉ ốm", "5", COLORS['error']),
+            ("Nghỉ hưu", "8", COLORS['success'])
+        ]
+        
+        for i, (label, count, color) in enumerate(insurance_alerts):
+            alert_card = ctk.CTkFrame(alerts_frame, fg_color=color)
+            alert_card.grid(row=0, column=i, padx=12, pady=10, sticky="ew")
+            
+            ctk.CTkLabel(alert_card, text=count, font=ctk.CTkFont(size=28, weight="bold"), text_color="white").pack(pady=8)
+            ctk.CTkLabel(alert_card, text=label, font=ctk.CTkFont(size=10), text_color="white").pack(pady=5)
+            ctk.CTkLabel(alert_card, text="CẦN XỬ LÝ", font=ctk.CTkFont(size=8, weight="bold"), text_color="white").pack()
+        
+        for i in range(4):
+            alerts_frame.grid_columnconfigure(i, weight=1)
+        
+        # Monthly report
+        monthly_title = ctk.CTkLabel(content_frame, text="📋 Báo cáo BHXH tháng 12/2024", 
+                                   font=ctk.CTkFont(size=16, weight="bold"))
+        monthly_title.pack(pady=(20, 10))
+        
+        # Categories
+        categories = [
+            ("Nhân viên mới tham gia BHXH", [
+                ("NV156", "Nguyễn Văn Tân", "15/12/2024", "Tờ khai mới", "✅"),
+                ("NV157", "Trần Thị Lan", "20/12/2024", "Tờ khai mới", "✅")
+            ]),
+            ("Điều chỉnh lương/phụ cấp", [
+                ("NV008", "Lê Văn Đức", "01/12/2024", "Điều chỉnh lương", "⚠️"),
+                ("NV015", "Phạm Thị Hồng", "15/12/2024", "Điều chỉnh lương", "⚠️")
+            ]),
+            ("Chấm dứt BHXH", [
+                ("NV045", "Hoàng Văn Minh", "31/12/2024", "Nghỉ hưu", "💫"),
+                ("NV067", "Nguyễn Thị Mai", "25/12/2024", "Thôi việc", "💫")
+            ])
+        ]
+        
+        for category, items in categories:
+            # Category header
+            cat_header = ctk.CTkFrame(content_frame, height=40, fg_color="#dc2626")
+            cat_header.pack(fill="x", pady=(10, 5))
+            cat_header.pack_propagate(False)
+            
+            ctk.CTkLabel(cat_header, text=category, font=ctk.CTkFont(size=12, weight="bold"), text_color="white").pack(side="left", padx=15, pady=10)
+            ctk.CTkLabel(cat_header, text=f"{len(items)} trường hợp", font=ctk.CTkFont(size=10), text_color="white").pack(side="right", padx=15, pady=10)
+            
+            # Items
+            for emp_id, name, date, action, status in items:
+                item_frame = ctk.CTkFrame(content_frame, fg_color=COLORS['surface'], border_width=1, border_color=COLORS['background'])
+                item_frame.pack(fill="x", pady=2)
+                
+                # Status indicator
+                if status == "✅":
+                    indicator_color = COLORS['success']
+                elif status == "⚠️":
+                    indicator_color = COLORS['warning']
+                else:
+                    indicator_color = COLORS['error']
+                
+                ctk.CTkFrame(item_frame, width=5, fg_color=indicator_color).pack(side="left", fill="y")
+                
+                # Item info
+                info_frame = ctk.CTkFrame(item_frame, fg_color="transparent")
+                info_frame.pack(side="left", fill="both", expand=True, padx=15, pady=8)
+                
+                # Row
+                row = ctk.CTkFrame(info_frame, fg_color="transparent")
+                row.pack(fill="x")
+                
+                ctk.CTkLabel(row, text=status, font=ctk.CTkFont(size=12)).pack(side="left")
+                ctk.CTkLabel(row, text=f"{emp_id} - {name}", font=ctk.CTkFont(size=11, weight="bold")).pack(side="left", padx=(10, 0))
+                ctk.CTkLabel(row, text=action, font=ctk.CTkFont(size=10), text_color="#dc2626").pack(side="left", padx=(20, 0))
+                ctk.CTkLabel(row, text=date, font=ctk.CTkFont(size=10), text_color=COLORS['text_secondary']).pack(side="right")
+                
+                # Action button
+                if status == "⚠️":
+                    ctk.CTkButton(item_frame, text="Xử lý", width=70, height=25, fg_color="#dc2626", font=ctk.CTkFont(size=9)).pack(side="right", padx=15)
+        
+        # Quick actions
+        quick_actions = ctk.CTkFrame(content_frame, height=60, fg_color=COLORS['background'])
+        quick_actions.pack(fill="x", pady=20)
+        quick_actions.pack_propagate(False)
+        
+        ctk.CTkLabel(quick_actions, text="⚡ Thao tác nhanh", font=ctk.CTkFont(size=14, weight="bold")).pack(pady=10)
+        
+        quick_buttons = ctk.CTkFrame(quick_actions, fg_color="transparent")
+        quick_buttons.pack()
+        
+        ctk.CTkButton(quick_buttons, text="➕ Thêm BHXH", width=130, fg_color=COLORS['success']).pack(side="left", padx=10)
+        ctk.CTkButton(quick_buttons, text="✏️ Điều chỉnh", width=130, fg_color=COLORS['warning']).pack(side="left", padx=10)
+        ctk.CTkButton(quick_buttons, text="💫 Chấm dứt", width=130, fg_color=COLORS['error']).pack(side="left", padx=10)
+        
+        # Export section
+        export_frame = ctk.CTkFrame(content_frame, height=80)
+        export_frame.pack(fill="x", pady=20)
+        export_frame.pack_propagate(False)
+        
+        export_title = ctk.CTkLabel(export_frame, text="📤 Xuất báo cáo BHXH", font=ctk.CTkFont(size=14, weight="bold"))
+        export_title.pack(pady=10)
+        
+        export_buttons = ctk.CTkFrame(export_frame, fg_color="transparent")
+        export_buttons.pack()
+        
+        ctk.CTkButton(export_buttons, text="📈 Báo cáo tháng", width=140, fg_color="#dc2626").pack(side="left", padx=10)
+        ctk.CTkButton(export_buttons, text="📊 Excel tổng hợp", width=140, fg_color=COLORS['success']).pack(side="left", padx=10)
+        ctk.CTkButton(export_buttons, text="📋 Tờ khai BHXH", width=140, fg_color=COLORS['primary']).pack(side="left", padx=10)
     
     def handle_logout(self):
         """Handle user logout"""
