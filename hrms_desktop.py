@@ -31,8 +31,25 @@ class HRMSDesktop:
     def __init__(self):
         self.root = ctk.CTk()
         self.root.title("🏢 HRMS - Hệ thống Quản lý Nhân sự")
-        self.root.geometry("1400x900")
+        
+        # Set larger default size and make fully resizable
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        
+        # Start with 90% of screen size
+        start_width = int(screen_width * 0.9)
+        start_height = int(screen_height * 0.9)
+        
+        self.root.geometry(f"{start_width}x{start_height}")
         self.root.resizable(True, True)
+        
+        # Enable maximize button and fullscreen capability
+        self.root.state('normal')  # Allow maximize
+        self.is_fullscreen = False
+        
+        # Bind F11 for fullscreen toggle
+        self.root.bind('<F11>', self.toggle_fullscreen)
+        self.root.bind('<Escape>', self.exit_fullscreen)
         
         # Center window
         self.center_window()
@@ -59,6 +76,20 @@ class HRMSDesktop:
         x = (self.root.winfo_screenwidth() // 2) - (width // 2)
         y = (self.root.winfo_screenheight() // 2) - (height // 2)
         self.root.geometry(f'{width}x{height}+{x}+{y}')
+    
+    def toggle_fullscreen(self, event=None):
+        """Toggle fullscreen mode"""
+        self.is_fullscreen = not self.is_fullscreen
+        if self.is_fullscreen:
+            self.root.attributes("-fullscreen", True)
+        else:
+            self.root.attributes("-fullscreen", False)
+    
+    def exit_fullscreen(self, event=None):
+        """Exit fullscreen mode"""
+        if self.is_fullscreen:
+            self.is_fullscreen = False
+            self.root.attributes("-fullscreen", False)
     
     def init_database(self):
         """Initialize SQLite database"""
@@ -195,6 +226,12 @@ class HRMSDesktop:
                                  font=ctk.CTkFont(size=11))
         credentials.pack(pady=5)
         
+        # Fullscreen info
+        fullscreen_info = ctk.CTkLabel(info_frame, 
+                                     text="⌨️ Phím tắt: F11 (Toàn màn hình) | ESC (Thoát)",
+                                     font=ctk.CTkFont(size=10))
+        fullscreen_info.pack(pady=5)
+        
         # Bind Enter key
         self.password_entry.bind("<Return>", lambda e: self.handle_login())
         
@@ -243,7 +280,7 @@ class HRMSDesktop:
         self.show_home_dashboard()
     
     def create_header(self):
-        """Create header with user info and logout"""
+        """Create header with user info and controls"""
         header = ctk.CTkFrame(self.main_container, height=60)
         header.pack(fill="x", pady=(0, 10))
         
@@ -252,14 +289,23 @@ class HRMSDesktop:
                              font=ctk.CTkFont(size=18, weight="bold"))
         welcome.pack(side="left", padx=20, pady=15)
         
+        # Controls frame
+        controls_frame = ctk.CTkFrame(header, fg_color="transparent")
+        controls_frame.pack(side="right", padx=20, pady=15)
+        
+        # Fullscreen button
+        fullscreen_btn = ctk.CTkButton(controls_frame, text="🔳 Toàn màn hình", 
+                                     command=self.toggle_fullscreen, width=120)
+        fullscreen_btn.pack(side="left", padx=(0, 10))
+        
         # Logout button
-        logout_btn = ctk.CTkButton(header, text="🚪 Đăng xuất", 
+        logout_btn = ctk.CTkButton(controls_frame, text="🚪 Đăng xuất", 
                                  command=self.handle_logout, width=120)
-        logout_btn.pack(side="right", padx=20, pady=15)
+        logout_btn.pack(side="left")
         
     def create_sidebar(self, parent):
-        """Create navigation sidebar"""
-        sidebar = ctk.CTkFrame(parent, width=280)
+        """Create navigation sidebar with scrollable content"""
+        sidebar = ctk.CTkFrame(parent, width=300)  # Slightly wider
         sidebar.pack(side="left", fill="y", padx=(0, 10))
         sidebar.pack_propagate(False)
         
@@ -267,6 +313,10 @@ class HRMSDesktop:
         nav_title = ctk.CTkLabel(sidebar, text="🧭 Chức năng chính", 
                                font=ctk.CTkFont(size=16, weight="bold"))
         nav_title.pack(pady=20)
+        
+        # Create scrollable frame for navigation buttons
+        nav_scroll = ctk.CTkScrollableFrame(sidebar, width=260, height=600)
+        nav_scroll.pack(fill="both", expand=True, padx=15, pady=10)
         
         # Navigation buttons
         nav_buttons = [
@@ -285,10 +335,10 @@ class HRMSDesktop:
         ]
         
         for text, command in nav_buttons:
-            btn = ctk.CTkButton(sidebar, text=text, command=command, 
-                              width=250, height=35, anchor="w",
-                              font=ctk.CTkFont(size=12))
-            btn.pack(pady=5, padx=15)
+            btn = ctk.CTkButton(nav_scroll, text=text, command=command, 
+                              width=240, height=40, anchor="w",
+                              font=ctk.CTkFont(size=12, weight="bold"))
+            btn.pack(pady=8, padx=10, fill="x")
     
     def show_home_dashboard(self):
         """Show home dashboard with statistics"""
@@ -307,29 +357,37 @@ class HRMSDesktop:
         self.cursor.execute("SELECT COUNT(*) FROM employees WHERE status = 'active'")
         total_employees = self.cursor.fetchone()[0]
         
-        # Create statistics cards
+        # Create statistics cards with better responsive layout
         stats = [
             ("👥 Tổng nhân sự", str(total_employees), "green"),
             ("⏰ Sắp nghỉ hưu", "12", "orange"),
             ("💰 Đến kỳ nâng lương", "25", "blue"),
-            ("📄 Hợp đồng hết hạn", "6", "red")
+            ("📄 Hợp đồng hết hạn", "6", "red"),
+            ("🏆 Khen thưởng tháng", "8", "purple"),
+            ("📋 Quy hoạch hết hạn", "15", "brown")
         ]
         
+        # Create 2 rows of cards for better use of space
         for i, (label, value, color) in enumerate(stats):
-            card = ctk.CTkFrame(stats_frame)
-            card.grid(row=0, column=i, padx=10, pady=10, sticky="ew")
+            row = i // 3  # 3 cards per row
+            col = i % 3
+            
+            card = ctk.CTkFrame(stats_frame, height=120)
+            card.grid(row=row, column=col, padx=15, pady=15, sticky="ew")
             
             value_label = ctk.CTkLabel(card, text=value, 
-                                     font=ctk.CTkFont(size=32, weight="bold"))
-            value_label.pack(pady=10)
+                                     font=ctk.CTkFont(size=36, weight="bold"))
+            value_label.pack(pady=15)
             
             label_label = ctk.CTkLabel(card, text=label, 
-                                     font=ctk.CTkFont(size=12))
+                                     font=ctk.CTkFont(size=13, weight="bold"))
             label_label.pack(pady=5)
         
-        # Configure grid weights
-        for i in range(4):
+        # Configure grid weights for responsive layout
+        for i in range(3):  # 3 columns
             stats_frame.grid_columnconfigure(i, weight=1)
+        for i in range(2):  # 2 rows
+            stats_frame.grid_rowconfigure(i, weight=1)
         
         # Recent activities
         activities_frame = ctk.CTkFrame(self.main_content)

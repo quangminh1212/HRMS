@@ -10,6 +10,8 @@
 - 💾 **Offline hoàn toàn** - SQLite database cục bộ
 - 🎨 **Giao diện đẹp** - Modern UI với CustomTkinter
 - 📦 **Portable** - Có thể build thành file .exe
+- 🔳 **Fullscreen Support** - F11 toàn màn hình, responsive layout
+- 📱 **Responsive Design** - Tự động điều chỉnh theo kích thước màn hình
 
 ## 📋 Yêu cầu hệ thống
 
@@ -41,15 +43,25 @@ run.bat
 🔑 Mật khẩu: admin123
 ```
 
+## ⌨️ Phím tắt
+
+| Phím | Chức năng |
+|------|-----------|
+| **F11** | Bật/tắt toàn màn hình |
+| **ESC** | Thoát toàn màn hình |
+| **Enter** | Đăng nhập (tại màn hình login) |
+
 ---
 
 ## 📱 Giao diện Desktop
 
 ### 🏠 Dashboard chính
-- **Sidebar navigation** với 11 chức năng
-- **Statistics cards** hiển thị thống kê real-time
+- **Sidebar navigation** với 11 chức năng (scrollable)
+- **Statistics cards** hiển thị thống kê real-time (2 rows x 3 columns)
 - **Recent activities** danh sách hoạt động gần đây
 - **Professional UI** với CustomTkinter modern design
+- **Fullscreen support** - F11 để bật/tắt, ESC để thoát
+- **Responsive layout** - Tự động điều chỉnh theo kích thước màn hình
 
 ### 🔍 Tra cứu nhân sự (Đã hoàn thành)
 - **Search interface** tìm kiếm theo tên/mã nhân viên
