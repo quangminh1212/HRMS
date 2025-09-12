@@ -259,7 +259,9 @@ def retirement_management():
         Employee.status == 'active'
     ).order_by(Employee.retirement_date).all()
     
-    return render_template('retirement_management.html', retiring_employees=retiring_soon)
+    return render_template('retirement_management.html', 
+                         retiring_employees=retiring_soon,
+                         now=datetime.now())
 
 @app.route('/contracts')
 @login_required

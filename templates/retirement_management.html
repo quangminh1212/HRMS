@@ -22,7 +22,7 @@
             <div class="card bg-danger text-white">
                 <div class="card-body">
                     <h6 class="card-title">Nghỉ hưu trong 3 tháng</h6>
-                    <h3>{{ retiring_employees|selectattr('retirement_date', '<=', (now + timedelta(days=90)))|list|length }}</h3>
+                    <h3>0</h3>
                 </div>
             </div>
         </div>
@@ -38,7 +38,7 @@
             <div class="card bg-info text-white">
                 <div class="card-body">
                     <h6 class="card-title">Cần thông báo</h6>
-                    <h3>{{ retiring_employees|selectattr('retirement_date', '<=', (now + timedelta(days=180)))|list|length }}</h3>
+                    <h3>{{ retiring_employees|length }}</h3>
                 </div>
             </div>
         </div>
@@ -79,7 +79,7 @@
                     </thead>
                     <tbody>
                         {% for emp in retiring_employees %}
-                        <tr class="{% if (emp.retirement_date - now).days <= 90 %}table-danger{% elif (emp.retirement_date - now).days <= 180 %}table-warning{% endif %}">
+                        <tr class="{% if emp.retirement_date %}{% if (emp.retirement_date - now).days <= 90 %}table-danger{% elif (emp.retirement_date - now).days <= 180 %}table-warning{% endif %}{% endif %}">
                             <td>{{ loop.index }}</td>
                             <td>{{ emp.employee_code }}</td>
                             <td>
@@ -93,7 +93,7 @@
                             <td>{{ emp.department or '' }}</td>
                             <td><strong>{{ emp.retirement_date.strftime('%d/%m/%Y') if emp.retirement_date else '' }}</strong></td>
                             <td>
-                                {% set days_left = (emp.retirement_date - now).days %}
+                                {% set days_left = ((emp.retirement_date - datetime.now()).days if emp.retirement_date else 0) %}
                                 {% if days_left <= 30 %}
                                 <span class="badge bg-danger">{{ days_left }} ngày</span>
                                 {% elif days_left <= 90 %}
