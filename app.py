@@ -37,6 +37,7 @@ from components import ModernComponents
 # Import enhanced features  
 from hr_search import render_employee_search_page
 from salary_management import render_salary_management_page
+from retirement_management import render_retirement_management_page
 
 # Cấu hình trang với theme hiện đại
 st.set_page_config(
@@ -304,7 +305,7 @@ def main_app():
     elif st.session_state.current_page == "💰 Nâng lương định kỳ":
         render_salary_management_page()
     elif st.session_state.current_page == "⏰ Theo dõi nghỉ hưu":
-        ModernPages.retirement_tracking_page()
+        render_retirement_management_page()
     elif st.session_state.current_page == "📊 Báo cáo thống kê":
         ModernPages.reports_dashboard()
     elif st.session_state.current_page == "📋 Kiểm tra quy hoạch":
