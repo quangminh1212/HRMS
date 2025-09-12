@@ -6,15 +6,15 @@ Tham khảo từ Material Design 3, Fluent Design, Ant Design
 class DesignTokens:
     """Design tokens cho consistency"""
     
-    # Color System - Tham khảo Material Design 3
+    # Color System - Simple Teal, Elm, Bunker & White
     COLORS = {
-        # Primary Colors - XLAB Teal/Cyan Theme
+        # Primary Colors - Teal (Xanh lá cây xanh)
         'primary': {
             10: '#042F2E',
             20: '#0F4C4C', 
             30: '#134E4A',
             40: '#0F766E',
-            50: '#14B8A6',
+            50: '#14B8A6',  # Main Teal
             60: '#2DD4BF',
             70: '#5EEAD4',
             80: '#99F6E4',
@@ -23,26 +23,41 @@ class DesignTokens:
             99: '#FFFFFF'
         },
         
-        # Secondary Colors - Complementary Blue-Gray
+        # Secondary Colors - Elm (Nâu xanh)  
         'secondary': {
-            10: '#0C1A2E',
-            20: '#1E293B',
-            30: '#334155',
-            40: '#475569',
-            50: '#64748B',
-            60: '#94A3B8',
-            70: '#CBD5E1',
-            80: '#E2E8F0',
-            90: '#F1F5F9',
-            95: '#F8FAFC',
+            10: '#2A2D22',
+            20: '#353A2A',
+            30: '#464C36',
+            40: '#5A6145',
+            50: '#8B9467',  # Main Elm
+            60: '#A5AD85',
+            70: '#BFC6A8',
+            80: '#D5DAC8',
+            90: '#E8EBDF',
+            95: '#F6F7F4',
             99: '#FFFFFF'
         },
         
-        # Semantic Colors - Modern & Clean
-        'success': '#10B981',  # Emerald Green
-        'warning': '#F59E0B',  # Amber 
-        'error': '#EF4444',   # Modern Red
-        'info': '#3B82F6',    # Modern Blue
+        # Bunker Colors (Xám đen đậm) - For text and contrast
+        'bunker': {
+            10: '#000000',
+            20: '#0D1421',  # Main Bunker
+            30: '#141821',
+            40: '#1F2329',
+            50: '#2F3441',
+            60: '#434857',
+            70: '#6B7485',
+            80: '#9FA8B5',
+            90: '#C7CDD5',
+            95: '#E3E6EA',
+            99: '#FFFFFF'
+        },
+        
+        # Semantic Colors - Simple & Clean
+        'success': '#14B8A6',  # Teal
+        'warning': '#8B9467',  # Elm
+        'error': '#DC2626',    # Simple Red
+        'info': '#0D1421'     # Bunker
         
         # Neutral Colors
         'neutral': {
@@ -251,9 +266,9 @@ class UIComponents:
         
         .stApp {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, #F0F9FF 0%, #ECFDF5 35%, #FFFFFF 100%);
+            background: linear-gradient(135deg, #F0FDFA 0%, #F6F7F4 35%, #FFFFFF 100%);
             min-height: 100vh;
-            color: #1F2937;
+            color: #0D1421;
         }
         
         /* Container System */
@@ -335,8 +350,8 @@ class UIComponents:
         .hero-header {
             background: linear-gradient(135deg, 
                 rgba(20, 184, 166, 0.95) 0%, 
-                rgba(45, 212, 191, 0.9) 50%, 
-                rgba(94, 234, 212, 0.85) 100%);
+                rgba(139, 148, 103, 0.9) 50%, 
+                rgba(13, 20, 33, 0.85) 100%);
             backdrop-filter: blur(20px) saturate(180%);
             border: 1px solid rgba(255, 255, 255, 0.2);
             border-radius: 28px;
@@ -398,7 +413,7 @@ class UIComponents:
             left: 0;
             right: 0;
             height: 4px;
-            background: linear-gradient(90deg, #14B8A6, #2DD4BF, #5EEAD4);
+            background: linear-gradient(90deg, #14B8A6, #8B9467, #0D1421);
         }
         
         .metric-card:hover {
@@ -421,27 +436,27 @@ class UIComponents:
         }
         
         .icon-primary {
-            background: linear-gradient(135deg, #14B8A6, #2DD4BF);
+            background: linear-gradient(135deg, #14B8A6, #8B9467);
             color: white;
             box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
         }
         
         .icon-success {
-            background: linear-gradient(135deg, #10B981, #34D399);
+            background: linear-gradient(135deg, #14B8A6, #2DD4BF);
             color: white;
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+            box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
         }
         
         .icon-warning {
-            background: linear-gradient(135deg, #F59E0B, #FCD34D);
+            background: linear-gradient(135deg, #8B9467, #A5AD85);
             color: white;
-            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+            box-shadow: 0 4px 12px rgba(139, 148, 103, 0.3);
         }
         
         .icon-error {
-            background: linear-gradient(135deg, #EF4444, #F87171);
+            background: linear-gradient(135deg, #DC2626, #0D1421);
             color: white;
-            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
         }
         
         /* Button System */

@@ -167,7 +167,7 @@ def dashboard_page():
     for i, (icon, title, value, change, color_class) in enumerate(metrics_data):
         with cols[i]:
             st.markdown(
-                ModernComponents.metric_card(icon, title, value, change, color_class),
+                ModernComponents.metric_card(title, value, change, icon),
                 unsafe_allow_html=True
             )
     
