@@ -57,7 +57,7 @@ class DesignTokens:
         'success': '#14B8A6',  # Teal
         'warning': '#8B9467',  # Elm
         'error': '#DC2626',    # Simple Red
-        'info': '#0D1421'     # Bunker
+        'info': '#0D1421',     # Bunker
         
         # Neutral Colors
         'neutral': {
