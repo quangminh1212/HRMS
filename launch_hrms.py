@@ -22,14 +22,22 @@ def print_ui_options():
     options = [
         {
             "num": "1", 
-            "name": "Streamlit (Web)", 
-            "icon": "🌐",
-            "desc": "Web app với CSS hiện đại, glassmorphism",
-            "pros": "✅ Nhanh, dễ sử dụng, responsive",
-            "cons": "⚠️ Hạn chế về customization sâu"
+            "name": "HRMS Modern (NEW)", 
+            "icon": "💎",
+            "desc": "Giao diện thiết kế lại hoàn toàn, Material Design 3",
+            "pros": "✅ Đẹp nhất, Design System chuyên nghiệp, Component-based",
+            "cons": "⚠️ Phiên bản mới, cần feedback"
         },
         {
             "num": "2", 
+            "name": "Streamlit (Classic)", 
+            "icon": "🌐",
+            "desc": "Web app với CSS hiện đại, glassmorphism",
+            "pros": "✅ Ổn định, dễ sử dụng, responsive",
+            "cons": "⚠️ Giao diện cũ hơn"
+        },
+        {
+            "num": "3", 
             "name": "Flet (Flutter)", 
             "icon": "📱",
             "desc": "Giao diện đẹp như Flutter, hiện đại nhất",
@@ -37,7 +45,7 @@ def print_ui_options():
             "cons": "⚠️ Tương đối mới, cần học thêm"
         },
         {
-            "num": "3", 
+            "num": "4", 
             "name": "CustomTkinter", 
             "icon": "💻",
             "desc": "Desktop app hiện đại, giống macOS/Windows",
@@ -45,7 +53,7 @@ def print_ui_options():
             "cons": "⚠️ Chỉ desktop, không web"
         },
         {
-            "num": "4", 
+            "num": "5", 
             "name": "NiceGUI", 
             "icon": "✨",
             "desc": "Web UI hiện đại với Tailwind CSS",
@@ -53,7 +61,7 @@ def print_ui_options():
             "cons": "⚠️ Mới, ecosystem nhỏ"
         },
         {
-            "num": "5", 
+            "num": "6", 
             "name": "Gradio", 
             "icon": "🎯",
             "desc": "Tối ưu cho data science interface",
@@ -93,9 +101,17 @@ def install_framework(framework):
             return False
     return False
 
+def run_modern():
+    """Chạy phiên bản HRMS Modern"""
+    print("🚀 Khởi động HRMS Modern...")
+    try:
+        subprocess.run([sys.executable, "run_modern.py"])
+    except Exception as e:
+        print(f"❌ Lỗi: {e}")
+
 def run_streamlit():
-    """Chạy phiên bản Streamlit"""
-    print("🚀 Khởi động HRMS với Streamlit...")
+    """Chạy phiên bản Streamlit Classic"""
+    print("🚀 Khởi động HRMS với Streamlit Classic...")
     try:
         subprocess.run([sys.executable, "run_streamlit.py"])
     except Exception as e:
@@ -139,24 +155,31 @@ def main():
         print_ui_options()
         
         print("🎮 Các tùy chọn khác:")
-        print("📦 [6] Cài đặt tất cả frameworks")
-        print("🔧 [7] Kiểm tra dependencies")
+        print("📦 [7] Cài đặt tất cả frameworks")
+        print("🔧 [8] Kiểm tra dependencies")
         print("❌ [0] Thoát")
         print()
         
-        choice = input("👉 Chọn giao diện (1-7, 0 để thoát): ").strip()
+        choice = input("👉 Chọn giao diện (1-8, 0 để thoát): ").strip()
         
         if choice == "0":
             print("👋 Tạm biệt! Cảm ơn bạn đã sử dụng HRMS!")
             break
             
         elif choice == "1":
-            print("\n🌐 Bạn đã chọn Streamlit!")
-            print("💫 Giao diện web hiện đại với glassmorphism effect")
+            print("\n💎 Bạn đã chọn HRMS Modern!")
+            print("🎨 Giao diện thiết kế lại hoàn toàn với Material Design 3")
+            print("✨ Component System chuyên nghiệp & Design Tokens")
+            input("\nNhấn Enter để khởi động...")
+            run_modern()
+            
+        elif choice == "2":
+            print("\n🌐 Bạn đã chọn Streamlit Classic!")
+            print("💫 Giao diện web ổn định với glassmorphism effect")
             input("\nNhấn Enter để khởi động...")
             run_streamlit()
             
-        elif choice == "2":
+        elif choice == "3":
             print("\n📱 Bạn đã chọn Flet!")
             print("🎨 Giao diện đẹp nhất với Flutter components")
             input("\nNhấn Enter để khởi động...")
