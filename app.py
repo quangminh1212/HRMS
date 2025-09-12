@@ -34,6 +34,9 @@ from pages import ModernPages
 # Import components
 from components import ModernComponents
 
+# Import enhanced features
+from hr_search import render_employee_search_page
+
 # Cấu hình trang với theme hiện đại
 st.set_page_config(
     page_title="HRMS - Hệ thống Quản lý Nhân sự",
@@ -249,168 +252,7 @@ def dashboard_page():
             "📋 Cần chuẩn bị thủ tục và hồ sơ"
         ), unsafe_allow_html=True)
 
-# Employee Search Page với Modern Design
-def employee_search_page():
-    ModernComponents.hero_header(
-        "Tra cứu nhân sự",
-        "Tìm kiếm và quản lý thông tin nhân viên",
-        "👥"
-    )
-    
-    # Modern Search Section
-    st.markdown(ModernComponents.surface_container("""
-        <div style="padding: 1.5rem;">
-            <div class="title-large" style="margin-bottom: 1rem; color: #1C1B1F;">
-                🔍 Tìm kiếm nhân viên
-            </div>
-        </div>
-    """, "container-high"), unsafe_allow_html=True)
-    
-    col1, col2 = st.columns([3, 1])
-    
-    with col1:
-        search_term = st.text_input(
-            "Nhập tên nhân viên",
-            placeholder="VD: Nguyễn Văn A",
-            help="Nhập tên để tìm kiếm thông tin nhân viên"
-        )
-    
-    with col2:
-        st.markdown('<div style="height: 1.75rem;"></div>', unsafe_allow_html=True)
-        search_button = st.button("🔍 Tìm kiếm", use_container_width=True)
-    
-    if search_term and search_button:
-        # Success message
-        st.markdown(ModernComponents.modern_alert(
-            "success",
-            "Tìm kiếm thành công",
-            f"Đã tìm thấy thông tin nhân viên: {search_term}",
-            "Hiển thị kết quả chi tiết bên dưới"
-        ), unsafe_allow_html=True)
-        
-        # Modern Tabs
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
-            "📋 Thông tin cơ bản", 
-            "💼 Công việc", 
-            "💰 Lương & Phụ cấp", 
-            "🎓 Đào tạo", 
-            "🏆 Thành tích"
-        ])
-        
-        with tab1:
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown(ModernComponents.surface_container("""
-                    <div style="padding: 1.5rem;">
-                        <div class="title-medium" style="margin-bottom: 1rem; color: #1C1B1F;">
-                            👤 Thông tin cá nhân
-                        </div>
-                        <div class="body-medium" style="line-height: 1.8; color: #49454F;">
-                            <strong>Mã nhân viên:</strong> NV001<br>
-                            <strong>Họ tên:</strong> Nguyễn Văn A<br>
-                            <strong>Ngày sinh:</strong> 15/06/1985<br>
-                            <strong>Giới tính:</strong> Nam<br>
-                            <strong>Dân tộc:</strong> Kinh<br>
-                            <strong>Tôn giáo:</strong> Không<br>
-                            <strong>Quê quán:</strong> Hà Nội, Việt Nam
-                        </div>
-                    </div>
-                """, "container"), unsafe_allow_html=True)
-            
-            with col2:
-                st.markdown(ModernComponents.surface_container("""
-                    <div style="padding: 1.5rem;">
-                        <div class="title-medium" style="margin-bottom: 1rem; color: #1C1B1F;">
-                            📞 Thông tin liên hệ
-                        </div>
-                        <div class="body-medium" style="line-height: 1.8; color: #49454F;">
-                            <strong>Điện thoại:</strong> 0901234567<br>
-                            <strong>Email:</strong> nguyenvana@company.vn<br>
-                            <strong>Địa chỉ:</strong> 123 Phố Huế, Hà Nội
-                        </div>
-                    </div>
-                """, "container"), unsafe_allow_html=True)
-        
-        with tab2:
-            st.markdown(ModernComponents.surface_container("""
-                <div style="padding: 1.5rem;">
-                    <div class="title-medium" style="margin-bottom: 1rem; color: #1C1B1F;">
-                        💼 Thông tin công việc
-                    </div>
-                    <div class="body-medium" style="line-height: 1.8; color: #49454F;">
-                        <strong>Chức vụ:</strong> Chuyên viên chính<br>
-                        <strong>Đơn vị:</strong> Phòng Tổ chức - Hành chính<br>
-                        <strong>Ngày vào Đảng:</strong> 10/05/2010<br>
-                        <strong>Trình độ LLCT:</strong> Trung cấp<br>
-                        <strong>Trình độ chuyên môn:</strong> Cử nhân Luật, Đại học Luật Hà Nội<br>
-                        <strong>Ngày bắt đầu công tác:</strong> 01/08/2008<br>
-                        <strong>Ngày vào cơ quan:</strong> 15/03/2015<br>
-                        <strong>Ngày nghỉ hưu dự kiến:</strong> 15/09/2048
-                    </div>
-                </div>
-            """, "container"), unsafe_allow_html=True)
-        
-        with tab3:
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown(ModernComponents.surface_container("""
-                    <div style="padding: 1.5rem;">
-                        <div class="title-medium" style="margin-bottom: 1rem; color: #1C1B1F;">
-                            💰 Thông tin lương hiện tại
-                        </div>
-                        <div class="body-medium" style="line-height: 1.8; color: #49454F;">
-                            <strong>Ngạch lương:</strong> A2<br>
-                            <strong>Hệ số lương:</strong> 3.45<br>
-                            <strong>Phụ cấp chức vụ:</strong> 0.5<br>
-                            <strong>Ngày nâng lương gần nhất:</strong> 01/04/2021
-                        </div>
-                    </div>
-                """, "container"), unsafe_allow_html=True)
-            
-            with col2:
-                st.markdown(ModernComponents.modern_alert(
-                    "success",
-                    "Đủ điều kiện nâng lương",
-                    "Nhân viên đã đủ 36 tháng kể từ lần nâng lương gần nhất",
-                    "🔼 Dự kiến nâng lên hệ số: 3.66"
-                ), unsafe_allow_html=True)
-        
-        with tab4:
-            training_data = pd.DataFrame({
-                'Loại': ['Đại học', 'LLCT Trung cấp', 'Ngoại ngữ'],
-                'Tên khóa học': ['Cử nhân Luật', 'Lý luận chính trị', 'Tiếng Anh B1'],
-                'Cơ sở': ['ĐH Luật Hà Nội', 'Học viện Chính trị', 'Trung tâm Ngoại ngữ'],
-                'Thời gian': ['2003-2007', '2010-2012', '2020-2021']
-            })
-            ModernComponents.data_table(training_data, "🎓 Lịch sử đào tạo & bồi dưỡng")
-        
-        with tab5:
-            achievement_data = pd.DataFrame({
-                'Loại': ['Lao động tiên tiến', 'Bằng khen', 'Chiến sỹ thi đua'],
-                'Tên/Danh hiệu': ['Lao động tiên tiến 2023', 'Bằng khen Thủ tướng', 'Chiến sỹ thi đua cơ sở'],
-                'Cấp': ['Cơ quan', 'Nhà nước', 'Cơ quan'],
-                'Ngày': ['15/11/2023', '20/08/2022', '01/05/2021']
-            })
-            ModernComponents.data_table(achievement_data, "🏆 Thành tích & khen thưởng")
-        
-        # Action buttons
-        st.markdown('<div style="height: 2rem;"></div>', unsafe_allow_html=True)
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            if st.button("📄 Xuất file Word", use_container_width=True):
-                st.success("✅ Đã xuất file Word thành công!")
-        
-        with col2:
-            if st.button("⏰ Kiểm tra nghỉ hưu", use_container_width=True):
-                st.info("ℹ️ Nhân viên nghỉ hưu vào: 15/09/2048 (còn 24 năm)")
-        
-        with col3:
-            if st.button("💰 Kiểm tra nâng lương", use_container_width=True):
-                st.success("✅ Đủ điều kiện nâng lương!")
+# Old employee_search_page() removed - using enhanced hr_search.py module
 
 # Main App với Modern Sidebar
 def main_app():
@@ -457,7 +299,7 @@ def main_app():
     if st.session_state.current_page == "🏠 Trang chủ":
         dashboard_page()
     elif st.session_state.current_page == "👥 Tra cứu nhân sự":
-        employee_search_page()
+        render_employee_search_page()
     elif st.session_state.current_page == "💰 Nâng lương định kỳ":
         ModernPages.salary_management_page()
     elif st.session_state.current_page == "⏰ Theo dõi nghỉ hưu":
