@@ -27,63 +27,29 @@ Hệ thống quản lý nhân sự toàn diện được phát triển bằng Py
 - Báo cáo thống kê đa dạng
 - Xuất file Word, Excel
 
-## Quick Start
+## Cài đặt và chạy
 
-### Prerequisites
-- Python 3.8 or higher
-- pip (Python package manager)
-- Modern web browser
+### Yêu cầu
+- Python 3.8 trở lên
+- pip
 
-### Installation
+### Các bước thực hiện
 
-1. **Clone the repository:**
-```bash
-git clone https://github.com/your-org/hrms.git
-cd hrms
-```
-
-2. **Create virtual environment (recommended):**
-```bash
-python -m venv venv
-# On Windows
-venv\Scripts\activate
-# On macOS/Linux
-source venv/bin/activate
-```
-
-3. **Install dependencies:**
+1. **Cài đặt dependencies:**
 ```bash
 pip install -r requirements.txt
 ```
 
-4. **Initialize database:**
+2. **Chạy ứng dụng:**
 ```bash
 python run.py
 ```
 
-5. **Access the application:**
-- Open your browser and go to: http://localhost:5000
-- Login with default credentials:
-  - **Username:** admin
-  - **Password:** admin123
-
-### Development Setup
-
-For development with additional tools:
-```bash
-pip install -r requirements-dev.txt
-```
-
-### Using Make (Optional)
-
-If you have `make` installed:
-```bash
-make install      # Install dependencies
-make run          # Run the application
-make test         # Run tests
-make lint         # Run code linting
-make format       # Format code
-```
+3. **Truy cập hệ thống:**
+- Mở trình duyệt: http://localhost:5000
+- Đăng nhập:
+  - **Tên đăng nhập:** admin
+  - **Mật khẩu:** admin123
 
 ## Project Structure
 
