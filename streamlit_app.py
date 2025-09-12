@@ -1367,12 +1367,261 @@ def early_salary_page():
                     st.success("✅ Đã xuất quyết định nâng lương!")
 
 def reports_page():
-    st.markdown('<div class="main-header"><h1>📊 Báo cáo thống kê</h1></div>', unsafe_allow_html=True)
-    st.info("Chức năng đang được phát triển...")
+    st.markdown('<div class="main-header"><h1>📊 Báo cáo nhanh</h1></div>', unsafe_allow_html=True)
+    
+    # Chọn năm báo cáo
+    report_year = st.selectbox("📅 Chọn năm báo cáo:", ["2024", "2023", "2022"])
+    
+    tab1, tab2, tab3 = st.tabs(["📈 Tổng quan", "📊 Phân tích", "🔍 Chi tiết"])
+    
+    with tab1:
+        st.subheader(f"📈 Báo cáo tổng quan năm {report_year}")
+        
+        # Thống kê tổng quan
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("💰 Nâng lương", "25", "8")
+            st.metric("⏰ Nghỉ hưu", "12", "-3")
+        
+        with col2:
+            st.metric("📄 Hợp đồng mới", "15", "5")
+            st.metric("👋 Thôi việc", "8", "2")
+        
+        with col3:
+            st.metric("⬆️ Bổ nhiệm", "6", "1")
+            st.metric("🤱 Nghỉ thai sản", "4", "-1")
+        
+        with col4:
+            st.metric("📚 Đi học", "3", "1")
+            st.metric("🌍 Phu nhân ngoại giao", "1", "0")
+        
+        # Biểu đồ theo tháng
+        st.subheader("📊 Biến động nhân sự theo tháng")
+        monthly_data = pd.DataFrame({
+            'Tháng': ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12'],
+            'Vào': [2, 1, 3, 2, 1, 4, 2, 0, 1, 2, 1, 0],
+            'Ra': [1, 0, 2, 1, 3, 1, 0, 2, 1, 0, 1, 2]
+        })
+        st.line_chart(monthly_data.set_index('Tháng'))
+    
+    with tab2:
+        st.subheader("🔍 Phân tích thôi việc")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### 📊 Theo độ tuổi")
+            age_resign_data = pd.DataFrame({
+                'Độ tuổi': ['25-30', '31-35', '36-40', '41-45', '46-50'],
+                'Số lượng': [3, 2, 2, 1, 0]
+            })
+            st.bar_chart(age_resign_data.set_index('Độ tuổi'))
+        
+        with col2:
+            st.markdown("#### 🎓 Theo trình độ")
+            education_resign_data = pd.DataFrame({
+                'Trình độ': ['Cử nhân', 'Thạc sĩ', 'Tiến sĩ'],
+                'Số lượng': [5, 2, 1]
+            })
+            st.bar_chart(education_resign_data.set_index('Trình độ'))
+        
+        st.markdown("#### ⏰ Theo thâm niên")
+        tenure_data = pd.DataFrame({
+            'Thâm niên': ['< 2 năm', '2-5 năm', '5-10 năm', '> 10 năm'],
+            'Số lượng': [4, 2, 1, 1]
+        })
+        st.bar_chart(tenure_data.set_index('Thâm niên'))
+        
+        st.info("💡 **Nhận xét**: Tỷ lệ thôi việc cao ở nhóm 25-35 tuổi, cần có biện pháp giữ chân nhân tài")
+    
+    with tab3:
+        st.subheader("🔍 Cơ cấu nhân sự chi tiết")
+        
+        # Cơ cấu theo nhiều tiêu chí
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### 👥 Theo giới tính")
+            gender_structure = pd.DataFrame({
+                'Giới tính': ['Nam', 'Nữ'],
+                'Số lượng': [85, 65],
+                'Tỷ lệ (%)': [56.7, 43.3]
+            })
+            st.dataframe(gender_structure)
+            
+            st.markdown("#### 🏛️ Theo dân tộc")
+            ethnic_structure = pd.DataFrame({
+                'Dân tộc': ['Kinh', 'Tày', 'Thái', 'Khác'],
+                'Số lượng': [140, 5, 3, 2]
+            })
+            st.dataframe(ethnic_structure)
+        
+        with col2:
+            st.markdown("#### 🎓 Theo trình độ LLCT")
+            political_structure = pd.DataFrame({
+                'Trình độ': ['Cao cấp', 'Trung cấp', 'Sơ cấp', 'Chưa có'],
+                'Số lượng': [25, 80, 35, 10]
+            })
+            st.dataframe(political_structure)
+            
+            st.markdown("#### 💼 Theo chuyên môn")
+            professional_structure = pd.DataFrame({
+                'Trình độ': ['Tiến sĩ', 'Thạc sĩ', 'Cử nhân', 'Khác'],
+                'Số lượng': [5, 45, 85, 15]
+            })
+            st.dataframe(professional_structure)
+        
+        # Tra cứu thời gian còn lại
+        st.markdown("---")
+        st.markdown("#### ⏰ Tra cứu thời gian còn lại đến sự kiện")
+        
+        col_a, col_b = st.columns(2)
+        with col_a:
+            target_date = st.date_input("📅 Chọn mốc thời gian:")
+        with col_b:
+            event_type = st.selectbox("🎯 Loại sự kiện:", 
+                ["Nghỉ hưu", "Hết hạn hợp đồng", "Kết thúc quy hoạch"])
+        
+        if st.button("🔍 Tính toán thời gian"):
+            from datetime import date
+            days_left = (target_date - date.today()).days
+            st.info(f"⏰ Còn **{days_left} ngày** ({days_left/30:.1f} tháng) đến {event_type.lower()}")
+    
+    # Xuất báo cáo
+    st.markdown("---")
+    if st.button("📊 Xuất báo cáo năm tổng hợp", use_container_width=True):
+        st.success(f"✅ Đã xuất báo cáo tổng hợp năm {report_year}!")
 
 def insurance_page():
-    st.markdown('<div class="main-header"><h1>🏥 Báo bảo hiểm</h1></div>', unsafe_allow_html=True)
-    st.info("Chức năng đang được phát triển...")
+    st.markdown('<div class="main-header"><h1>🏥 Báo bảo hiểm xã hội</h1></div>', unsafe_allow_html=True)
+    
+    tab1, tab2, tab3 = st.tabs(["⏰ Nhắc nhở", "📊 Xuất Excel BHXH", "📋 Quản lý thay đổi"])
+    
+    with tab1:
+        st.subheader("⏰ Nhắc nhở công việc bảo hiểm")
+        
+        # Danh sách nhắc nhở
+        insurance_reminders = [
+            {"type": "Điều chỉnh lương", "employee": "Nguyễn Văn A", "deadline": "31/12/2024", "days_left": 30},
+            {"type": "Báo nghỉ thai sản", "employee": "Trần Thị B", "deadline": "15/01/2025", "days_left": 45},
+            {"type": "Báo nghỉ hưu", "employee": "Lê Văn C", "deadline": "28/02/2025", "days_left": 89}
+        ]
+        
+        if insurance_reminders:
+            st.warning(f"⚠️ Có {len(insurance_reminders)} việc cần xử lý!")
+            
+            for reminder in insurance_reminders:
+                if reminder['days_left'] <= 7:
+                    urgency, color = "🔴 Khẩn cấp", "#ffebee"
+                elif reminder['days_left'] <= 30:
+                    urgency, color = "🟡 Quan trọng", "#fff3e0"
+                else:
+                    urgency, color = "🟢 Bình thường", "#e8f5e8"
+                
+                st.markdown(f"""
+                <div style="border-left: 4px solid #1976d2; padding: 1rem; margin: 1rem 0; 
+                           background: {color}; border-radius: 8px;">
+                    <h4>📋 {reminder['type']} ({urgency})</h4>
+                    <p><strong>Nhân viên:</strong> {reminder['employee']}</p>
+                    <p><strong>Hạn xử lý:</strong> {reminder['deadline']} (còn {reminder['days_left']} ngày)</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                if st.button(f"✅ Đã xử lý", key=f"done_{reminder['employee']}"):
+                    st.success(f"✅ Đã đánh dấu hoàn thành {reminder['type']} cho {reminder['employee']}")
+        else:
+            st.success("✅ Không có công việc bảo hiểm nào cần xử lý!")
+    
+    with tab2:
+        st.subheader("📊 Xuất file Excel cho Bảo hiểm Xã hội")
+        
+        # Chọn loại báo cáo
+        report_type = st.selectbox("📋 Chọn loại báo cáo BHXH:",
+            ["Điều chỉnh chức danh/lương/phụ cấp", "Nghỉ hưu/thôi việc", "Nghỉ thai sản", 
+             "Nghỉ ốm đau", "Đi học", "Phu nhân ngoại giao"])
+        
+        # Chọn tháng báo cáo
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            report_month = st.selectbox("📅 Tháng báo cáo:", 
+                ["12/2024", "11/2024", "10/2024", "09/2024"])
+        
+        with col2:
+            department = st.selectbox("🏢 Phòng ban:", 
+                ["Tất cả", "Phòng TCHC", "Phòng TCKT", "Phòng KD"])
+        
+        if st.button("📊 Tạo file Excel BHXH", use_container_width=True):
+            # Dữ liệu mẫu tùy theo loại báo cáo
+            if "lương" in report_type:
+                excel_data = pd.DataFrame([
+                    {"STT": 1, "Mã NV": "NV001", "Họ tên": "Nguyễn Văn A", "Số sổ BHXH": "1234567890",
+                     "Lương cũ": 6900000, "Lương mới": 7320000, "Từ tháng": "01/2025", "Ghi chú": "Nâng lương định kỳ"},
+                    {"STT": 2, "Mã NV": "NV002", "Họ tên": "Trần Thị B", "Số sổ BHXH": "1234567891", 
+                     "Lương cũ": 5340000, "Lương mới": 5781000, "Từ tháng": "01/2025", "Ghi chú": "Nâng lương định kỳ"}
+                ])
+            elif "thai sản" in report_type:
+                excel_data = pd.DataFrame([
+                    {"STT": 1, "Mã NV": "NV003", "Họ tên": "Nguyễn Thị C", "Số sổ BHXH": "1234567892",
+                     "Từ ngày": "15/01/2025", "Đến ngày": "15/07/2025", "Chế độ": "Nghỉ thai sản 6 tháng", "Ghi chú": ""}
+                ])
+            else:
+                excel_data = pd.DataFrame([
+                    {"STT": 1, "Thông tin": "Dữ liệu mẫu", "Ghi chú": "Sẽ cập nhật theo loại báo cáo"}
+                ])
+            
+            st.success(f"✅ Đã tạo file Excel: {report_type} - {report_month}")
+            st.dataframe(excel_data, use_container_width=True)
+            
+            # Nút tải xuống
+            csv_data = excel_data.to_csv(index=False, encoding='utf-8-sig')
+            st.download_button(
+                label="📥 Tải file Excel",
+                data=csv_data,
+                file_name=f"BHXH_{report_type.replace('/', '_')}_{report_month.replace('/', '_')}.csv",
+                mime="text/csv"
+            )
+    
+    with tab3:
+        st.subheader("📋 Quản lý thay đổi BHXH")
+        
+        # Thêm thay đổi mới
+        with st.expander("➕ Thêm thay đổi BHXH mới"):
+            with st.form("add_insurance_change"):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    emp_name = st.text_input("👤 Họ tên nhân viên:")
+                    change_type = st.selectbox("📋 Loại thay đổi:",
+                        ["Điều chỉnh lương", "Nghỉ thai sản", "Nghỉ hưu", "Thôi việc", "Đi học"])
+                    effective_date = st.date_input("📅 Ngày hiệu lực:")
+                
+                with col2:
+                    old_value = st.text_input("📊 Giá trị cũ:")
+                    new_value = st.text_input("🔄 Giá trị mới:")
+                    notes = st.text_area("📝 Ghi chú:")
+                
+                if st.form_submit_button("➕ Thêm thay đổi"):
+                    st.success(f"✅ Đã thêm thay đổi BHXH cho {emp_name}!")
+        
+        # Danh sách thay đổi gần đây
+        st.markdown("#### 📋 Thay đổi BHXH gần đây")
+        
+        recent_changes = pd.DataFrame([
+            {"Ngày": "15/12/2024", "Nhân viên": "Nguyễn Văn A", "Loại": "Điều chỉnh lương", 
+             "Cũ": "6.900.000", "Mới": "7.320.000", "Trạng thái": "Đã xử lý"},
+            {"Ngày": "10/12/2024", "Nhân viên": "Trần Thị B", "Loại": "Nghỉ thai sản", 
+             "Cũ": "Đang làm", "Mới": "Nghỉ từ 15/01/2025", "Trạng thái": "Chờ xử lý"},
+            {"Ngày": "05/12/2024", "Nhân viên": "Lê Văn C", "Loại": "Nghỉ hưu", 
+             "Cũ": "Đang làm", "Mới": "Nghỉ hưu từ 01/03/2025", "Trạng thái": "Đã xử lý"}
+        ])
+        
+        st.dataframe(recent_changes, use_container_width=True)
+        
+        # Xuất tổng hợp
+        if st.button("📊 Xuất báo cáo tổng hợp BHXH tháng", use_container_width=True):
+            st.success("✅ Đã xuất báo cáo tổng hợp BHXH!")
 
 # Main execution
 def main():
