@@ -28,6 +28,9 @@ from utils_streamlit import (
     calculate_seniority_allowance
 )
 
+# Import additional modern pages
+from hrms_pages_modern import ModernPages
+
 # Cấu hình trang với theme hiện đại
 st.set_page_config(
     page_title="HRMS - Hệ thống Quản lý Nhân sự",
@@ -534,11 +537,59 @@ def main_app():
     elif st.session_state.current_page == "👥 Tra cứu nhân sự":
         employee_search_page()
     elif st.session_state.current_page == "💰 Nâng lương định kỳ":
+        ModernPages.salary_management_page()
+    elif st.session_state.current_page == "⏰ Theo dõi nghỉ hưu":
+        ModernPages.retirement_tracking_page()
+    elif st.session_state.current_page == "📊 Báo cáo thống kê":
+        ModernPages.reports_dashboard()
+    elif st.session_state.current_page == "📋 Kiểm tra quy hoạch":
         st.markdown(ModernComponents.modern_alert(
             "info",
-            "Chức năng đang phát triển",
-            "Trang nâng lương định kỳ sẽ được cập nhật trong phiên bản tiếp theo",
-            "🚧 Vui lòng quay lại sau"
+            "Chức năng đang hoàn thiện",
+            "Trang kiểm tra quy hoạch cán bộ sẽ được cập nhật trong phiên bản tiếp theo",
+            "🚧 Đang phát triển thêm tính năng nâng cao"
+        ), unsafe_allow_html=True)
+    elif st.session_state.current_page == "💼 Quá trình công tác":
+        st.markdown(ModernComponents.modern_alert(
+            "info", 
+            "Chức năng đang hoàn thiện",
+            "Trang quá trình công tác sẽ được cập nhật trong phiên bản tiếp theo",
+            "🚧 Đang tích hợp timeline và workflow"
+        ), unsafe_allow_html=True)
+    elif st.session_state.current_page == "📄 Hợp đồng lao động":
+        st.markdown(ModernComponents.modern_alert(
+            "info",
+            "Chức năng đang hoàn thiện", 
+            "Trang hợp đồng lao động sẽ được cập nhật trong phiên bản tiếp theo",
+            "🚧 Đang phát triển quản lý hợp đồng điện tử"
+        ), unsafe_allow_html=True)
+    elif st.session_state.current_page == "✅ Điều kiện bổ nhiệm":
+        st.markdown(ModernComponents.modern_alert(
+            "info",
+            "Chức năng đang hoàn thiện",
+            "Trang kiểm tra điều kiện bổ nhiệm sẽ được cập nhật trong phiên bản tiếp theo", 
+            "🚧 Đang tích hợp AI để tự động kiểm tra điều kiện"
+        ), unsafe_allow_html=True)
+    elif st.session_state.current_page == "🏆 Điều kiện khen thưởng":
+        st.markdown(ModernComponents.modern_alert(
+            "info",
+            "Chức năng đang hoàn thiện",
+            "Trang điều kiện khen thưởng sẽ được cập nhật trong phiên bản tiếp theo",
+            "🚧 Đang phát triển hệ thống đánh giá tự động"
+        ), unsafe_allow_html=True)
+    elif st.session_state.current_page == "⚡ Nâng lương trước hạn":
+        st.markdown(ModernComponents.modern_alert(
+            "info",
+            "Chức năng đang hoàn thiện", 
+            "Trang nâng lương trước hạn do thành tích sẽ được cập nhật trong phiên bản tiếp theo",
+            "🚧 Đang tích hợp workflow phê duyệt"
+        ), unsafe_allow_html=True)
+    elif st.session_state.current_page == "🏥 Báo bảo hiểm":
+        st.markdown(ModernComponents.modern_alert(
+            "info",
+            "Chức năng đang hoàn thiện",
+            "Trang báo bảo hiểm xã hội sẽ được cập nhật trong phiên bản tiếp theo", 
+            "🚧 Đang tích hợp API Bảo hiểm xã hội"
         ), unsafe_allow_html=True)
     else:
         # Placeholder cho các trang khác
@@ -550,7 +601,7 @@ def main_app():
         
         st.markdown(ModernComponents.modern_alert(
             "warning",
-            "Tính năng đang được hoàn thiện",
+            "Tính năng đang được hoàn thiện", 
             f"Chức năng {st.session_state.current_page} đang trong quá trình phát triển và sẽ được cập nhật trong phiên bản tiếp theo.",
             "💡 Vui lòng sử dụng các tính năng khác đã hoàn thành"
         ), unsafe_allow_html=True)
