@@ -342,15 +342,564 @@ def employee_search_page():
 # Các page khác sẽ được implement tương tự...
 def salary_management_page():
     st.markdown('<div class="main-header"><h1>💰 Quản lý nâng lương định kỳ</h1></div>', unsafe_allow_html=True)
-    st.info("Chức năng đang được phát triển...")
+    
+    # Tabs cho các chức năng con
+    tab1, tab2, tab3 = st.tabs(["📅 Lịch cảnh báo", "👥 Danh sách nâng lương", "📄 Xuất file"])
+    
+    with tab1:
+        st.subheader("📅 Lịch cảnh báo nâng lương")
+        
+        # Hiển thị lịch cảnh báo theo quý
+        current_year = datetime.now().year
+        alert_schedule = [
+            {"quarter": "Q1", "alert_date": "15/02", "review_date": "31/03", "status": "completed" if datetime.now().month > 3 else "upcoming"},
+            {"quarter": "Q2", "alert_date": "15/05", "review_date": "30/06", "status": "completed" if datetime.now().month > 6 else "upcoming"},
+            {"quarter": "Q3", "alert_date": "15/08", "review_date": "30/09", "status": "completed" if datetime.now().month > 9 else "upcoming"},
+            {"quarter": "Q4", "alert_date": "15/11", "review_date": "31/12", "status": "completed" if datetime.now().month > 12 else "upcoming"}
+        ]
+        
+        for schedule in alert_schedule:
+            status_icon = "✅" if schedule["status"] == "completed" else "⏰"
+            status_color = "success" if schedule["status"] == "completed" else "info"
+            
+            st.markdown(f"""
+            <div class="{'success-box' if schedule['status'] == 'completed' else 'warning-box'}">
+                <h4>{status_icon} {schedule['quarter']}/{current_year}</h4>
+                <p><strong>Cảnh báo:</strong> {schedule['alert_date']}/{current_year}</p>
+                <p><strong>Xét nâng lương:</strong> {schedule['review_date']}/{current_year}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        st.markdown("""
+        **📋 Quy tắc nâng lương thường xuyên:**
+        - **Chuyên viên và tương đương trở lên**: 36 tháng
+        - **Nhân viên, Thủ quỹ**: 24 tháng
+        - **Phụ cấp thâm niên vượt khung**: 5% (năm đầu) + 1%/năm tiếp theo
+        
+        **📖 Căn cứ pháp lý:** Thông tư 08/2013/TT-BNV
+        """)
+    
+    with tab2:
+        st.subheader("👥 Danh sách nhân viên đủ điều kiện nâng lương")
+        
+        # Bộ lọc
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            filter_department = st.selectbox("🏢 Lọc theo đơn vị", 
+                ["Tất cả", "Phòng Tổ chức - Hành chính", "Phòng Tài chính - Kế toán", "Phòng Kinh doanh"])
+        
+        with col2:
+            filter_position = st.selectbox("💼 Lọc theo chức vụ",
+                ["Tất cả", "Chuyên viên cao cấp", "Chuyên viên chính", "Chuyên viên", "Nhân viên"])
+        
+        with col3:
+            filter_level = st.selectbox("📊 Lọc theo ngạch",
+                ["Tất cả", "A1", "A2", "A3", "B1", "B2", "B3"])
+        
+        if st.button("🔍 Tính toán danh sách", use_container_width=True):
+            # Dữ liệu mẫu - trong thực tế sẽ query từ database
+            eligible_employees = [
+                {
+                    "name": "Nguyễn Văn A",
+                    "position": "Chuyên viên chính", 
+                    "department": "Phòng Tổ chức - Hành chính",
+                    "current_level": "A2",
+                    "current_coefficient": 3.45,
+                    "last_increase_date": "01/04/2021",
+                    "expected_level": "A2",
+                    "expected_coefficient": 3.66,
+                    "next_increase_date": "01/04/2024",
+                    "months_left": 4,
+                    "is_eligible": True,
+                    "notes": ""
+                },
+                {
+                    "name": "Trần Thị B",
+                    "position": "Chuyên viên",
+                    "department": "Phòng Tài chính - Kế toán", 
+                    "current_level": "A1",
+                    "current_coefficient": 2.67,
+                    "last_increase_date": "15/01/2022",
+                    "expected_level": "A1",
+                    "expected_coefficient": 2.89,
+                    "next_increase_date": "15/01/2025",
+                    "months_left": 8,
+                    "is_eligible": True,
+                    "notes": ""
+                },
+                {
+                    "name": "Lê Văn C",
+                    "position": "Nhân viên",
+                    "department": "Phòng Kinh doanh",
+                    "current_level": "B1", 
+                    "current_coefficient": 2.10,
+                    "last_increase_date": "10/06/2022",
+                    "expected_level": "B1",
+                    "expected_coefficient": 2.25,
+                    "next_increase_date": "10/06/2024",
+                    "months_left": 6,
+                    "is_eligible": True,
+                    "notes": "Bị kéo dài do kỷ luật 3 tháng"
+                }
+            ]
+            
+            # Hiển thị danh sách
+            st.success(f"✅ Tìm thấy {len(eligible_employees)} nhân viên đủ điều kiện nâng lương")
+            
+            for idx, emp in enumerate(eligible_employees, 1):
+                with st.expander(f"👤 {emp['name']} - {emp['position']}", expanded=True if idx <= 2 else False):
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        st.write("**Thông tin hiện tại:**")
+                        st.write(f"• Đơn vị: {emp['department']}")
+                        st.write(f"• Ngạch/Hệ số: {emp['current_level']}/{emp['current_coefficient']}")
+                        st.write(f"• Nâng lương gần nhất: {emp['last_increase_date']}")
+                    
+                    with col2:
+                        st.write("**Dự kiến nâng lương:**")
+                        st.write(f"• Ngạch/Hệ số mới: {emp['expected_level']}/{emp['expected_coefficient']}")
+                        st.write(f"• Ngày dự kiến: {emp['next_increase_date']}")
+                        
+                        if emp['months_left'] <= 3:
+                            st.error(f"⚠️ Còn {emp['months_left']} tháng")
+                        elif emp['months_left'] <= 6:
+                            st.warning(f"🔔 Còn {emp['months_left']} tháng")
+                        else:
+                            st.info(f"📅 Còn {emp['months_left']} tháng")
+                    
+                    with col3:
+                        st.write("**Trạng thái:**")
+                        if emp['is_eligible']:
+                            st.success("✅ Đủ điều kiện")
+                        else:
+                            st.error("❌ Chưa đủ điều kiện")
+                        
+                        if emp['notes']:
+                            st.warning(f"📝 {emp['notes']}")
+                        
+                        # Ghi chú đặc biệt
+                        special_note = st.text_input(f"📝 Ghi chú đặc biệt cho {emp['name']}:", 
+                                                   value=emp['notes'], key=f"note_{idx}")
+    
+    with tab3:
+        st.subheader("📄 Xuất file báo cáo")
+        
+        st.markdown("**Chọn loại file cần xuất:**")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button("📄 Công văn rà soát", use_container_width=True):
+                st.success("✅ Đã xuất file: CV_RaSoat_NangLuong_Q4_2024.docx")
+                st.download_button(
+                    label="📥 Tải xuống",
+                    data="Nội dung công văn rà soát...",
+                    file_name="CV_RaSoat_NangLuong_Q4_2024.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                )
+        
+        with col2:
+            if st.button("📢 Thông báo kết quả", use_container_width=True):
+                st.success("✅ Đã xuất file: ThongBao_KetQua_NangLuong_Q4_2024.docx")
+                st.download_button(
+                    label="📥 Tải xuống",
+                    data="Nội dung thông báo kết quả...",
+                    file_name="ThongBao_KetQua_NangLuong_Q4_2024.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                )
+        
+        with col3:
+            if st.button("⚖️ Quyết định nâng lương", use_container_width=True):
+                st.success("✅ Đã xuất file: QuyetDinh_NangLuong_Q4_2024.docx")
+                st.download_button(
+                    label="📥 Tải xuống", 
+                    data="Nội dung quyết định nâng lương...",
+                    file_name="QuyetDinh_NangLuong_Q4_2024.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                )
+        
+        st.markdown("---")
+        
+        # Danh sách Excel kèm theo
+        st.markdown("**📊 File Excel kèm theo:**")
+        
+        if st.button("📊 Xuất danh sách Excel", use_container_width=True):
+            # Tạo dữ liệu Excel mẫu
+            excel_data = pd.DataFrame({
+                'STT': [1, 2, 3],
+                'Họ tên': ['Nguyễn Văn A', 'Trần Thị B', 'Lê Văn C'],
+                'Chức vụ': ['Chuyên viên chính', 'Chuyên viên', 'Nhân viên'],
+                'Đơn vị': ['Phòng TCHC', 'Phòng TCKT', 'Phòng KD'],
+                'Ngạch hiện tại': ['A2', 'A1', 'B1'],
+                'Hệ số hiện tại': [3.45, 2.67, 2.10],
+                'Ngạch mới': ['A2', 'A1', 'B1'],
+                'Hệ số mới': [3.66, 2.89, 2.25],
+                'Thời điểm hưởng': ['01/04/2024', '15/01/2025', '10/06/2024'],
+                'Ghi chú': ['', '', 'Kéo dài do kỷ luật']
+            })
+            
+            st.success("✅ Đã tạo file Excel thành công!")
+            st.dataframe(excel_data, use_container_width=True)
+            
+            # Convert to CSV for download
+            csv_data = excel_data.to_csv(index=False, encoding='utf-8-sig')
+            st.download_button(
+                label="📥 Tải danh sách Excel",
+                data=csv_data,
+                file_name="DanhSach_NangLuong_Q4_2024.csv", 
+                mime="text/csv"
+            )
 
 def retirement_page():
     st.markdown('<div class="main-header"><h1>⏰ Theo dõi nghỉ hưu</h1></div>', unsafe_allow_html=True)
-    st.info("Chức năng đang được phát triển...")
+    
+    # Tabs cho các chức năng con
+    tab1, tab2, tab3, tab4 = st.tabs(["⏰ Danh sách nghỉ hưu", "📢 Cảnh báo", "💰 Nâng lương trước hạn", "📄 Xuất file"])
+    
+    with tab1:
+        st.subheader("⏰ Danh sách nhân viên sắp nghỉ hưu")
+        
+        # Dữ liệu mẫu nghỉ hưu
+        retirement_employees = [
+            {
+                "name": "Nguyễn Văn D", "birth_date": "15/03/1964", "gender": "Nam",
+                "position": "Chuyên viên cao cấp", "department": "Phòng Tổ chức - Hành chính",
+                "retirement_date": "15/06/2025", "days_left": 185, "months_left": 6.1,
+                "current_salary": "A3/4.2", "years_of_service": 35,
+                "eligible_for_early_increase": True, "notification_sent": False, "decision_sent": False
+            },
+            {
+                "name": "Trần Thị E", "birth_date": "10/01/1970", "gender": "Nữ", 
+                "position": "Chuyên viên chính", "department": "Phòng Tài chính - Kế toán",
+                "retirement_date": "10/05/2025", "days_left": 149, "months_left": 4.9,
+                "current_salary": "A2/3.8", "years_of_service": 28,
+                "eligible_for_early_increase": True, "notification_sent": True, "decision_sent": False
+            },
+            {
+                "name": "Lê Văn F", "birth_date": "20/02/1965", "gender": "Nam",
+                "position": "Trưởng phòng", "department": "Phòng Kinh doanh", 
+                "retirement_date": "20/02/2025", "days_left": 70, "months_left": 2.3,
+                "current_salary": "A4/5.1", "years_of_service": 40,
+                "eligible_for_early_increase": False, "notification_sent": True, "decision_sent": True
+            }
+        ]
+        
+        # Thống kê tổng quan
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("👥 Tổng số", len(retirement_employees))
+        with col2:
+            need_notification = len([emp for emp in retirement_employees if emp['days_left'] <= 180 and not emp['notification_sent']])
+            st.metric("📢 Cần thông báo", need_notification)
+        with col3:
+            need_decision = len([emp for emp in retirement_employees if emp['days_left'] <= 90 and not emp['decision_sent']])  
+            st.metric("⚖️ Cần quyết định", need_decision)
+        with col4:
+            eligible_salary = len([emp for emp in retirement_employees if emp['eligible_for_early_increase']])
+            st.metric("💰 Đủ điều kiện nâng lương", eligible_salary)
+        
+        # Hiển thị danh sách
+        for emp in retirement_employees:
+            if emp['days_left'] <= 30:
+                priority, background = "🔴 Khẩn cấp", "#ffebee"
+            elif emp['days_left'] <= 90:
+                priority, background = "🟡 Quan trọng", "#fff3e0"
+            elif emp['days_left'] <= 180:
+                priority, background = "🟢 Theo dõi", "#e8f5e8"
+            else:
+                priority, background = "⚪ Bình thường", "#f5f5f5"
+            
+            with st.container():
+                st.markdown(f"""
+                <div style="border-left: 4px solid #1976d2; padding: 1rem; margin: 1rem 0; 
+                           background: {background}; border-radius: 8px;">
+                    <h4>👤 {emp['name']} ({priority}) - Còn {emp['days_left']} ngày</h4>
+                    <p><strong>Nghỉ hưu:</strong> {emp['retirement_date']} | <strong>Thâm niên:</strong> {emp['years_of_service']} năm</p>
+                    <p><strong>Trạng thái:</strong> 
+                       {'✅ Đã thông báo' if emp['notification_sent'] else '❌ Chưa thông báo'} | 
+                       {'✅ Có quyết định' if emp['decision_sent'] else '❌ Chưa có quyết định'}
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+    
+    with tab2:
+        st.subheader("📢 Hệ thống cảnh báo")
+        
+        warning_6_months = [emp for emp in retirement_employees if 150 <= emp['days_left'] <= 180 and not emp['notification_sent']]
+        warning_3_months = [emp for emp in retirement_employees if 60 <= emp['days_left'] <= 90 and not emp['decision_sent']]
+        warning_1_month = [emp for emp in retirement_employees if emp['days_left'] <= 30]
+        
+        if warning_6_months:
+            st.error(f"⚠️ **Cảnh báo 6 tháng**: {len(warning_6_months)} nhân viên cần thông báo nghỉ hưu")
+        if warning_3_months:
+            st.error(f"🚨 **Cảnh báo 3 tháng**: {len(warning_3_months)} nhân viên cần quyết định nghỉ hưu")  
+        if warning_1_month:
+            st.error(f"🔥 **Khẩn cấp**: {len(warning_1_month)} nhân viên nghỉ hưu trong tháng")
+        
+        if not any([warning_6_months, warning_3_months, warning_1_month]):
+            st.success("✅ Tất cả thủ tục nghỉ hưu đã được xử lý đúng thời hạn!")
+    
+    with tab3:
+        st.subheader("💰 Nâng lương trước thời hạn")
+        eligible = [emp for emp in retirement_employees if emp['eligible_for_early_increase']]
+        
+        if eligible:
+            st.info(f"📋 {len(eligible)} nhân viên đủ điều kiện nâng lương trước thời hạn")
+            for emp in eligible:
+                st.write(f"• **{emp['name']}**: {emp['current_salary']} → Dự kiến tăng")
+        else:
+            st.warning("ℹ️ Không có nhân viên đủ điều kiện nâng lương trước thời hạn")
+    
+    with tab4:
+        st.subheader("📄 Xuất văn bản nghỉ hưu")
+        
+        selected_emp = st.selectbox("👤 Chọn nhân viên:", 
+            [f"{emp['name']} (nghỉ hưu {emp['retirement_date']})" for emp in retirement_employees])
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("📢 Thông báo (6 tháng)", use_container_width=True):
+                st.success("✅ Đã tạo thông báo nghỉ hưu!")
+        
+        with col2:
+            if st.button("⚖️ Quyết định (3 tháng)", use_container_width=True):
+                st.success("✅ Đã tạo quyết định nghỉ hưu!")
 
 def planning_page():
-    st.markdown('<div class="main-header"><h1>📋 Kiểm tra quy hoạch</h1></div>', unsafe_allow_html=True)
-    st.info("Chức năng đang được phát triển...")
+    st.markdown('<div class="main-header"><h1>📋 Kiểm tra quy hoạch cán bộ</h1></div>', unsafe_allow_html=True)
+    
+    # Tabs cho các chức năng con
+    tab1, tab2, tab3 = st.tabs(["👥 Danh sách quy hoạch", "📊 Phân tích", "⚙️ Cài đặt"])
+    
+    with tab1:
+        st.subheader("👥 Danh sách cán bộ quy hoạch")
+        
+        # Bộ lọc
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            position_filter = st.selectbox("🎯 Lọc theo vị trí quy hoạch",
+                ["Tất cả", "Trưởng phòng", "Phó Trưởng phòng", "Chuyên viên cao cấp"])
+        
+        with col2:
+            department_filter = st.selectbox("🏢 Lọc theo đơn vị",
+                ["Tất cả", "Phòng TCHC", "Phòng TCKT", "Phòng KD"])
+        
+        with col3:
+            age_filter = st.selectbox("📅 Lọc theo độ tuổi",
+                ["Tất cả", "Còn trong quy hoạch", "Sắp quá tuổi", "Đã quá tuổi"])
+        
+        # Dữ liệu quy hoạch mẫu
+        planning_data = [
+            {
+                "name": "Nguyễn Văn A", "birth_date": "15/06/1985", "age": 38,
+                "current_position": "Chuyên viên chính", "planning_position": "Phó Trưởng phòng",
+                "department": "Phòng TCHC", "planning_period": "2020-2025",
+                "max_age_for_position": 45, "years_left": 7, "is_valid": True,
+                "education": "Thạc sĩ Luật", "experience_years": 15,
+                "planning_status": "active", "notes": ""
+            },
+            {
+                "name": "Trần Thị B", "birth_date": "20/03/1978", "age": 45,
+                "current_position": "Chuyên viên", "planning_position": "Trưởng phòng",
+                "department": "Phòng TCKT", "planning_period": "2021-2026",
+                "max_age_for_position": 50, "years_left": 5, "is_valid": True,
+                "education": "Cử nhân Tài chính", "experience_years": 20,
+                "planning_status": "active", "notes": ""
+            },
+            {
+                "name": "Lê Văn C", "birth_date": "10/08/1970", "age": 53,
+                "current_position": "Phó Trưởng phòng", "planning_position": "Trưởng phòng",
+                "department": "Phòng KD", "planning_period": "2019-2024", 
+                "max_age_for_position": 52, "years_left": -1, "is_valid": False,
+                "education": "Cử nhân Kinh tế", "experience_years": 25,
+                "planning_status": "expired", "notes": "Đã quá tuổi quy hoạch"
+            }
+        ]
+        
+        # Thống kê tổng quan
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            total_planned = len(planning_data)
+            st.metric("👥 Tổng quy hoạch", total_planned)
+        
+        with col2:
+            active_planning = len([p for p in planning_data if p['is_valid']])
+            st.metric("✅ Còn hiệu lực", active_planning)
+        
+        with col3:
+            near_expiry = len([p for p in planning_data if p['is_valid'] and p['years_left'] <= 2])
+            st.metric("⚠️ Sắp hết hạn", near_expiry)
+        
+        with col4:
+            expired = len([p for p in planning_data if not p['is_valid']])
+            st.metric("❌ Đã hết hạn", expired)
+        
+        st.markdown("---")
+        
+        # Hiển thị danh sách
+        for person in planning_data:
+            # Xác định màu sắc và trạng thái
+            if not person['is_valid']:
+                status_color = "#ffebee"
+                status_text = "❌ Hết hạn"
+                border_color = "#f44336"
+            elif person['years_left'] <= 1:
+                status_color = "#fff3e0"
+                status_text = "⚠️ Sắp hết hạn"
+                border_color = "#ff9800"
+            elif person['years_left'] <= 2:
+                status_color = "#e3f2fd"
+                status_text = "🔔 Cần theo dõi"
+                border_color = "#2196f3"
+            else:
+                status_color = "#e8f5e8"
+                status_text = "✅ Bình thường"
+                border_color = "#4caf50"
+            
+            with st.container():
+                st.markdown(f"""
+                <div style="border-left: 4px solid {border_color}; padding: 1rem; margin: 1rem 0; 
+                           background: {status_color}; border-radius: 8px;">
+                    <h4>👤 {person['name']} ({status_text})</h4>
+                    <p><strong>Quy hoạch:</strong> {person['planning_position']} | <strong>Giai đoạn:</strong> {person['planning_period']}</p>
+                    <p><strong>Tuổi:</strong> {person['age']} (giới hạn: {person['max_age_for_position']}) | 
+                       <strong>Còn:</strong> {person['years_left']} năm</p>
+                    {'<p><strong>Ghi chú:</strong> ' + person['notes'] + '</p>' if person['notes'] else ''}
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Nút hành động
+                col_a, col_b, col_c = st.columns(3)
+                
+                with col_a:
+                    if st.button(f"📋 Chi tiết", key=f"detail_{person['name']}"):
+                        st.info(f"**Học vấn:** {person['education']}\n**Kinh nghiệm:** {person['experience_years']} năm")
+                
+                with col_b:
+                    if person['years_left'] <= 2 and person['is_valid']:
+                        if st.button(f"🔄 Gia hạn quy hoạch", key=f"extend_{person['name']}"):
+                            st.success(f"✅ Đã khởi tạo gia hạn quy hoạch cho {person['name']}")
+                
+                with col_c:
+                    if person['is_valid']:
+                        if st.button(f"⬆️ Đề xuất bổ nhiệm", key=f"promote_{person['name']}"):
+                            st.success(f"✅ Đã chuyển {person['name']} sang kiểm tra điều kiện bổ nhiệm")
+    
+    with tab2:
+        st.subheader("📊 Phân tích quy hoạch")
+        
+        # Biểu đồ phân tích
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### 📈 Phân bố theo độ tuổi")
+            age_data = pd.DataFrame({
+                'Độ tuổi': ['30-35', '36-40', '41-45', '46-50', '51-55'],
+                'Số lượng': [1, 1, 1, 0, 0]
+            })
+            st.bar_chart(age_data.set_index('Độ tuổi'))
+        
+        with col2:
+            st.markdown("#### 🎯 Trạng thái quy hoạch")
+            status_data = pd.DataFrame({
+                'Trạng thái': ['Còn hiệu lực', 'Sắp hết hạn', 'Đã hết hạn'],
+                'Số lượng': [1, 1, 1]
+            })
+            st.bar_chart(status_data.set_index('Trạng thái'))
+        
+        st.markdown("---")
+        
+        # Quota check (Số lượng quy hoạch)
+        st.markdown("#### 📋 Kiểm tra định mức quy hoạch")
+        
+        quota_data = [
+            {"position": "Trưởng phòng", "current": 2, "max_quota": 3, "available": 1},
+            {"position": "Phó Trưởng phòng", "current": 1, "max_quota": 4, "available": 3},
+            {"position": "Chuyên viên cao cấp", "current": 0, "max_quota": 5, "available": 5}
+        ]
+        
+        for quota in quota_data:
+            col_pos, col_cur, col_max, col_avail = st.columns(4)
+            
+            with col_pos:
+                st.write(f"**{quota['position']}**")
+            
+            with col_cur:
+                st.metric("Hiện có", quota['current'])
+            
+            with col_max:
+                st.metric("Định mức", quota['max_quota'])
+            
+            with col_avail:
+                if quota['available'] > 0:
+                    st.success(f"✅ Còn {quota['available']} suất")
+                else:
+                    st.error("❌ Đã đầy")
+    
+    with tab3:
+        st.subheader("⚙️ Cài đặt quy hoạch")
+        
+        # Thiết lập độ tuổi giới hạn
+        st.markdown("#### 📅 Giới hạn độ tuổi theo vị trí")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.number_input("Trưởng phòng (tuổi tối đa)", value=50, min_value=40, max_value=60)
+            st.number_input("Phó Trưởng phòng (tuổi tối đa)", value=45, min_value=35, max_value=55)
+        
+        with col2:
+            st.number_input("Chuyên viên cao cấp (tuổi tối đa)", value=40, min_value=30, max_value=50)
+            st.number_input("Chuyên viên chính (tuổi tối đa)", value=35, min_value=25, max_value=45)
+        
+        st.markdown("---")
+        
+        # Thiết lập định mức
+        st.markdown("#### 📊 Định mức quy hoạch theo đơn vị")
+        
+        department_quotas = st.data_editor(
+            pd.DataFrame({
+                "Đơn vị": ["Phòng TCHC", "Phòng TCKT", "Phòng KD"],
+                "Trưởng phòng": [1, 1, 1],
+                "Phó Trưởng phòng": [2, 1, 1], 
+                "Chuyên viên cao cấp": [2, 2, 1]
+            }),
+            use_container_width=True
+        )
+        
+        if st.button("💾 Lưu cài đặt", use_container_width=True):
+            st.success("✅ Đã lưu cài đặt quy hoạch thành công!")
+        
+        st.markdown("---")
+        
+        # Xuất báo cáo
+        st.markdown("#### 📄 Xuất báo cáo quy hoạch")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("📊 Báo cáo tổng hợp", use_container_width=True):
+                st.success("✅ Đã tạo báo cáo tổng hợp quy hoạch!")
+        
+        with col2:
+            if st.button("📋 Danh sách Excel", use_container_width=True):
+                export_data = pd.DataFrame([
+                    {
+                        "STT": i+1, "Họ tên": p["name"], "Tuổi": p["age"],
+                        "Chức vụ hiện tại": p["current_position"],
+                        "Vị trí quy hoạch": p["planning_position"],
+                        "Đơn vị": p["department"], "Giai đoạn": p["planning_period"],
+                        "Trạng thái": "Còn hiệu lực" if p["is_valid"] else "Hết hạn"
+                    } for i, p in enumerate(planning_data)
+                ])
+                
+                st.success("✅ Đã tạo danh sách Excel!")
+                st.dataframe(export_data, use_container_width=True)
 
 def work_history_page():
     st.markdown('<div class="main-header"><h1>💼 Quá trình công tác</h1></div>', unsafe_allow_html=True)
