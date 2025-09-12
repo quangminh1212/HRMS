@@ -185,21 +185,21 @@ def main():
             input("\nNhấn Enter để khởi động...")
             run_flet()
             
-        elif choice == "3":
+        elif choice == "4":
             print("\n💻 Bạn đã chọn CustomTkinter!")
             create_customtkinter_app()
             
-        elif choice == "4":
+        elif choice == "5":
             print("\n✨ Bạn đã chọn NiceGUI!")
             print("🎨 Giao diện web hiện đại với Tailwind CSS")
             input("\nNhấn Enter để khởi động...")
             run_nicegui()
             
-        elif choice == "5":
+        elif choice == "6":
             print("\n🎯 Bạn đã chọn Gradio!")
             create_gradio_app()
             
-        elif choice == "6":
+        elif choice == "7":
             print("\n📦 Cài đặt tất cả frameworks...")
             frameworks = ["streamlit", "flet", "customtkinter", "nicegui", "gradio"]
             
@@ -209,14 +209,14 @@ def main():
             print("\n✅ Hoàn tất cài đặt!")
             input("Nhấn Enter để tiếp tục...")
             
-        elif choice == "7":
+        elif choice == "8":
             print("\n🔧 Kiểm tra dependencies...")
             
             # Kiểm tra Python version
             print(f"🐍 Python: {sys.version}")
             
             # Kiểm tra các package
-            packages = ["streamlit", "flet", "customtkinter", "nicegui", "gradio"]
+            packages = ["streamlit", "flet", "customtkinter", "nicegui", "gradio", "plotly", "pandas"]
             
             for pkg in packages:
                 try:
