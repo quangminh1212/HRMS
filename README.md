@@ -18,6 +18,9 @@ run.bat
 
 # Hoặc chạy nhanh HRMS Modern
 quick-start.bat
+
+# Duy trì localhost tự động (khuyến nghị)
+keep-alive.bat
 ```
 
 ### **Cách 2: Python trực tiếp**
