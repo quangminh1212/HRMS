@@ -15,7 +15,7 @@ class ModernPages:
     @staticmethod
     def salary_management_page():
         """Trang quản lý nâng lương hiện đại"""
-        from app import ModernComponents
+        from components import ModernComponents
         
         ModernComponents.hero_header(
             "Quản lý nâng lương",
@@ -208,7 +208,7 @@ class ModernPages:
     @staticmethod
     def retirement_tracking_page():
         """Trang theo dõi nghỉ hưu hiện đại"""
-        from app import ModernComponents
+        from components import ModernComponents
         
         ModernComponents.hero_header(
             "Theo dõi nghỉ hưu", 
@@ -310,7 +310,7 @@ class ModernPages:
     @staticmethod
     def reports_dashboard():
         """Dashboard báo cáo hiện đại"""
-        from app import ModernComponents
+        from components import ModernComponents
         
         ModernComponents.hero_header(
             "Báo cáo & Thống kê",

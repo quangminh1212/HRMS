@@ -31,6 +31,9 @@ from utils import (
 # Import additional modern pages
 from pages import ModernPages
 
+# Import components
+from components import ModernComponents
+
 # Cấu hình trang với theme hiện đại
 st.set_page_config(
     page_title="HRMS - Hệ thống Quản lý Nhân sự",
