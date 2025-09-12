@@ -95,66 +95,10 @@ python -m pytest tests/
 3. Chọn định dạng file (Word/Excel)
 4. File sẽ được lưu trong thư mục exports/
 
-## Security
-
-- Password hashing with Werkzeug
-- Session management with Flask-Login
-- CSRF protection with Flask-WTF
-- Role-based access control (admin, manager, user)
-- Secure cookie configuration
-- SQL injection prevention with SQLAlchemy ORM
-
-## Troubleshooting
-
-Common issues and solutions:
-
-1. **Port 5000 already in use**:
-   ```bash
-   # Find and kill process using port 5000
-   netstat -ano | findstr :5000
-   taskkill /PID <process_id> /F
-   ```
-
-2. **Database locked error**:
-   ```bash
-   # Remove database file and reinitialize
-   rm instance/hrms.db
-   python run.py
-   ```
-
-3. **Import errors**:
-   ```bash
-   # Ensure virtual environment is activated
-   pip install -r requirements.txt --force-reinstall
-   ```
-
-## Performance
-
-For better performance in production:
-- Use PostgreSQL instead of SQLite
-- Enable database connection pooling
-- Use Redis for session storage
-- Implement caching with Flask-Caching
-- Use CDN for static assets
-
-## Support
-
-- 📧 Email: support@hrms.local
-- 📖 Documentation: [Wiki](https://github.com/your-org/hrms/wiki)
-- 🐛 Bug Reports: [Issues](https://github.com/your-org/hrms/issues)
-- 💡 Feature Requests: [Discussions](https://github.com/your-org/hrms/discussions)
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Flask team for the excellent web framework
-- SQLAlchemy for database ORM
-- Bootstrap for UI components
-- All contributors who helped make this project better
+## Ghi chú
+- Tài khoản mặc định: admin / admin123  
+- Database được tạo tự động khi chạy lần đầu
+- File export sẽ lưu trong thư mục exports/
 
 ---
-
-**Made with ❤️ for Vietnamese HR departments**
+© 2024 HRMS - Hệ thống Quản lý Nhân sự
