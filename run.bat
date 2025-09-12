@@ -48,7 +48,7 @@ set /p choice="👉 Chọn (1-7): "
 
 if "%choice%"=="1" (
     echo 💎 Đang khởi động HRMS Modern...
-    echo 🌐 Mở trình duyệt tại: http://localhost:8501
+    echo 🌐 Mở trình duyệt tại: http://localhost:3000
     echo ⚠️  Nhấn Ctrl+C để dừng
     python run.py
 ) else if "%choice%"=="2" (
@@ -64,14 +64,14 @@ if "%choice%"=="1" (
     )
     
     echo ✅ Đang khởi động HRMS Modern...
-    echo 🌐 URL: http://localhost:8501  
+    echo 🌐 URL: http://localhost:3000  
     echo 🔑 admin/admin123
     echo.
     python run.py
 ) else if "%choice%"=="3" (
     echo 🌐 HRMS LOCALHOST KEEPER - DUY TRI SERVER
     echo ======================================================================
-    echo 💡 Script này sẽ tự động duy trì localhost:8501
+    echo 💡 Script này sẽ tự động duy trì localhost:3000
     echo 🔄 Tự động restart nếu server bị dừng
     echo ⚠️  Nhấn Ctrl+C để dừng hoàn toàn
     echo ======================================================================
@@ -80,10 +80,10 @@ if "%choice%"=="1" (
     :keep_alive_start
     echo [%date% %time%] 🚀 Đang kiểm tra HRMS server...
     
-    REM Kiểm tra port 8501 có đang hoạt động không
-    netstat -ano | findstr :8501 >nul
+    REM Kiểm tra port 3000 có đang hoạt động không
+    netstat -ano | findstr :3000 >nul
     if !errorlevel!==0 (
-        echo [%date% %time%] ✅ Server đang hoạt động tốt trên localhost:8501
+        echo [%date% %time%] ✅ Server đang hoạt động tốt trên localhost:3000
     ) else (
         echo [%date% %time%] ❌ Server không phản hồi, đang khởi động lại...
         echo [%date% %time%] 🔄 Restarting HRMS Modern...

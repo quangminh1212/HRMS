@@ -436,7 +436,7 @@ def main():
     print(f"✅ File Excel: {excel_file}")
     print(f"✅ Nhân viên trong Excel: {len(employees_data)} người")
     print(f"✅ Import vào database: {imported_count} người")
-    print(f"📱 Có thể test ngay trên HRMS tại: http://localhost:8501")
+    print(f"📱 Có thể test ngay trên HRMS tại: http://localhost:3000")
     print("👤 Login: admin / admin123")
     print("="*60)
 

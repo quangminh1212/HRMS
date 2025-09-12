@@ -47,13 +47,13 @@ python run_nicegui.py      # Tailwind CSS
 
 ### **1. HRMS Modern** (🔥 MỚI NHẤT)
 - **🎨 Design**: Material Design 3 system  
-- **🌐 Port**: 8501
+- **🌐 Port**: 3000
 - **✨ Tính năng**: Component library, Design tokens, Glassmorphism
 - **📱 UI**: Hero headers, Metric cards, Interactive charts
 
 ### **2. Streamlit Classic** 
 - **🎨 Design**: Enhanced Streamlit với CSS hiện đại
-- **🌐 Port**: 8501  
+- **🌐 Port**: 3000  
 - **✨ Tính năng**: Glassmorphism effects, Gradient backgrounds
 - **📱 UI**: Responsive layout, Smooth animations
 

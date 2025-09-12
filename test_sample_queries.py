@@ -94,7 +94,7 @@ def test_queries():
     print("✅ Test hoàn tất - Dữ liệu test đã sẵn sàng cho HRMS!")
     print("🚀 Có thể chạy ứng dụng và test các tính năng:")
     print("   python run.py")
-    print("   http://localhost:8501")
+    print("   http://localhost:3000")
     print("="*60)
 
 if __name__ == "__main__":

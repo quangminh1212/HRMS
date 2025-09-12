@@ -18,7 +18,7 @@ def main():
     print("✨ Frontend & Backend 100% Python")
     print("🎯 Đáp ứng đầy đủ 11 yêu cầu nghiệp vụ")
     print("=" * 60)
-    print("🌐 Ứng dụng sẽ mở tại: http://localhost:8501")
+    print("🌐 Ứng dụng sẽ mở tại: http://localhost:3000")
     print("👤 Tài khoản: admin / admin123")
     print("=" * 60)
     print("⚠️  Nhấn Ctrl+C để dừng server")
@@ -38,7 +38,7 @@ def main():
         # Sử dụng subprocess để chạy streamlit run
         cmd = [
             sys.executable, "-m", "streamlit", "run", "app_classic.py",
-            "--server.port", "8501",
+            "--server.port", "3000",
             "--server.address", "0.0.0.0",
             "--browser.gatherUsageStats", "false"
         ]

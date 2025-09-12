@@ -49,11 +49,11 @@ def check_salary_increase_eligibility(employee):
     - Chuyên viên trở lên: 36 tháng
     - Nhân viên, Thủ quỹ: 24 tháng
     """
-    if not employee.last_salary_increase_date:
+    if not employee.current_salary_date:
         # Nếu chưa có lần nâng lương nào, tính từ ngày bắt đầu công tác
-        reference_date = employee.start_date
+        reference_date = employee.organization_start_date
     else:
-        reference_date = employee.last_salary_increase_date
+        reference_date = employee.current_salary_date
     
     if not reference_date:
         return False
@@ -61,14 +61,14 @@ def check_salary_increase_eligibility(employee):
     # Tính số tháng từ lần nâng lương gần nhất
     months_since_last = calculate_months_difference(reference_date, date.today())
     
-    # Xác định thời gian cần thiết dựa trên ngạch
-    if employee.current_salary_level and any(level in (employee.current_salary_level or '') 
-                                           for level in ['Chuyên viên', 'Chuyên gia', 'Giám đốc', 'Phó giám đốc']):
+    # Xác định thời gian cần thiết dựa trên chức vụ
+    if employee.position and any(pos in employee.position 
+                                for pos in ['Chuyên viên', 'Chuyên gia', 'Giám đốc', 'Phó giám đốc', 'Trưởng phòng']):
         required_months = 36
     else:
         required_months = 24
     
-    return months_since_last >= required_months
+    return months_since_last >= required_months, months_since_last
 
 def calculate_months_difference(start_date, end_date):
     """Tính số tháng giữa 2 ngày"""
@@ -80,17 +80,17 @@ def calculate_seniority_allowance(employee):
     - Hưởng 5% khi đủ 36 tháng ở bậc lương cuối cùng (Chuyên viên) hoặc 24 tháng (Nhân viên)
     - Sau đó mỗi năm tăng 1%
     """
-    if not employee.last_salary_increase_date:
+    if not employee.current_salary_date:
         return 0
     
     # Kiểm tra xem có phải bậc lương cuối cùng không (giả sử hệ số >= 4.0 là bậc cuối)
     if (employee.current_salary_coefficient or 0) < 4.0:
         return 0
     
-    months_at_max_level = calculate_months_difference(employee.last_salary_increase_date, date.today())
+    months_at_max_level = calculate_months_difference(employee.current_salary_date, date.today())
     
     # Xác định thời gian cần thiết
-    if employee.current_salary_level and 'Chuyên viên' in employee.current_salary_level:
+    if employee.position and 'Chuyên viên' in employee.position:
         required_months = 36
     else:
         required_months = 24

@@ -20,7 +20,7 @@ def main():
     print("🏗️ Component System chuyên nghiệp với Clean White Theme")
     print("💎 Modern Teal Accents & Micro-animations")
     print("=" * 70)
-    print("🌐 Ứng dụng sẽ mở tại: http://localhost:8501")
+    print("🌐 Ứng dụng sẽ mở tại: http://localhost:3000")
     print("👤 Tài khoản: admin / admin123")
     print("=" * 70)
     print("⚠️  Nhấn Ctrl+C để dừng server")
@@ -44,7 +44,7 @@ def main():
         # Sử dụng subprocess để chạy streamlit run
         cmd = [
             sys.executable, "-m", "streamlit", "run", "app.py",
-            "--server.port", "8501",
+            "--server.port", "3000",
             "--server.address", "0.0.0.0", 
             "--browser.gatherUsageStats", "false",
             "--theme.primaryColor", "#6750A4",
@@ -61,7 +61,7 @@ def main():
     except Exception as e:
         print(f"\n❌ Lỗi khi chạy HRMS Modern: {e}")
         print("💡 Hướng dẫn khắc phục:")
-        print("   - Kiểm tra port 8501 có bị chiếm không")
+        print("   - Kiểm tra port 3000 có bị chiếm không")
         print("   - Chạy lại script với quyền admin")
         print("   - Cài đặt lại dependencies: pip install -r requirements.txt")
         print("   - Đảm bảo file design.py tồn tại")
