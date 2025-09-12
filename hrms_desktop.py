@@ -16,6 +16,19 @@ from PIL import Image, ImageTk
 import threading
 import webbrowser
 
+# Microsoft Fluent Design Colors
+COLORS = {
+    'primary': '#0078d4',      # Microsoft Blue
+    'secondary': '#106ebe',     # Darker Blue
+    'success': '#107c10',       # Microsoft Green  
+    'warning': '#ff8c00',       # Microsoft Orange
+    'error': '#d13438',         # Microsoft Red
+    'background': '#f3f2f1',    # Microsoft Light Gray
+    'surface': '#ffffff',       # White
+    'text': '#323130',          # Microsoft Dark Gray
+    'text_secondary': '#605e5c' # Microsoft Medium Gray
+}
+
 # Import business logic
 try:
     from models_streamlit import *
@@ -23,14 +36,53 @@ try:
 except ImportError:
     print("⚠️ Business logic modules not found. Creating mock data...")
 
-# Set appearance
-ctk.set_appearance_mode("light")  # "light" or "dark"
-ctk.set_default_color_theme("blue")  # "blue", "green", "dark-blue"
+# Microsoft Fluent Design Theme
+ctk.set_appearance_mode("light")  # Microsoft uses light theme primarily
+ctk.set_default_color_theme("blue")  # Microsoft Blue theme
+
+# Microsoft-style Icons (Text-based for professional look)
+ICONS = {
+    'home': '🏠',
+    'people': '👥', 
+    'salary': '💰',
+    'time': '⏰',
+    'planning': '📋',
+    'work': '💼',
+    'contract': '📄',
+    'check': '✅',
+    'award': '🏆',
+    'fast': '⚡',
+    'chart': '📊',
+    'health': '🏥',
+    'settings': '⚙️',
+    'help': '❓',
+    'fullscreen': '⛶',
+    'logout': '↪️',
+    'search': '🔍',
+    'export': '📤',
+    'info': 'ℹ️'
+}
+
+# Help texts for each function (Microsoft-style helpful descriptions)
+HELP_TEXTS = {
+    'home': 'Xem tổng quan thống kê và hoạt động gần đây của hệ thống',
+    'employee_search': 'Tìm kiếm và xem chi tiết thông tin của nhân viên theo tên hoặc mã',
+    'salary_mgmt': 'Quản lý nâng lương định kỳ theo quy định 36/24 tháng và phụ cấp thâm niên',
+    'retirement': 'Theo dõi nghỉ hưu, cảnh báo trước 6 tháng và xử lý nâng lương trước hạn',
+    'planning': 'Kiểm tra quy hoạch cán bộ theo độ tuổi và quota từng vị trí',
+    'work_history': 'Quản lý timeline quá trình công tác, thêm/sửa/xóa các giai đoạn',
+    'contracts': 'Quản lý hợp đồng lao động cho Ban kiểm soát và nhân viên, cảnh báo hết hạn',
+    'appointment': 'Kiểm tra đầy đủ điều kiện bổ nhiệm và cảnh báo bổ nhiệm lại sau 90 ngày',
+    'awards': 'Xem điều kiện khen thưởng và đánh giá các tiêu chí cần thiết',
+    'early_salary': 'Quản lý nâng lương trước thời hạn do lập thành tích xuất sắc',
+    'reports': 'Xem báo cáo thống kê toàn diện và phân tích cơ cấu nhân sự',
+    'insurance': 'Nhắc nhở và xuất Excel báo cáo bảo hiểm xã hội'
+}
 
 class HRMSDesktop:
     def __init__(self):
         self.root = ctk.CTk()
-        self.root.title("🏢 HRMS - Hệ thống Quản lý Nhân sự")
+        self.root.title("Microsoft HRMS - Human Resource Management System")
         
         # Set larger default size and make fully resizable
         screen_width = self.root.winfo_screenwidth()
@@ -60,6 +112,10 @@ class HRMSDesktop:
         # Session state
         self.current_user = None
         self.is_logged_in = False
+        self.show_help = True  # Microsoft-style contextual help
+        
+        # Tooltip system for Microsoft-style guidance
+        self.current_tooltip = None
         
         # Create main container
         self.main_container = ctk.CTkFrame(self.root)
@@ -180,57 +236,120 @@ class HRMSDesktop:
         self.conn.commit()
         
     def show_login_screen(self):
-        """Show login interface"""
+        """Show Microsoft-style login interface"""
         # Clear main container
         for widget in self.main_container.winfo_children():
             widget.destroy()
             
-        # Login frame
-        login_frame = ctk.CTkFrame(self.main_container, width=400, height=500)
+        # Main login container
+        login_container = ctk.CTkFrame(self.main_container, fg_color=COLORS['surface'])
+        login_container.pack(fill="both", expand=True)
+        
+        # Left panel - Welcome & Branding
+        left_panel = ctk.CTkFrame(login_container, width=600, fg_color=COLORS['primary'])
+        left_panel.pack(side="left", fill="y", padx=20, pady=20)
+        left_panel.pack_propagate(False)
+        
+        # Microsoft-style welcome
+        welcome_title = ctk.CTkLabel(left_panel, text="Chào mừng đến với", 
+                                   font=ctk.CTkFont(size=18), text_color="white")
+        welcome_title.pack(pady=(50, 10))
+        
+        app_title = ctk.CTkLabel(left_panel, text="Microsoft HRMS", 
+                               font=ctk.CTkFont(size=36, weight="bold"), text_color="white")
+        app_title.pack(pady=10)
+        
+        app_subtitle = ctk.CTkLabel(left_panel, text="Human Resource Management System", 
+                                  font=ctk.CTkFont(size=16), text_color="white")
+        app_subtitle.pack(pady=5)
+        
+        description = ctk.CTkLabel(left_panel, 
+                                 text="Hệ thống quản lý nhân sự hiện đại\nvới giao diện Microsoft Fluent Design\n\n"
+                                      "✓ Quản lý thông tin nhân viên\n"
+                                      "✓ Theo dõi nâng lương định kỳ\n"
+                                      "✓ Báo cáo và thống kê\n"
+                                      "✓ Giao diện thân thiện, dễ sử dụng",
+                                 font=ctk.CTkFont(size=13), text_color="white",
+                                 justify="left")
+        description.pack(pady=30, padx=40)
+        
+        # Right panel - Login form
+        right_panel = ctk.CTkFrame(login_container, fg_color=COLORS['surface'])
+        right_panel.pack(side="right", fill="both", expand=True, padx=20, pady=20)
+        
+        # Login form container
+        login_frame = ctk.CTkFrame(right_panel, width=400)
         login_frame.place(relx=0.5, rely=0.5, anchor="center")
         
-        # Title
-        title = ctk.CTkLabel(login_frame, text="🏢 HRMS Desktop", 
-                           font=ctk.CTkFont(size=32, weight="bold"))
-        title.pack(pady=30)
+        # Login header
+        login_header = ctk.CTkLabel(login_frame, text="Đăng nhập vào tài khoản", 
+                                  font=ctk.CTkFont(size=24, weight="bold"),
+                                  text_color=COLORS['text'])
+        login_header.pack(pady=(30, 20))
         
-        subtitle = ctk.CTkLabel(login_frame, text="Hệ thống Quản lý Nhân sự\n100% Python Desktop Application",
-                              font=ctk.CTkFont(size=14))
-        subtitle.pack(pady=10)
+        help_text = ctk.CTkLabel(login_frame, text="Nhập thông tin đăng nhập để tiếp tục", 
+                               font=ctk.CTkFont(size=12),
+                               text_color=COLORS['text_secondary'])
+        help_text.pack(pady=(0, 30))
         
-        # Login form
-        self.username_entry = ctk.CTkEntry(login_frame, placeholder_text="👤 Tên đăng nhập", width=300)
-        self.username_entry.pack(pady=20)
+        # Username field with Microsoft-style labeling
+        username_label = ctk.CTkLabel(login_frame, text="Tên đăng nhập", 
+                                    font=ctk.CTkFont(size=12, weight="bold"),
+                                    text_color=COLORS['text'])
+        username_label.pack(anchor="w", padx=50, pady=(0, 5))
+        
+        self.username_entry = ctk.CTkEntry(login_frame, placeholder_text="Nhập tên đăng nhập", 
+                                         width=300, height=35,
+                                         font=ctk.CTkFont(size=13))
+        self.username_entry.pack(pady=(0, 20), padx=50)
         self.username_entry.insert(0, "admin")  # Default username
         
-        self.password_entry = ctk.CTkEntry(login_frame, placeholder_text="🔒 Mật khẩu", 
-                                         show="*", width=300)
-        self.password_entry.pack(pady=10)
+        # Password field
+        password_label = ctk.CTkLabel(login_frame, text="Mật khẩu", 
+                                    font=ctk.CTkFont(size=12, weight="bold"),
+                                    text_color=COLORS['text'])
+        password_label.pack(anchor="w", padx=50, pady=(0, 5))
+        
+        self.password_entry = ctk.CTkEntry(login_frame, placeholder_text="Nhập mật khẩu", 
+                                         show="*", width=300, height=35,
+                                         font=ctk.CTkFont(size=13))
+        self.password_entry.pack(pady=(0, 30), padx=50)
         self.password_entry.insert(0, "admin123")  # Default password
         
-        # Login button
-        login_btn = ctk.CTkButton(login_frame, text="🚀 Đăng nhập", 
-                                command=self.handle_login, width=300, height=40,
-                                font=ctk.CTkFont(size=16, weight="bold"))
-        login_btn.pack(pady=30)
+        # Login button - Microsoft style
+        login_btn = ctk.CTkButton(login_frame, text="Đăng nhập", 
+                                command=self.handle_login, width=300, height=45,
+                                font=ctk.CTkFont(size=14, weight="bold"),
+                                fg_color=COLORS['primary'], hover_color=COLORS['secondary'])
+        login_btn.pack(pady=(0, 20), padx=50)
         
-        # Info panel
-        info_frame = ctk.CTkFrame(login_frame, fg_color="transparent")
-        info_frame.pack(pady=20, fill="x")
+        # Demo credentials info with Microsoft styling
+        demo_frame = ctk.CTkFrame(login_frame, fg_color=COLORS['background'], corner_radius=8)
+        demo_frame.pack(fill="x", padx=50, pady=20)
         
-        info_label = ctk.CTkLabel(info_frame, text="📋 Tài khoản mặc định:",
-                                font=ctk.CTkFont(size=12, weight="bold"))
-        info_label.pack()
+        demo_title = ctk.CTkLabel(demo_frame, text="Tài khoản demo",
+                                font=ctk.CTkFont(size=11, weight="bold"),
+                                text_color=COLORS['text'])
+        demo_title.pack(pady=(10, 5))
         
-        credentials = ctk.CTkLabel(info_frame, text="• Tên đăng nhập: admin\n• Mật khẩu: admin123",
-                                 font=ctk.CTkFont(size=11))
-        credentials.pack(pady=5)
+        credentials = ctk.CTkLabel(demo_frame, 
+                                 text="Tên đăng nhập: admin\nMật khẩu: admin123",
+                                 font=ctk.CTkFont(size=10),
+                                 text_color=COLORS['text_secondary'])
+        credentials.pack(pady=(0, 10))
         
-        # Fullscreen info
-        fullscreen_info = ctk.CTkLabel(info_frame, 
-                                     text="⌨️ Phím tắt: F11 (Toàn màn hình) | ESC (Thoát)",
-                                     font=ctk.CTkFont(size=10))
-        fullscreen_info.pack(pady=5)
+        # Help section - Microsoft style
+        help_frame = ctk.CTkFrame(login_frame, fg_color="transparent")
+        help_frame.pack(fill="x", padx=50, pady=10)
+        
+        help_icon = ctk.CTkLabel(help_frame, text=ICONS['help'], font=ctk.CTkFont(size=12))
+        help_icon.pack(side="left")
+        
+        help_text = ctk.CTkLabel(help_frame, 
+                               text="F11: Toàn màn hình | ESC: Thoát | Enter: Đăng nhập",
+                               font=ctk.CTkFont(size=9),
+                               text_color=COLORS['text_secondary'])
+        help_text.pack(side="left", padx=(5, 0))
         
         # Bind Enter key
         self.password_entry.bind("<Return>", lambda e: self.handle_login())
@@ -280,27 +399,57 @@ class HRMSDesktop:
         self.show_home_dashboard()
     
     def create_header(self):
-        """Create header with user info and controls"""
-        header = ctk.CTkFrame(self.main_container, height=60)
+        """Create Microsoft-style header with user info and controls"""
+        header = ctk.CTkFrame(self.main_container, height=70, fg_color=COLORS['surface'])
         header.pack(fill="x", pady=(0, 10))
         
-        # Welcome message
-        welcome = ctk.CTkLabel(header, text=f"👋 Xin chào, {self.current_user}!", 
-                             font=ctk.CTkFont(size=18, weight="bold"))
-        welcome.pack(side="left", padx=20, pady=15)
+        # Left side - App branding and user welcome
+        left_frame = ctk.CTkFrame(header, fg_color="transparent")
+        left_frame.pack(side="left", padx=20, pady=15)
         
-        # Controls frame
+        app_name = ctk.CTkLabel(left_frame, text="Microsoft HRMS", 
+                              font=ctk.CTkFont(size=16, weight="bold"),
+                              text_color=COLORS['primary'])
+        app_name.pack(side="left")
+        
+        separator = ctk.CTkLabel(left_frame, text="•", 
+                               font=ctk.CTkFont(size=14),
+                               text_color=COLORS['text_secondary'])
+        separator.pack(side="left", padx=10)
+        
+        welcome = ctk.CTkLabel(left_frame, text=f"Xin chào, {self.current_user}", 
+                             font=ctk.CTkFont(size=14),
+                             text_color=COLORS['text'])
+        welcome.pack(side="left")
+        
+        # Right side - Controls with Microsoft styling
         controls_frame = ctk.CTkFrame(header, fg_color="transparent")
         controls_frame.pack(side="right", padx=20, pady=15)
         
-        # Fullscreen button
-        fullscreen_btn = ctk.CTkButton(controls_frame, text="🔳 Toàn màn hình", 
-                                     command=self.toggle_fullscreen, width=120)
+        # Help toggle button
+        help_btn = ctk.CTkButton(controls_frame, text=f"{ICONS['help']} Trợ giúp", 
+                               command=self.toggle_help, width=100, height=30,
+                               font=ctk.CTkFont(size=11),
+                               fg_color="transparent", 
+                               text_color=COLORS['primary'],
+                               hover_color=COLORS['background'])
+        help_btn.pack(side="left", padx=(0, 10))
+        
+        # Fullscreen button - Microsoft style
+        fullscreen_btn = ctk.CTkButton(controls_frame, text=f"{ICONS['fullscreen']} Toàn màn hình", 
+                                     command=self.toggle_fullscreen, width=130, height=30,
+                                     font=ctk.CTkFont(size=11),
+                                     fg_color=COLORS['background'], 
+                                     text_color=COLORS['text'],
+                                     hover_color=COLORS['primary'])
         fullscreen_btn.pack(side="left", padx=(0, 10))
         
-        # Logout button
-        logout_btn = ctk.CTkButton(controls_frame, text="🚪 Đăng xuất", 
-                                 command=self.handle_logout, width=120)
+        # Logout button - Microsoft style
+        logout_btn = ctk.CTkButton(controls_frame, text=f"{ICONS['logout']} Đăng xuất", 
+                                 command=self.handle_logout, width=110, height=30,
+                                 font=ctk.CTkFont(size=11),
+                                 fg_color=COLORS['error'], 
+                                 hover_color="#b91c1c")
         logout_btn.pack(side="left")
         
     def create_sidebar(self, parent):
