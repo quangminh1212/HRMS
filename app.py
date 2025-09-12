@@ -38,6 +38,16 @@ from components import ModernComponents
 from hr_search import render_employee_search_page
 from salary_management import render_salary_management_page
 from retirement_management import render_retirement_management_page
+from additional_features import (
+    render_planning_management_page,
+    render_work_history_page,
+    render_contract_management_page,
+    render_appointment_check_page,
+    render_rewards_page,
+    render_early_salary_page,
+    render_quick_reports_page,
+    render_insurance_page
+)
 
 # Cấu hình trang với theme hiện đại
 st.set_page_config(
@@ -307,56 +317,21 @@ def main_app():
     elif st.session_state.current_page == "⏰ Theo dõi nghỉ hưu":
         render_retirement_management_page()
     elif st.session_state.current_page == "📊 Báo cáo thống kê":
-        ModernPages.reports_dashboard()
+        render_quick_reports_page()
     elif st.session_state.current_page == "📋 Kiểm tra quy hoạch":
-        st.markdown(ModernComponents.modern_alert(
-            "info",
-            "Chức năng đang hoàn thiện",
-            "Trang kiểm tra quy hoạch cán bộ sẽ được cập nhật trong phiên bản tiếp theo",
-            "🚧 Đang phát triển thêm tính năng nâng cao"
-        ), unsafe_allow_html=True)
+        render_planning_management_page()
     elif st.session_state.current_page == "💼 Quá trình công tác":
-        st.markdown(ModernComponents.modern_alert(
-            "info", 
-            "Chức năng đang hoàn thiện",
-            "Trang quá trình công tác sẽ được cập nhật trong phiên bản tiếp theo",
-            "🚧 Đang tích hợp timeline và workflow"
-        ), unsafe_allow_html=True)
+        render_work_history_page()
     elif st.session_state.current_page == "📄 Hợp đồng lao động":
-        st.markdown(ModernComponents.modern_alert(
-            "info",
-            "Chức năng đang hoàn thiện", 
-            "Trang hợp đồng lao động sẽ được cập nhật trong phiên bản tiếp theo",
-            "🚧 Đang phát triển quản lý hợp đồng điện tử"
-        ), unsafe_allow_html=True)
+        render_contract_management_page()
     elif st.session_state.current_page == "✅ Điều kiện bổ nhiệm":
-        st.markdown(ModernComponents.modern_alert(
-            "info",
-            "Chức năng đang hoàn thiện",
-            "Trang kiểm tra điều kiện bổ nhiệm sẽ được cập nhật trong phiên bản tiếp theo", 
-            "🚧 Đang tích hợp AI để tự động kiểm tra điều kiện"
-        ), unsafe_allow_html=True)
+        render_appointment_check_page()
     elif st.session_state.current_page == "🏆 Điều kiện khen thưởng":
-        st.markdown(ModernComponents.modern_alert(
-            "info",
-            "Chức năng đang hoàn thiện",
-            "Trang điều kiện khen thưởng sẽ được cập nhật trong phiên bản tiếp theo",
-            "🚧 Đang phát triển hệ thống đánh giá tự động"
-        ), unsafe_allow_html=True)
+        render_rewards_page()
     elif st.session_state.current_page == "⚡ Nâng lương trước hạn":
-        st.markdown(ModernComponents.modern_alert(
-            "info",
-            "Chức năng đang hoàn thiện", 
-            "Trang nâng lương trước hạn do thành tích sẽ được cập nhật trong phiên bản tiếp theo",
-            "🚧 Đang tích hợp workflow phê duyệt"
-        ), unsafe_allow_html=True)
+        render_early_salary_page()
     elif st.session_state.current_page == "🏥 Báo bảo hiểm":
-        st.markdown(ModernComponents.modern_alert(
-            "info",
-            "Chức năng đang hoàn thiện",
-            "Trang báo bảo hiểm xã hội sẽ được cập nhật trong phiên bản tiếp theo", 
-            "🚧 Đang tích hợp API Bảo hiểm xã hội"
-        ), unsafe_allow_html=True)
+        render_insurance_page()
     else:
         # Placeholder cho các trang khác
         ModernComponents.hero_header(
