@@ -1,47 +1,43 @@
 """
 HRMS - Hệ thống Quản lý Nhân sự
 Human Resource Management System
+
+Main application module containing all routes and business logic.
 """
+
+import os
+import logging
+from datetime import datetime, timedelta
 
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file
 from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-from datetime import datetime, timedelta, date
-from werkzeug.security import generate_password_hash, check_password_hash
-import os
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+
+from config import config
 from models import db, Employee, User, SalaryHistory, WorkHistory, Training, Achievement, Contract
 from utils import calculate_retirement_date, check_salary_increase_eligibility, export_to_word, export_to_excel
-import pandas as pd
 
-# Khởi tạo Flask app
+# Initialize Flask app
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'hrms-secret-key-2024'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///hrms.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Khởi tạo extensions
+# Load configuration
+config_name = os.environ.get('FLASK_ENV', 'development')
+app.config.from_object(config[config_name])
+config[config_name].init_app(app)
+
+# Initialize extensions
 db.init_app(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
+login_manager.login_message = 'Vui lòng đăng nhập để truy cập trang này.'
+login_manager.login_message_category = 'info'
+
 
 @login_manager.user_loader
 def load_user(user_id):
+    """Load user by ID for Flask-Login."""
     return User.query.get(int(user_id))
-
-# Tạo database tables
-with app.app_context():
-    db.create_all()
-    # Tạo admin user mặc định nếu chưa có
-    if not User.query.filter_by(username='admin').first():
-        admin = User(
-            username='admin',
-            email='admin@hrms.vn',
-            role='admin'
-        )
-        admin.set_password('admin123')
-        db.session.add(admin)
-        db.session.commit()
 
 # Routes
 @app.route('/')
@@ -334,5 +330,4 @@ def api_search_employees():
     
     return jsonify(results)
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+# Application factory pattern - app is configured in run.py

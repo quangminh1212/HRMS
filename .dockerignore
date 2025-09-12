@@ -1,0 +1,62 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.pytest_cache/
+
+# Development files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Database
+*.db
+instance/
+
+# Local development
+.env
+.env.local
+
+# Documentation
+docs/_build/
+README.md
+QUICKSTART.md
+
+# Testing
+htmlcov/
+.pytest_cache/
+
+# Exports and uploads
+exports/
+uploads/
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml

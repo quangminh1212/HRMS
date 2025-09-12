@@ -1,7 +1,12 @@
-# HRMS - Hệ thống Quản lý Nhân sự
+# HRMS - Human Resource Management System
 
-## Giới thiệu
-HRMS (Human Resource Management System) là hệ thống quản lý nhân sự toàn diện được phát triển bằng Python Flask.
+[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
+[![Flask](https://img.shields.io/badge/Flask-3.0+-green.svg)](https://flask.palletsprojects.com/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Code Style](https://img.shields.io/badge/code%20style-black-black.svg)](https://github.com/psf/black)
+
+## Overview
+HRMS (Human Resource Management System) is a comprehensive HR management system developed with Python Flask, designed for Vietnamese organizations to manage their human resources efficiently.
 
 ## Tính năng chính
 
@@ -28,51 +33,192 @@ HRMS (Human Resource Management System) là hệ thống quản lý nhân sự t
 - Báo cáo thống kê đa dạng
 - Xuất file Word, Excel
 
-## Cài đặt
+## Quick Start
 
-### Yêu cầu hệ thống
-- Python 3.8 trở lên
-- Windows 10/11
+### Prerequisites
+- Python 3.8 or higher
+- pip (Python package manager)
+- Modern web browser
 
-### Các bước cài đặt
+### Installation
 
-1. Cài đặt dependencies:
+1. **Clone the repository:**
+```bash
+git clone https://github.com/your-org/hrms.git
+cd hrms
+```
+
+2. **Create virtual environment (recommended):**
+```bash
+python -m venv venv
+# On Windows
+venv\Scripts\activate
+# On macOS/Linux
+source venv/bin/activate
+```
+
+3. **Install dependencies:**
 ```bash
 pip install -r requirements.txt
 ```
 
-2. Chạy ứng dụng:
+4. **Initialize database:**
 ```bash
-python app.py
+python run.py
 ```
 
-3. Truy cập hệ thống:
-- Mở trình duyệt và truy cập: http://localhost:5000
-- Đăng nhập với tài khoản mặc định:
-  - Username: admin
-  - Password: admin123
+5. **Access the application:**
+- Open your browser and go to: http://localhost:5000
+- Login with default credentials:
+  - **Username:** admin
+  - **Password:** admin123
 
-## Cấu trúc dự án
+### Development Setup
+
+For development with additional tools:
+```bash
+pip install -r requirements-dev.txt
+```
+
+### Using Make (Optional)
+
+If you have `make` installed:
+```bash
+make install      # Install dependencies
+make run          # Run the application
+make test         # Run tests
+make lint         # Run code linting
+make format       # Format code
+```
+
+## Project Structure
 
 ```
 HRMS/
-├── app.py              # File chính của ứng dụng
-├── models.py           # Database models
-├── utils.py            # Các hàm tiện ích
-├── requirements.txt    # Dependencies
-├── templates/          # HTML templates
+├── app.py                  # Main Flask application
+├── run.py                  # Application entry point
+├── config.py               # Configuration management
+├── models.py               # Database models
+├── utils.py                # Utility functions
+├── setup.py                # Package setup
+├── requirements*.txt       # Dependencies
+├── pytest.ini             # Test configuration
+├── Makefile               # Common development tasks
+├── Dockerfile             # Docker configuration
+├── templates/             # Jinja2 templates
 │   ├── base.html
 │   ├── login.html
 │   ├── dashboard.html
-│   ├── employees.html
 │   └── ...
-├── static/            # Static files
+├── static/               # Static assets
 │   ├── css/
-│   │   └── style.css
 │   └── js/
-│       └── main.js
-└── exports/           # Thư mục xuất file
+├── tests/               # Test suite
+│   ├── __init__.py
+│   ├── conftest.py
+│   ├── test_app.py
+│   └── ...
+├── logs/               # Application logs
+├── exports/            # Export files
+└── instance/          # Instance-specific files
 ```
+
+## Configuration
+
+The application supports multiple environments:
+
+- **Development**: Default configuration with debug enabled
+- **Production**: Optimized for production deployment
+- **Testing**: Configuration for running tests
+
+Environment variables can be set in a `.env` file (copy from `.env.example`).
+
+## Testing
+
+Run the test suite:
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=. --cov-report=html
+
+# Run specific test file
+pytest tests/test_app.py
+
+# Run with verbose output
+pytest -v
+```
+
+## Code Quality
+
+This project uses several tools to maintain code quality:
+
+- **Black**: Code formatting
+- **Flake8**: Style guide enforcement
+- **MyPy**: Static type checking
+- **pytest**: Testing framework
+
+Run quality checks:
+```bash
+make lint      # Run all linting
+make format    # Format code with black
+```
+
+## Docker Support
+
+Build and run with Docker:
+```bash
+# Build image
+docker build -t hrms .
+
+# Run container
+docker run -p 5000:5000 hrms
+```
+
+## Deployment
+
+### Production Deployment
+
+1. Set environment to production:
+```bash
+export FLASK_ENV=production
+```
+
+2. Use a production WSGI server:
+```bash
+pip install -r requirements-prod.txt
+gunicorn --bind 0.0.0.0:5000 run:app
+```
+
+### Environment Variables
+
+Key environment variables for production:
+- `FLASK_ENV`: Set to 'production'
+- `SECRET_KEY`: Strong secret key for sessions
+- `DATABASE_URL`: Database connection string
+- `MAIL_SERVER`: Email server for notifications
+
+## API Documentation
+
+The application provides REST API endpoints for integration:
+- `/api/search-employees`: Employee search
+- More endpoints available in the application
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+### Development Guidelines
+
+- Follow PEP 8 style guide
+- Write tests for new features
+- Update documentation
+- Use meaningful commit messages
 
 ## Hướng dẫn sử dụng
 
@@ -94,16 +240,66 @@ HRMS/
 3. Chọn định dạng file (Word/Excel)
 4. File sẽ được lưu trong thư mục exports/
 
-## Bảo mật
-- Mật khẩu được mã hóa
-- Phân quyền người dùng (admin, manager, user)
-- Session timeout sau 30 phút không hoạt động
+## Security
 
-## Hỗ trợ
-Nếu gặp vấn đề khi sử dụng, vui lòng kiểm tra:
-1. Python đã được cài đặt đúng phiên bản
-2. Tất cả dependencies đã được cài đặt
-3. Port 5000 không bị chiếm bởi ứng dụng khác
+- Password hashing with Werkzeug
+- Session management with Flask-Login
+- CSRF protection with Flask-WTF
+- Role-based access control (admin, manager, user)
+- Secure cookie configuration
+- SQL injection prevention with SQLAlchemy ORM
+
+## Troubleshooting
+
+Common issues and solutions:
+
+1. **Port 5000 already in use**:
+   ```bash
+   # Find and kill process using port 5000
+   netstat -ano | findstr :5000
+   taskkill /PID <process_id> /F
+   ```
+
+2. **Database locked error**:
+   ```bash
+   # Remove database file and reinitialize
+   rm instance/hrms.db
+   python run.py
+   ```
+
+3. **Import errors**:
+   ```bash
+   # Ensure virtual environment is activated
+   pip install -r requirements.txt --force-reinstall
+   ```
+
+## Performance
+
+For better performance in production:
+- Use PostgreSQL instead of SQLite
+- Enable database connection pooling
+- Use Redis for session storage
+- Implement caching with Flask-Caching
+- Use CDN for static assets
+
+## Support
+
+- 📧 Email: support@hrms.local
+- 📖 Documentation: [Wiki](https://github.com/your-org/hrms/wiki)
+- 🐛 Bug Reports: [Issues](https://github.com/your-org/hrms/issues)
+- 💡 Feature Requests: [Discussions](https://github.com/your-org/hrms/discussions)
 
 ## License
-© 2024 HRMS - Hệ thống Quản lý Nhân sự
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- Flask team for the excellent web framework
+- SQLAlchemy for database ORM
+- Bootstrap for UI components
+- All contributors who helped make this project better
+
+---
+
+**Made with ❤️ for Vietnamese HR departments**

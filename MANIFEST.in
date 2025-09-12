@@ -1,0 +1,26 @@
+# Include package data
+include README.md
+include LICENSE
+include requirements*.txt
+include pytest.ini
+include Makefile
+include .gitignore
+
+# Include templates and static files
+recursive-include templates *
+recursive-include static *
+
+# Include configuration
+include config.py
+
+# Include sample data script
+include init_sample_data.py
+
+# Exclude unnecessary files
+exclude Dockerfile
+exclude .dockerignore
+exclude docker-compose*.yml
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
+recursive-exclude * .coverage
+recursive-exclude * .pytest_cache

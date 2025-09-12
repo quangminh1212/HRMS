@@ -1,0 +1,14 @@
+# Production requirements
+-r requirements.txt
+
+# WSGI server
+gunicorn
+
+# PostgreSQL adapter (if using PostgreSQL)
+psycopg2-binary
+
+# Environment management
+python-dotenv
+
+# Process monitoring
+supervisor
