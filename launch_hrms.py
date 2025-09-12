@@ -115,11 +115,13 @@ def create_customtkinter_app():
     print("📝 Sẽ có trong phiên bản tiếp theo")
     input("\nNhấn Enter để quay lại menu...")
 
-def create_nicegui_app():
-    """Tạo app NiceGUI (placeholder)"""
-    print("🚧 NiceGUI version đang được phát triển...")  
-    print("📝 Sẽ có trong phiên bản tiếp theo")
-    input("\nNhấn Enter để quay lại menu...")
+def run_nicegui():
+    """Chạy phiên bản NiceGUI"""
+    print("🚀 Khởi động HRMS với NiceGUI...")
+    try:
+        subprocess.run([sys.executable, "run_nicegui.py"])
+    except Exception as e:
+        print(f"❌ Lỗi: {e}")
 
 def create_gradio_app():
     """Tạo app Gradio (placeholder)"""
@@ -166,7 +168,9 @@ def main():
             
         elif choice == "4":
             print("\n✨ Bạn đã chọn NiceGUI!")
-            create_nicegui_app()
+            print("🎨 Giao diện web hiện đại với Tailwind CSS")
+            input("\nNhấn Enter để khởi động...")
+            run_nicegui()
             
         elif choice == "5":
             print("\n🎯 Bạn đã chọn Gradio!")
