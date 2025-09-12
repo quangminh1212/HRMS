@@ -137,9 +137,7 @@ python run_nicegui.py      # Tailwind CSS
 │   └── requirements.txt        # Python dependencies
 │
 └── 📚 Documentation
-    ├── README.md               # This file
-    ├── README_MODERN.md        # Modern UI guide
-    └── README_FRAMEWORKS.md    # Framework comparison
+    └── README.md               # Complete project guide
 ```
 
 ---

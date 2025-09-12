@@ -47,6 +47,13 @@ exports/
 # Streamlit
 .streamlit/
 
+# Playwright & Browser automation
+.playwright-mcp/
+.playwright/
+
+# Flet
+.flet/
+
 # Jupyter Notebook
 .ipynb_checkpoints
 
