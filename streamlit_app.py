@@ -902,16 +902,390 @@ def planning_page():
                 st.dataframe(export_data, use_container_width=True)
 
 def work_history_page():
-    st.markdown('<div class="main-header"><h1>💼 Quá trình công tác</h1></div>', unsafe_allow_html=True)
-    st.info("Chức năng đang được phát triển...")
+    st.markdown('<div class="main-header"><h1>💼 Quản lý quá trình công tác</h1></div>', unsafe_allow_html=True)
+    
+    # Chọn nhân viên
+    selected_employee = st.selectbox("👤 Chọn nhân viên:", 
+        ["Nguyễn Văn A", "Trần Thị B", "Lê Văn C"])
+    
+    tab1, tab2, tab3 = st.tabs(["📅 Timeline công tác", "➕ Thêm giai đoạn", "📄 Xuất file"])
+    
+    with tab1:
+        st.subheader(f"📅 Quá trình công tác của {selected_employee}")
+        
+        # Dữ liệu timeline mẫu
+        timeline_data = [
+            {
+                "period": "08/2008 - 03/2015",
+                "position": "Nhân viên",
+                "department": "Công ty ABC",
+                "location": "Hà Nội",
+                "responsibilities": "Xử lý hồ sơ, làm báo cáo",
+                "achievements": "Hoàn thành tốt nhiệm vụ",
+                "status": "completed"
+            },
+            {
+                "period": "03/2015 - 12/2020", 
+                "position": "Chuyên viên",
+                "department": "Phòng Tổ chức - Hành chính",
+                "location": "Hà Nội",
+                "responsibilities": "Quản lý hồ sơ nhân sự, tổ chức đào tạo",
+                "achievements": "Đạt danh hiệu lao động tiên tiến 2019",
+                "status": "completed"
+            },
+            {
+                "period": "12/2020 - Hiện tại",
+                "position": "Chuyên viên chính", 
+                "department": "Phòng Tổ chức - Hành chính",
+                "location": "Hà Nội",
+                "responsibilities": "Phụ trách công tác quy hoạch và đào tạo cán bộ",
+                "achievements": "Bằng khen Thủ tướng 2022",
+                "status": "current"
+            }
+        ]
+        
+        # Hiển thị timeline
+        for i, period in enumerate(timeline_data):
+            is_current = period['status'] == 'current'
+            
+            st.markdown(f"""
+            <div style="border-left: 4px solid {'#4caf50' if is_current else '#2196f3'}; 
+                       padding: 1rem; margin: 1rem 0; 
+                       background: {'#e8f5e8' if is_current else '#f8f9fa'}; 
+                       border-radius: 8px;">
+                <h4>{"🟢" if is_current else "🔵"} {period['period']}</h4>
+                <p><strong>Chức vụ:</strong> {period['position']}</p>
+                <p><strong>Đơn vị:</strong> {period['department']}</p>
+                <p><strong>Địa điểm:</strong> {period['location']}</p>
+                <p><strong>Nhiệm vụ:</strong> {period['responsibilities']}</p>
+                <p><strong>Thành tích:</strong> {period['achievements']}</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Nút sửa/xóa
+            col1, col2, col3 = st.columns([1, 1, 8])
+            with col1:
+                if st.button("✏️", key=f"edit_{i}"):
+                    st.info(f"Chỉnh sửa giai đoạn {period['period']}")
+            with col2:
+                if st.button("🗑️", key=f"delete_{i}"):
+                    st.success(f"Đã xóa giai đoạn {period['period']}")
+    
+    with tab2:
+        st.subheader("➕ Thêm giai đoạn công tác mới")
+        
+        with st.form("add_work_period"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                start_date = st.date_input("📅 Từ ngày:")
+                end_date = st.date_input("📅 Đến ngày:")
+                position = st.text_input("💼 Chức vụ:")
+                department = st.text_input("🏢 Đơn vị:")
+            
+            with col2:
+                location = st.text_input("📍 Địa điểm:")
+                responsibilities = st.text_area("📋 Nhiệm vụ:", height=100)
+                achievements = st.text_area("🏆 Thành tích:", height=100)
+            
+            if st.form_submit_button("➕ Thêm giai đoạn"):
+                st.success("✅ Đã thêm giai đoạn công tác mới!")
+    
+    with tab3:
+        st.subheader("📄 Xuất file quá trình công tác")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("📄 Xuất Word", use_container_width=True):
+                st.success(f"✅ Đã xuất quá trình công tác của {selected_employee}!")
+        
+        with col2:
+            if st.button("📊 Xuất Excel", use_container_width=True):
+                st.success(f"✅ Đã xuất Excel quá trình công tác!")
 
 def contract_page():
-    st.markdown('<div class="main-header"><h1>📄 Hợp đồng lao động</h1></div>', unsafe_allow_html=True)
-    st.info("Chức năng đang được phát triển...")
+    st.markdown('<div class="main-header"><h1>📄 Quản lý hợp đồng lao động</h1></div>', unsafe_allow_html=True)
+    
+    tab1, tab2, tab3 = st.tabs(["📋 Danh sách hợp đồng", "➕ Tạo hợp đồng mới", "⚠️ Cảnh báo hết hạn"])
+    
+    with tab1:
+        st.subheader("📋 Danh sách hợp đồng hiện tại")
+        
+        # Dữ liệu hợp đồng mẫu
+        contract_data = [
+            {
+                "employee": "Nguyễn Văn A", "type": "Hợp đồng không thời hạn",
+                "start_date": "15/03/2020", "end_date": "Không thời hạn",
+                "position": "Chuyên viên chính", "salary": "3.45",
+                "status": "active", "days_to_expire": None
+            },
+            {
+                "employee": "Trần Thị B", "type": "Hợp đồng có thời hạn", 
+                "start_date": "01/06/2023", "end_date": "31/05/2025",
+                "position": "Chuyên viên", "salary": "2.67",
+                "status": "active", "days_to_expire": 162
+            },
+            {
+                "employee": "Lê Văn C (BKS)", "type": "Hợp đồng Ban kiểm soát",
+                "start_date": "01/01/2024", "end_date": "31/12/2026", 
+                "position": "Thành viên BKS", "salary": "Theo quy định",
+                "status": "active", "days_to_expire": 730
+            }
+        ]
+        
+        # Thống kê
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("📄 Tổng hợp đồng", len(contract_data))
+        
+        with col2:
+            active_contracts = len([c for c in contract_data if c['status'] == 'active'])
+            st.metric("✅ Đang hiệu lực", active_contracts)
+        
+        with col3:
+            expiring_soon = len([c for c in contract_data if c['days_to_expire'] and c['days_to_expire'] <= 90])
+            st.metric("⚠️ Sắp hết hạn", expiring_soon)
+        
+        with col4:
+            bks_contracts = len([c for c in contract_data if "BKS" in c['employee']])
+            st.metric("👥 Hợp đồng BKS", bks_contracts)
+        
+        # Hiển thị danh sách
+        for contract in contract_data:
+            # Xác định màu sắc
+            if contract['days_to_expire'] is None:
+                color, status_text = "#e8f5e8", "♾️ Không thời hạn"
+            elif contract['days_to_expire'] <= 30:
+                color, status_text = "#ffebee", "🔴 Sắp hết hạn"
+            elif contract['days_to_expire'] <= 90:
+                color, status_text = "#fff3e0", "🟡 Cần theo dõi"
+            else:
+                color, status_text = "#e3f2fd", "🔵 Bình thường"
+            
+            st.markdown(f"""
+            <div style="border-left: 4px solid #1976d2; padding: 1rem; margin: 1rem 0; 
+                       background: {color}; border-radius: 8px;">
+                <h4>📄 {contract['employee']} ({status_text})</h4>
+                <p><strong>Loại:</strong> {contract['type']}</p>
+                <p><strong>Thời gian:</strong> {contract['start_date']} → {contract['end_date']}</p>
+                <p><strong>Chức vụ:</strong> {contract['position']} | <strong>Lương:</strong> {contract['salary']}</p>
+                {f'<p><strong>Còn lại:</strong> {contract["days_to_expire"]} ngày</p>' if contract['days_to_expire'] else ''}
+            </div>
+            """, unsafe_allow_html=True)
+    
+    with tab2:
+        st.subheader("➕ Tạo hợp đồng lao động mới")
+        
+        with st.form("new_contract"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                employee_name = st.text_input("👤 Họ tên nhân viên:")
+                contract_type = st.selectbox("📋 Loại hợp đồng:", 
+                    ["Hợp đồng có thời hạn", "Hợp đồng không thời hạn", "Hợp đồng Ban kiểm soát"])
+                start_date = st.date_input("📅 Ngày bắt đầu:")
+            
+            with col2:
+                position = st.text_input("💼 Chức vụ:")
+                if contract_type != "Hợp đồng không thời hạn":
+                    end_date = st.date_input("📅 Ngày kết thúc:")
+                salary_coefficient = st.number_input("💰 Hệ số lương:", min_value=1.0, max_value=10.0, step=0.01)
+            
+            terms_conditions = st.text_area("📜 Điều khoản đặc biệt:", height=100)
+            
+            if st.form_submit_button("✅ Tạo hợp đồng"):
+                st.success(f"✅ Đã tạo hợp đồng cho {employee_name}!")
+    
+    with tab3:
+        st.subheader("⚠️ Cảnh báo hợp đồng sắp hết hạn")
+        
+        expiring_contracts = [c for c in contract_data if c['days_to_expire'] and c['days_to_expire'] <= 90]
+        
+        if expiring_contracts:
+            st.error(f"🚨 Có {len(expiring_contracts)} hợp đồng sắp hết hạn!")
+            
+            for contract in expiring_contracts:
+                with st.container():
+                    col1, col2, col3 = st.columns([2, 1, 1])
+                    
+                    with col1:
+                        st.write(f"**{contract['employee']}**")
+                        st.write(f"Hết hạn: {contract['end_date']} (còn {contract['days_to_expire']} ngày)")
+                    
+                    with col2:
+                        if st.button("🔄 Gia hạn", key=f"extend_{contract['employee']}"):
+                            st.success("✅ Đã khởi tạo gia hạn hợp đồng!")
+                    
+                    with col3:
+                        if st.button("📄 Tạo mới", key=f"new_{contract['employee']}"):
+                            st.success("✅ Đã khởi tạo hợp đồng mới!")
+        else:
+            st.success("✅ Không có hợp đồng nào sắp hết hạn!")
+        
+        # Xuất báo cáo
+        if st.button("📊 Xuất báo cáo hợp đồng", use_container_width=True):
+            report_data = pd.DataFrame([
+                {
+                    "STT": i+1, "Họ tên": c["employee"], "Loại HĐ": c["type"],
+                    "Bắt đầu": c["start_date"], "Kết thúc": c["end_date"],
+                    "Chức vụ": c["position"], "Trạng thái": "Hiệu lực" if c["status"] == "active" else "Hết hạn"
+                } for i, c in enumerate(contract_data)
+            ])
+            
+            st.success("✅ Đã tạo báo cáo hợp đồng!")
+            st.dataframe(report_data, use_container_width=True)
 
 def appointment_page():
-    st.markdown('<div class="main-header"><h1>✅ Điều kiện bổ nhiệm</h1></div>', unsafe_allow_html=True)
-    st.info("Chức năng đang được phát triển...")
+    st.markdown('<div class="main-header"><h1>✅ Kiểm tra điều kiện bổ nhiệm</h1></div>', unsafe_allow_html=True)
+    
+    tab1, tab2, tab3 = st.tabs(["🔍 Kiểm tra điều kiện", "⏰ Cảnh báo bổ nhiệm lại", "📊 Thống kê"])
+    
+    with tab1:
+        st.subheader("🔍 Kiểm tra điều kiện bổ nhiệm")
+        
+        # Chọn nhân viên và vị trí
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            selected_employee = st.selectbox("👤 Chọn nhân viên:", 
+                ["Nguyễn Văn A", "Trần Thị B", "Lê Văn C"])
+        
+        with col2:
+            target_position = st.selectbox("🎯 Vị trí bổ nhiệm:",
+                ["Phó Trưởng phòng", "Trưởng phòng", "Chuyên viên cao cấp"])
+        
+        if st.button("🔍 Kiểm tra điều kiện", use_container_width=True):
+            st.markdown("### 📋 Kết quả kiểm tra")
+            
+            # Mô phỏng kết quả kiểm tra
+            conditions = [
+                {"name": "Trong quy hoạch", "status": True, "details": "Có trong quy hoạch 2020-2025"},
+                {"name": "Trình độ học vấn", "status": True, "details": "Thạc sĩ Luật (đạt yêu cầu)"},
+                {"name": "Chứng chỉ bắt buộc", "status": False, "details": "Thiếu chứng chỉ Quản lý nhà nước"},
+                {"name": "Kinh nghiệm công tác", "status": True, "details": "15 năm (≥ 5 năm yêu cầu)"},
+                {"name": "Độ tuổi", "status": True, "details": "38 tuổi (trong giới hạn 45 tuổi)"},
+                {"name": "Đánh giá năng lực", "status": True, "details": "Hoàn thành xuất sắc 3 năm liên tiếp"}
+            ]
+            
+            all_passed = all(c['status'] for c in conditions)
+            
+            for condition in conditions:
+                if condition['status']:
+                    st.success(f"✅ **{condition['name']}**: {condition['details']}")
+                else:
+                    st.error(f"❌ **{condition['name']}**: {condition['details']}")
+            
+            st.markdown("---")
+            
+            if all_passed:
+                st.success("🎉 **ĐỦ ĐIỀU KIỆN BỔ NHIỆM**")
+                col_a, col_b = st.columns(2)
+                
+                with col_a:
+                    if st.button("📄 Tạo hồ sơ đề xuất"):
+                        st.success("✅ Đã tạo hồ sơ đề xuất bổ nhiệm!")
+                
+                with col_b:
+                    if st.button("📋 Xuất báo cáo"):
+                        st.success("✅ Đã xuất báo cáo đánh giá điều kiện!")
+            else:
+                st.error("❌ **CHƯA ĐỦ ĐIỀU KIỆN BỔ NHIỆM**")
+                st.warning("📝 Cần hoàn thiện các điều kiện chưa đạt trước khi bổ nhiệm")
+    
+    with tab2:
+        st.subheader("⏰ Cảnh báo bổ nhiệm lại (90 ngày)")
+        
+        # Dữ liệu cảnh báo bổ nhiệm lại
+        reappointment_data = [
+            {
+                "name": "Trần Văn D", "position": "Trưởng phòng TCHC",
+                "appointment_date": "15/01/2022", "term_end_date": "15/01/2025",
+                "days_left": 45, "term_years": 3, "current_term": 1
+            },
+            {
+                "name": "Nguyễn Thị E", "position": "Phó Trưởng phòng TCKT",
+                "appointment_date": "01/03/2022", "term_end_date": "01/03/2025",
+                "days_left": 90, "term_years": 3, "current_term": 1
+            }
+        ]
+        
+        if reappointment_data:
+            st.error(f"⚠️ Có {len(reappointment_data)} cán bộ cần xét bổ nhiệm lại trong 90 ngày tới!")
+            
+            for person in reappointment_data:
+                # Xác định mức độ ưu tiên
+                if person['days_left'] <= 30:
+                    priority_color, priority_text = "#ffebee", "🔴 Khẩn cấp"
+                elif person['days_left'] <= 60:
+                    priority_color, priority_text = "#fff3e0", "🟡 Quan trọng"
+                else:
+                    priority_color, priority_text = "#e3f2fd", "🔵 Theo dõi"
+                
+                st.markdown(f"""
+                <div style="border-left: 4px solid #f44336; padding: 1rem; margin: 1rem 0; 
+                           background: {priority_color}; border-radius: 8px;">
+                    <h4>👤 {person['name']} ({priority_text})</h4>
+                    <p><strong>Chức vụ:</strong> {person['position']}</p>
+                    <p><strong>Nhiệm kỳ:</strong> {person['appointment_date']} → {person['term_end_date']} (Nhiệm kỳ {person['current_term']})</p>
+                    <p><strong>Thời gian còn lại:</strong> {person['days_left']} ngày</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Nút hành động
+                col_x, col_y, col_z = st.columns(3)
+                
+                with col_x:
+                    if st.button("🔍 Kiểm tra điều kiện", key=f"check_{person['name']}"):
+                        st.info(f"Đang kiểm tra điều kiện bổ nhiệm lại cho {person['name']}")
+                
+                with col_y:
+                    if st.button("📄 Tạo hồ sơ", key=f"create_{person['name']}"):
+                        st.success(f"✅ Đã tạo hồ sơ bổ nhiệm lại cho {person['name']}")
+                
+                with col_z:
+                    if st.button("⏰ Thiết lập nhắc nhở", key=f"remind_{person['name']}"):
+                        st.success("✅ Đã thiết lập nhắc nhở!")
+        else:
+            st.success("✅ Hiện tại không có cán bộ nào cần bổ nhiệm lại trong 90 ngày tới!")
+    
+    with tab3:
+        st.subheader("📊 Thống kê bổ nhiệm")
+        
+        # Biểu đồ thống kê
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### 📈 Bổ nhiệm theo năm")
+            year_data = pd.DataFrame({
+                'Năm': ['2022', '2023', '2024'],
+                'Số lượng': [5, 8, 3]
+            })
+            st.bar_chart(year_data.set_index('Năm'))
+        
+        with col2:
+            st.markdown("#### 🎯 Theo vị trí")
+            position_data = pd.DataFrame({
+                'Vị trí': ['Trưởng phòng', 'Phó Trưởng phòng', 'Chuyên viên cao cấp'],
+                'Số lượng': [2, 4, 6]
+            })
+            st.bar_chart(position_data.set_index('Vị trí'))
+        
+        # Bảng thống kê chi tiết
+        st.markdown("#### 📋 Chi tiết bổ nhiệm năm 2024")
+        
+        detail_data = pd.DataFrame([
+            {"Tháng": "01/2024", "Họ tên": "Trần Văn F", "Vị trí": "Phó Trưởng phòng", "Trạng thái": "Đã bổ nhiệm"},
+            {"Tháng": "03/2024", "Họ tên": "Nguyễn Thị G", "Vị trí": "Chuyên viên cao cấp", "Trạng thái": "Đã bổ nhiệm"},
+            {"Tháng": "06/2024", "Họ tên": "Lê Văn H", "Vị trí": "Trưởng phòng", "Trạng thái": "Đang xử lý"}
+        ])
+        
+        st.dataframe(detail_data, use_container_width=True)
+        
+        # Xuất báo cáo
+        if st.button("📊 Xuất báo cáo thống kê", use_container_width=True):
+            st.success("✅ Đã tạo báo cáo thống kê bổ nhiệm năm 2024!")
 
 def award_page():
     st.markdown('<div class="main-header"><h1>🏆 Điều kiện khen thưởng</h1></div>', unsafe_allow_html=True)
