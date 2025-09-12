@@ -51,47 +51,22 @@ python run.py
   - **Tên đăng nhập:** admin
   - **Mật khẩu:** admin123
 
-## Project Structure
+## Cấu trúc dự án
 
 ```
 HRMS/
-├── app.py                  # Main Flask application
-├── run.py                  # Application entry point
-├── config.py               # Configuration management
-├── models.py               # Database models
-├── utils.py                # Utility functions
-├── setup.py                # Package setup
-├── requirements*.txt       # Dependencies
-├── pytest.ini             # Test configuration
-├── Makefile               # Common development tasks
-├── Dockerfile             # Docker configuration
-├── templates/             # Jinja2 templates
-│   ├── base.html
-│   ├── login.html
-│   ├── dashboard.html
-│   └── ...
-├── static/               # Static assets
-│   ├── css/
-│   └── js/
-├── tests/               # Test suite
-│   ├── __init__.py
-│   ├── conftest.py
-│   ├── test_app.py
-│   └── ...
-├── logs/               # Application logs
-├── exports/            # Export files
-└── instance/          # Instance-specific files
+├── app.py              # Ứng dụng Flask chính
+├── run.py              # File khởi chạy
+├── config.py           # Cấu hình ứng dụng
+├── models.py           # Database models
+├── utils.py            # Hàm tiện ích
+├── requirements.txt    # Dependencies
+├── templates/          # HTML templates
+├── static/            # CSS, JS files
+├── tests/             # Test files
+├── exports/           # File xuất ra
+└── instance/         # Database file
 ```
-
-## Configuration
-
-The application supports multiple environments:
-
-- **Development**: Default configuration with debug enabled
-- **Production**: Optimized for production deployment
-- **Testing**: Configuration for running tests
-
-Environment variables can be set in a `.env` file (copy from `.env.example`).
 
 ## Testing
 
