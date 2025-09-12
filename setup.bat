@@ -3,7 +3,7 @@ chcp 65001 > nul
 echo ============================================================
 echo 🔧 THIẾT LẬP DỰ ÁN HRMS - Hệ thống Quản lý Nhân sự
 echo ============================================================
-echo ✨ Frontend ^& Backend 100%% Python với Streamlit
+echo ✨ Desktop Application 100%% Python với CustomTkinter
 echo 🎯 Đáp ứng đầy đủ 11 yêu cầu nghiệp vụ
 echo ============================================================
 echo.
@@ -28,8 +28,8 @@ echo ✅ Pip đã được cập nhật
 echo.
 
 echo [3/4] 📚 Cài đặt thư viện cần thiết...
-echo 🔽 Đang cài đặt dependencies từ requirements.txt...
-python -m pip install -r requirements.txt
+echo 🔽 Đang cài đặt dependencies cho Desktop GUI...
+python -m pip install -r requirements_desktop.txt
 if %errorlevel% neq 0 (
     echo ❌ Lỗi khi cài đặt thư viện!
     echo 💡 Kiểm tra kết nối mạng và thử lại
@@ -51,9 +51,9 @@ echo 🎉 THIẾT LẬP HOÀN TẤT!
 echo ============================================================
 echo 🚀 Cách chạy dự án:
 echo    • Chạy tự động: run.bat
-echo    • Chạy thủ công: python run_streamlit.py
+echo    • Chạy thủ công: python hrms_desktop.py
 echo.
-echo 🌐 Truy cập: http://localhost:8501
+echo 🖥️  Desktop Application - Không cần browser
 echo 👤 Tài khoản: admin / admin123
 echo ============================================================
 echo 📋 Các chức năng chính:
