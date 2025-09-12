@@ -147,6 +147,60 @@ class HRMSDesktop:
             self.is_fullscreen = False
             self.root.attributes("-fullscreen", False)
     
+    def toggle_help(self):
+        """Toggle help display in Microsoft style"""
+        self.show_help = not self.show_help
+        # Refresh current view to show/hide help
+        if hasattr(self, 'current_function'):
+            self.show_function_help(self.current_function)
+        else:
+            self.show_general_help()
+    
+    def show_function_help(self, function_key):
+        """Show contextual help for current function"""
+        if not self.show_help:
+            return
+            
+        help_text = HELP_TEXTS.get(function_key, "Chức năng này đang được phát triển.")
+        
+        # Create or update help panel
+        if hasattr(self, 'help_panel'):
+            self.help_panel.destroy()
+        
+        self.help_panel = ctk.CTkFrame(self.main_content, height=60, fg_color=COLORS['background'])
+        self.help_panel.pack(fill="x", pady=(0, 10))
+        
+        help_icon = ctk.CTkLabel(self.help_panel, text=ICONS['info'], 
+                               font=ctk.CTkFont(size=14))
+        help_icon.pack(side="left", padx=15, pady=15)
+        
+        help_label = ctk.CTkLabel(self.help_panel, text=help_text,
+                                font=ctk.CTkFont(size=12),
+                                text_color=COLORS['text'])
+        help_label.pack(side="left", padx=10, pady=15)
+    
+    def show_general_help(self):
+        """Show general help information"""
+        if not self.show_help:
+            return
+            
+        general_help = "Chọn một chức năng từ menu bên trái để bắt đầu. Hover vào các nút để xem thông tin chi tiết."
+        
+        if hasattr(self, 'help_panel'):
+            self.help_panel.destroy()
+        
+        self.help_panel = ctk.CTkFrame(self.main_content, height=60, fg_color=COLORS['background'])
+        self.help_panel.pack(fill="x", pady=(0, 10))
+        
+        help_icon = ctk.CTkLabel(self.help_panel, text=ICONS['info'], 
+                               font=ctk.CTkFont(size=14))
+        help_icon.pack(side="left", padx=15, pady=15)
+        
+        help_label = ctk.CTkLabel(self.help_panel, text=general_help,
+                                font=ctk.CTkFont(size=12),
+                                text_color=COLORS['text'])
+        help_label.pack(side="left", padx=10, pady=15)
+    
     def init_database(self):
         """Initialize SQLite database"""
         try:
@@ -453,50 +507,118 @@ class HRMSDesktop:
         logout_btn.pack(side="left")
         
     def create_sidebar(self, parent):
-        """Create navigation sidebar with scrollable content"""
-        sidebar = ctk.CTkFrame(parent, width=300)  # Slightly wider
+        """Create Microsoft-style navigation sidebar"""
+        sidebar = ctk.CTkFrame(parent, width=320, fg_color=COLORS['surface'])
         sidebar.pack(side="left", fill="y", padx=(0, 10))
         sidebar.pack_propagate(False)
         
-        # Navigation title
-        nav_title = ctk.CTkLabel(sidebar, text="🧭 Chức năng chính", 
-                               font=ctk.CTkFont(size=16, weight="bold"))
+        # Sidebar header with Microsoft styling
+        header_frame = ctk.CTkFrame(sidebar, height=80, fg_color=COLORS['primary'])
+        header_frame.pack(fill="x", padx=10, pady=10)
+        header_frame.pack_propagate(False)
+        
+        nav_title = ctk.CTkLabel(header_frame, text="Chức năng chính", 
+                               font=ctk.CTkFont(size=18, weight="bold"),
+                               text_color="white")
         nav_title.pack(pady=20)
         
         # Create scrollable frame for navigation buttons
-        nav_scroll = ctk.CTkScrollableFrame(sidebar, width=260, height=600)
+        nav_scroll = ctk.CTkScrollableFrame(sidebar, width=280, height=600,
+                                          fg_color="transparent")
         nav_scroll.pack(fill="both", expand=True, padx=15, pady=10)
         
-        # Navigation buttons
-        nav_buttons = [
-            ("🏠 Trang chủ", self.show_home_dashboard),
-            ("👥 Tra cứu nhân sự", self.show_employee_search),
-            ("💰 Nâng lương định kỳ", self.show_salary_management),
-            ("⏰ Theo dõi nghỉ hưu", self.show_retirement_tracking),
-            ("📋 Kiểm tra quy hoạch", self.show_planning_check),
-            ("💼 Quá trình công tác", self.show_work_history),
-            ("📄 Hợp đồng lao động", self.show_contracts),
-            ("✅ Điều kiện bổ nhiệm", self.show_appointment_check),
-            ("🏆 Điều kiện khen thưởng", self.show_award_check),
-            ("⚡ Nâng lương trước hạn", self.show_early_salary),
-            ("📊 Báo cáo thống kê", self.show_reports),
-            ("🏥 Báo bảo hiểm", self.show_insurance)
+        # Navigation buttons with Microsoft-style icons and help text
+        nav_items = [
+            ("home", "Trang chủ", self.show_home_dashboard, 'home'),
+            ("people", "Tra cứu nhân sự", self.show_employee_search, 'employee_search'),
+            ("salary", "Nâng lương định kỳ", self.show_salary_management, 'salary_mgmt'),
+            ("time", "Theo dõi nghỉ hưu", self.show_retirement_tracking, 'retirement'),
+            ("planning", "Kiểm tra quy hoạch", self.show_planning_check, 'planning'),
+            ("work", "Quá trình công tác", self.show_work_history, 'work_history'),
+            ("contract", "Hợp đồng lao động", self.show_contracts, 'contracts'),
+            ("check", "Điều kiện bổ nhiệm", self.show_appointment_check, 'appointment'),
+            ("award", "Điều kiện khen thưởng", self.show_award_check, 'awards'),
+            ("fast", "Nâng lương trước hạn", self.show_early_salary, 'early_salary'),
+            ("chart", "Báo cáo thống kê", self.show_reports, 'reports'),
+            ("health", "Báo bảo hiểm", self.show_insurance, 'insurance')
         ]
         
-        for text, command in nav_buttons:
-            btn = ctk.CTkButton(nav_scroll, text=text, command=command, 
-                              width=240, height=40, anchor="w",
-                              font=ctk.CTkFont(size=12, weight="bold"))
-            btn.pack(pady=8, padx=10, fill="x")
+        for icon_key, text, command, help_key in nav_items:
+            # Create button frame for better control
+            btn_frame = ctk.CTkFrame(nav_scroll, fg_color="transparent")
+            btn_frame.pack(fill="x", pady=4, padx=5)
+            
+            # Main navigation button with Microsoft styling
+            btn = ctk.CTkButton(btn_frame, 
+                              text=f"{ICONS[icon_key]}  {text}", 
+                              command=lambda c=command, h=help_key: self.nav_click(c, h),
+                              width=260, height=45, anchor="w",
+                              font=ctk.CTkFont(size=13),
+                              fg_color="transparent",
+                              text_color=COLORS['text'],
+                              hover_color=COLORS['background'])
+            btn.pack(fill="x")
+            
+            # Add hover tooltip (Microsoft-style help)
+            self.create_tooltip(btn, HELP_TEXTS.get(help_key, ""))
+    
+    def nav_click(self, command, help_key):
+        """Handle navigation click with help context"""
+        self.current_function = help_key
+        command()  # Execute the navigation command
+        self.show_function_help(help_key)  # Show contextual help
+    
+    def create_tooltip(self, widget, text):
+        """Create Microsoft-style tooltip for widget"""
+        def on_enter(event):
+            if hasattr(self, 'tooltip'):
+                self.tooltip.destroy()
+                
+            self.tooltip = ctk.CTkToplevel()
+            self.tooltip.wm_overrideredirect(True)
+            self.tooltip.configure(fg_color=COLORS['text'])
+            
+            label = ctk.CTkLabel(self.tooltip, text=text,
+                               font=ctk.CTkFont(size=10),
+                               text_color="white",
+                               fg_color=COLORS['text'])
+            label.pack(padx=8, pady=4)
+            
+            # Position tooltip
+            x = widget.winfo_rootx() + 20
+            y = widget.winfo_rooty() - 30
+            self.tooltip.geometry(f"+{x}+{y}")
+        
+        def on_leave(event):
+            if hasattr(self, 'tooltip'):
+                self.tooltip.destroy()
+        
+        widget.bind("<Enter>", on_enter)
+        widget.bind("<Leave>", on_leave)
     
     def show_home_dashboard(self):
-        """Show home dashboard with statistics"""
+        """Show Microsoft-style home dashboard"""
         self.clear_main_content()
         
-        # Title
-        title = ctk.CTkLabel(self.main_content, text="🏠 Bảng điều khiển HRMS", 
-                           font=ctk.CTkFont(size=24, weight="bold"))
-        title.pack(pady=20)
+        # Welcome section with Microsoft styling
+        welcome_frame = ctk.CTkFrame(self.main_content, height=100, fg_color=COLORS['surface'])
+        welcome_frame.pack(fill="x", padx=20, pady=20)
+        welcome_frame.pack_propagate(False)
+        
+        # Welcome content
+        welcome_content = ctk.CTkFrame(welcome_frame, fg_color="transparent")
+        welcome_content.pack(expand=True, fill="both", padx=30, pady=20)
+        
+        welcome_title = ctk.CTkLabel(welcome_content, text="Bảng điều khiển", 
+                                   font=ctk.CTkFont(size=28, weight="bold"),
+                                   text_color=COLORS['text'])
+        welcome_title.pack(anchor="w")
+        
+        welcome_subtitle = ctk.CTkLabel(welcome_content, 
+                                      text=f"Chào mừng trở lại, {self.current_user}. Đây là tổng quan về hệ thống HRMS của bạn.",
+                                      font=ctk.CTkFont(size=14),
+                                      text_color=COLORS['text_secondary'])
+        welcome_subtitle.pack(anchor="w", pady=(5, 0))
         
         # Statistics cards
         stats_frame = ctk.CTkFrame(self.main_content)
@@ -506,59 +628,131 @@ class HRMSDesktop:
         self.cursor.execute("SELECT COUNT(*) FROM employees WHERE status = 'active'")
         total_employees = self.cursor.fetchone()[0]
         
-        # Create statistics cards with better responsive layout
-        stats = [
-            ("👥 Tổng nhân sự", str(total_employees), "green"),
-            ("⏰ Sắp nghỉ hưu", "12", "orange"),
-            ("💰 Đến kỳ nâng lương", "25", "blue"),
-            ("📄 Hợp đồng hết hạn", "6", "red"),
-            ("🏆 Khen thưởng tháng", "8", "purple"),
-            ("📋 Quy hoạch hết hạn", "15", "brown")
+        # Microsoft-style statistics cards
+        stats_data = [
+            ("Tổng nhân sự", str(total_employees), COLORS['primary'], "people"),
+            ("Sắp nghỉ hưu", "12", COLORS['warning'], "time"), 
+            ("Đến kỳ nâng lương", "25", COLORS['success'], "salary"),
+            ("Hợp đồng hết hạn", "6", COLORS['error'], "contract"),
+            ("Khen thưởng tháng", "8", "#8b5cf6", "award"),
+            ("Quy hoạch hết hạn", "15", "#f59e0b", "planning")
         ]
         
-        # Create 2 rows of cards for better use of space
-        for i, (label, value, color) in enumerate(stats):
-            row = i // 3  # 3 cards per row
+        # Create Microsoft-style cards in 2 rows x 3 columns
+        for i, (label, value, color, icon_key) in enumerate(stats_data):
+            row = i // 3
             col = i % 3
             
-            card = ctk.CTkFrame(stats_frame, height=120)
-            card.grid(row=row, column=col, padx=15, pady=15, sticky="ew")
+            # Card container with Microsoft Fluent Design
+            card = ctk.CTkFrame(stats_frame, height=140, fg_color=COLORS['surface'],
+                              border_width=1, border_color=COLORS['background'])
+            card.grid(row=row, column=col, padx=12, pady=12, sticky="ew")
             
-            value_label = ctk.CTkLabel(card, text=value, 
-                                     font=ctk.CTkFont(size=36, weight="bold"))
-            value_label.pack(pady=15)
+            # Card header with icon and color accent
+            card_header = ctk.CTkFrame(card, height=40, fg_color=color)
+            card_header.pack(fill="x", padx=0, pady=0)
+            card_header.pack_propagate(False)
             
-            label_label = ctk.CTkLabel(card, text=label, 
-                                     font=ctk.CTkFont(size=13, weight="bold"))
-            label_label.pack(pady=5)
+            icon = ctk.CTkLabel(card_header, text=ICONS[icon_key], 
+                              font=ctk.CTkFont(size=18), text_color="white")
+            icon.pack(side="left", padx=15, pady=10)
+            
+            # Card content
+            content_frame = ctk.CTkFrame(card, fg_color="transparent")
+            content_frame.pack(fill="both", expand=True, padx=20, pady=15)
+            
+            value_label = ctk.CTkLabel(content_frame, text=value,
+                                     font=ctk.CTkFont(size=32, weight="bold"),
+                                     text_color=COLORS['text'])
+            value_label.pack(anchor="w")
+            
+            label_label = ctk.CTkLabel(content_frame, text=label,
+                                     font=ctk.CTkFont(size=12),
+                                     text_color=COLORS['text_secondary'])
+            label_label.pack(anchor="w", pady=(5, 0))
         
-        # Configure grid weights for responsive layout
-        for i in range(3):  # 3 columns
+        # Configure grid for responsive layout
+        for i in range(3):
             stats_frame.grid_columnconfigure(i, weight=1)
-        for i in range(2):  # 2 rows
+        for i in range(2):
             stats_frame.grid_rowconfigure(i, weight=1)
         
-        # Recent activities
-        activities_frame = ctk.CTkFrame(self.main_content)
+        # Recent activities with Microsoft styling
+        activities_frame = ctk.CTkFrame(self.main_content, fg_color=COLORS['surface'])
         activities_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
-        activities_title = ctk.CTkLabel(activities_frame, text="📋 Hoạt động gần đây", 
-                                      font=ctk.CTkFont(size=18, weight="bold"))
-        activities_title.pack(pady=15)
+        # Activities header
+        activities_header = ctk.CTkFrame(activities_frame, height=60, fg_color=COLORS['background'])
+        activities_header.pack(fill="x", padx=0, pady=0)
+        activities_header.pack_propagate(False)
         
-        # Activities list
+        activities_title = ctk.CTkLabel(activities_header, text="Hoạt động gần đây", 
+                                      font=ctk.CTkFont(size=18, weight="bold"),
+                                      text_color=COLORS['text'])
+        activities_title.pack(side="left", padx=20, pady=15)
+        
+        # View all button
+        view_all_btn = ctk.CTkButton(activities_header, text="Xem tất cả",
+                                   width=100, height=30,
+                                   font=ctk.CTkFont(size=11),
+                                   fg_color="transparent",
+                                   text_color=COLORS['primary'],
+                                   hover_color=COLORS['background'])
+        view_all_btn.pack(side="right", padx=20, pady=15)
+        
+        # Activities content
+        activities_content = ctk.CTkScrollableFrame(activities_frame, height=300)
+        activities_content.pack(fill="both", expand=True, padx=15, pady=15)
+        
+        # Activities list with Microsoft-style items
         activities = [
-            "💰 Nguyễn Văn A - Nâng lương từ A2/3.2 lên A2/3.45",
-            "⏰ Trần Thị B - Cảnh báo nghỉ hưu trong 6 tháng",
-            "📄 Lê Văn C - Gia hạn hợp đồng thành công",
-            "✅ Phạm Thị D - Đủ điều kiện bổ nhiệm Phó Trưởng phòng",
-            "🏆 Hoàng Văn E - Đạt danh hiệu Lao động tiên tiến"
+            ("salary", "Nguyễn Văn A", "Nâng lương từ A2/3.2 lên A2/3.45", "2 giờ trước", COLORS['success']),
+            ("time", "Trần Thị B", "Cảnh báo nghỉ hưu trong 6 tháng", "4 giờ trước", COLORS['warning']),
+            ("contract", "Lê Văn C", "Gia hạn hợp đồng thành công", "1 ngày trước", COLORS['primary']),
+            ("check", "Phạm Thị D", "Đủ điều kiện bổ nhiệm Phó Trưởng phòng", "2 ngày trước", COLORS['success']),
+            ("award", "Hoàng Văn E", "Đạt danh hiệu Lao động tiên tiến", "3 ngày trước", "#8b5cf6"),
+            ("people", "Nguyễn Thị F", "Nhân viên mới hoàn thành thử việc", "1 tuần trước", COLORS['primary'])
         ]
         
-        for activity in activities:
-            activity_label = ctk.CTkLabel(activities_frame, text=activity, 
-                                        font=ctk.CTkFont(size=11), anchor="w")
-            activity_label.pack(fill="x", padx=20, pady=5)
+        for icon_key, name, action, time, color in activities:
+            # Activity item container
+            activity_item = ctk.CTkFrame(activities_content, fg_color=COLORS['surface'],
+                                       border_width=1, border_color=COLORS['background'])
+            activity_item.pack(fill="x", pady=5, padx=5)
+            
+            # Activity content
+            activity_content = ctk.CTkFrame(activity_item, fg_color="transparent")
+            activity_content.pack(fill="x", padx=15, pady=12)
+            
+            # Icon with colored background
+            icon_frame = ctk.CTkFrame(activity_content, width=35, height=35, 
+                                    fg_color=color, corner_radius=17)
+            icon_frame.pack(side="left", padx=(0, 15))
+            icon_frame.pack_propagate(False)
+            
+            icon = ctk.CTkLabel(icon_frame, text=ICONS[icon_key], 
+                              font=ctk.CTkFont(size=12), text_color="white")
+            icon.pack(expand=True)
+            
+            # Text content
+            text_frame = ctk.CTkFrame(activity_content, fg_color="transparent")
+            text_frame.pack(side="left", fill="x", expand=True)
+            
+            name_label = ctk.CTkLabel(text_frame, text=name,
+                                    font=ctk.CTkFont(size=12, weight="bold"),
+                                    text_color=COLORS['text'])
+            name_label.pack(anchor="w")
+            
+            action_label = ctk.CTkLabel(text_frame, text=action,
+                                      font=ctk.CTkFont(size=11),
+                                      text_color=COLORS['text_secondary'])
+            action_label.pack(anchor="w")
+            
+            # Time
+            time_label = ctk.CTkLabel(activity_content, text=time,
+                                    font=ctk.CTkFont(size=10),
+                                    text_color=COLORS['text_secondary'])
+            time_label.pack(side="right", padx=(15, 0))
     
     def clear_main_content(self):
         """Clear main content area"""
