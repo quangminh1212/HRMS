@@ -1,17 +1,19 @@
-# 🖥️ HRMS Desktop Application
+# 🖥️ Microsoft HRMS Desktop Application
 
-> Hệ thống Quản lý Nhân sự - Desktop GUI 100% Python
+> Hệ thống Quản lý Nhân sự - Desktop GUI 100% Python với Microsoft Fluent Design
 
 ## ✨ Đặc điểm nổi bật
 
-- 🖼️ **Desktop Application** - Không cần trình duyệt web
-- 🎯 **100% Python** - CustomTkinter cho giao diện native Windows  
-- 🚀 **Hiệu suất cao** - Không phụ thuộc localhost/server
-- 💾 **Offline hoàn toàn** - SQLite database cục bộ
-- 🎨 **Giao diện đẹp** - Modern UI với CustomTkinter
-- 📦 **Portable** - Có thể build thành file .exe
-- 🔳 **Fullscreen Support** - F11 toàn màn hình, responsive layout
-- 📱 **Responsive Design** - Tự động điều chỉnh theo kích thước màn hình
+- 🎨 **Microsoft Fluent Design** - Giao diện chuẩn Microsoft với màu sắc và typography professional
+- 🖼️ **Desktop Application** - Không cần trình duyệt web, chạy native trên Windows
+- 🎯 **100% Python** - CustomTkinter với Microsoft styling cho UX/UI enterprise
+- 🚀 **Hiệu suất cao** - Không phụ thuộc localhost/server, tốc độ tối ưu
+- 💾 **Offline hoàn toàn** - SQLite database cục bộ, bảo mật dữ liệu
+- 📦 **Portable .exe** - Build thành file thực thi, dễ dàng phân phối
+- 🔳 **Fullscreen Support** - F11 toàn màn hình, responsive layout mọi resolution
+- 🆘 **Contextual Help** - Hệ thống trợ giúp tích hợp, tooltips Microsoft-style
+- 📋 **Professional UI** - Statistics cards, navigation sidebar, activities timeline
+- 🎭 **User-Friendly** - Dành cho người mới bắt đầu với hướng dẫn chi tiết
 
 ## 📋 Yêu cầu hệ thống
 
@@ -53,15 +55,32 @@ run.bat
 
 ---
 
-## 📱 Giao diện Desktop
+## 🎨 Microsoft Design Features
+
+### 🎯 **Microsoft Fluent Design System**
+- **Màu sắc chuẩn Microsoft**: Primary Blue (#0078d4), Success Green (#107c10), Warning Orange (#ff8c00)
+- **Typography professional**: Microsoft-style font sizes và weights
+- **Card-based layout**: Statistics cards với colored headers và clean content
+- **Hover effects**: Subtle animations và state changes như Office apps
+
+### 🖥️ **Login Experience**
+- **Two-panel layout**: Welcome branding (trái) + Login form (phải) như Microsoft 365
+- **Professional messaging**: Clear instructions và demo credentials
+- **Contextual help**: Keyboard shortcuts guide tích hợp ngay UI
+
+### 🧭 **Navigation & Help System**
+- **Contextual tooltips**: Hover mỗi function để xem detailed help
+- **Help toggle**: Button "Trợ giúp" để bật/tắt instruction panels
+- **Function descriptions**: Mỗi feature có explanation panel khi active
+- **Microsoft-style sidebar**: Professional icons + hover states
+
+## 📱 Giao diện Desktop Professional
 
 ### 🏠 Dashboard chính
-- **Sidebar navigation** với 11 chức năng (scrollable)
-- **Statistics cards** hiển thị thống kê real-time (2 rows x 3 columns)
-- **Recent activities** danh sách hoạt động gần đây
-- **Professional UI** với CustomTkinter modern design
-- **Fullscreen support** - F11 để bật/tắt, ESC để thoát
-- **Responsive layout** - Tự động điều chỉnh theo kích thước màn hình
+- **Welcome header** với personalized greeting và app branding
+- **6 Statistics cards** (2x3 grid) với colored icon headers và real-time data
+- **Activities timeline** với icon badges, timestamps và action descriptions
+- **Responsive grid** tự động adapt với window size và fullscreen mode
 
 ### 🔍 Tra cứu nhân sự (Đã hoàn thành)
 - **Search interface** tìm kiếm theo tên/mã nhân viên
