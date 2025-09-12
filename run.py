@@ -13,12 +13,12 @@ def main():
     """Chạy ứng dụng HRMS Modern"""
     
     print("=" * 70)
-    print("🚀 HRMS MODERN - HỆ THỐNG QUẢN LÝ NHÂN SỰ")  
+    print("⚡ XLAB HRMS - HỆ THỐNG QUẢN LÝ NHÂN SỰ")  
     print("=" * 70)
-    print("✨ Giao diện được thiết kế lại hoàn toàn từ đầu")
-    print("🎨 Tham khảo Material Design 3, Fluent Design, Ant Design")
-    print("🏗️ Component System chuyên nghiệp với Design Tokens")
-    print("💫 Glassmorphism effects & Micro-animations")
+    print("✨ Giao diện hiện đại với XLAB Design System")
+    print("🎨 Tham khảo XLAB Style, Material Design 3, Clean Architecture")
+    print("🏗️ Component System chuyên nghiệp với Clean White Theme")
+    print("💎 Modern Teal Accents & Micro-animations")
     print("=" * 70)
     print("🌐 Ứng dụng sẽ mở tại: http://localhost:8501")
     print("👤 Tài khoản: admin / admin123")

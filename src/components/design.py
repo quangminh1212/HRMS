@@ -8,41 +8,41 @@ class DesignTokens:
     
     # Color System - Tham khảo Material Design 3
     COLORS = {
-        # Primary Colors
+        # Primary Colors - XLAB Teal/Cyan Theme
         'primary': {
-            10: '#21005D',
-            20: '#381E72', 
-            30: '#4F378B',
-            40: '#6750A4',
-            50: '#7F67BE',
-            60: '#9A82DB',
-            70: '#B69DF8',
-            80: '#D0BCFF',
-            90: '#EADDFF',
-            95: '#F6EDFF',
-            99: '#FFFBFE'
+            10: '#042F2E',
+            20: '#0F4C4C', 
+            30: '#134E4A',
+            40: '#0F766E',
+            50: '#14B8A6',
+            60: '#2DD4BF',
+            70: '#5EEAD4',
+            80: '#99F6E4',
+            90: '#CCFBF1',
+            95: '#F0FDFA',
+            99: '#FFFFFF'
         },
         
-        # Secondary Colors
+        # Secondary Colors - Complementary Blue-Gray
         'secondary': {
-            10: '#1D192B',
-            20: '#332D41',
-            30: '#4A4458',
-            40: '#625B71',
-            50: '#7A7289',
-            60: '#958DA5',
-            70: '#B0A7C0',
-            80: '#CCC2DC',
-            90: '#E8DEF8',
-            95: '#F6EDFF',
-            99: '#FFFBFE'
+            10: '#0C1A2E',
+            20: '#1E293B',
+            30: '#334155',
+            40: '#475569',
+            50: '#64748B',
+            60: '#94A3B8',
+            70: '#CBD5E1',
+            80: '#E2E8F0',
+            90: '#F1F5F9',
+            95: '#F8FAFC',
+            99: '#FFFFFF'
         },
         
-        # Semantic Colors
-        'success': '#4CAF50',
-        'warning': '#FF9800', 
-        'error': '#F44336',
-        'info': '#2196F3',
+        # Semantic Colors - Modern & Clean
+        'success': '#10B981',  # Emerald Green
+        'warning': '#F59E0B',  # Amber 
+        'error': '#EF4444',   # Modern Red
+        'info': '#3B82F6',    # Modern Blue
         
         # Neutral Colors
         'neutral': {
@@ -251,9 +251,9 @@ class UIComponents:
         
         .stApp {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 35%, #f093fb 100%);
+            background: linear-gradient(135deg, #F0F9FF 0%, #ECFDF5 35%, #FFFFFF 100%);
             min-height: 100vh;
-            color: #1C1B1F;
+            color: #1F2937;
         }
         
         /* Container System */
@@ -334,9 +334,9 @@ class UIComponents:
         /* Header Hero Section */
         .hero-header {
             background: linear-gradient(135deg, 
-                rgba(103, 80, 164, 0.95) 0%, 
-                rgba(118, 75, 162, 0.9) 50%, 
-                rgba(240, 147, 251, 0.85) 100%);
+                rgba(20, 184, 166, 0.95) 0%, 
+                rgba(45, 212, 191, 0.9) 50%, 
+                rgba(94, 234, 212, 0.85) 100%);
             backdrop-filter: blur(20px) saturate(180%);
             border: 1px solid rgba(255, 255, 255, 0.2);
             border-radius: 28px;
@@ -398,7 +398,7 @@ class UIComponents:
             left: 0;
             right: 0;
             height: 4px;
-            background: linear-gradient(90deg, #6750A4, #7F67BE, #9A82DB);
+            background: linear-gradient(90deg, #14B8A6, #2DD4BF, #5EEAD4);
         }
         
         .metric-card:hover {
@@ -421,32 +421,32 @@ class UIComponents:
         }
         
         .icon-primary {
-            background: linear-gradient(135deg, #6750A4, #7F67BE);
+            background: linear-gradient(135deg, #14B8A6, #2DD4BF);
             color: white;
-            box-shadow: 0 4px 12px rgba(103, 80, 164, 0.3);
+            box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
         }
         
         .icon-success {
-            background: linear-gradient(135deg, #4CAF50, #66BB6A);
+            background: linear-gradient(135deg, #10B981, #34D399);
             color: white;
-            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
         }
         
         .icon-warning {
-            background: linear-gradient(135deg, #FF9800, #FFB74D);
+            background: linear-gradient(135deg, #F59E0B, #FCD34D);
             color: white;
-            box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
         }
         
         .icon-error {
-            background: linear-gradient(135deg, #F44336, #EF5350);
+            background: linear-gradient(135deg, #EF4444, #F87171);
             color: white;
-            box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
         }
         
         /* Button System */
         .btn-primary {
-            background: linear-gradient(135deg, #6750A4, #7F67BE);
+            background: linear-gradient(135deg, #14B8A6, #2DD4BF);
             color: white;
             border: none;
             border-radius: 12px;
@@ -461,8 +461,8 @@ class UIComponents:
         
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 16px rgba(103, 80, 164, 0.4);
-            background: linear-gradient(135deg, #5A4094, #7157B8);
+            box-shadow: 0 8px 16px rgba(20, 184, 166, 0.4);
+            background: linear-gradient(135deg, #0F766E, #14B8A6);
         }
         
         /* Alert System */
@@ -476,27 +476,27 @@ class UIComponents:
         }
         
         .alert-warning {
-            background: linear-gradient(135deg, rgba(255, 152, 0, 0.1), rgba(255, 183, 77, 0.15));
-            border-color: rgba(255, 152, 0, 0.2);
-            color: #E65100;
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(252, 211, 77, 0.15));
+            border-color: rgba(245, 158, 11, 0.2);
+            color: #92400E;
         }
         
         .alert-success {
-            background: linear-gradient(135deg, rgba(76, 175, 80, 0.1), rgba(102, 187, 106, 0.15));
-            border-color: rgba(76, 175, 80, 0.2);
-            color: #1B5E20;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(52, 211, 153, 0.15));
+            border-color: rgba(16, 185, 129, 0.2);
+            color: #065F46;
         }
         
         .alert-info {
-            background: linear-gradient(135deg, rgba(33, 150, 243, 0.1), rgba(100, 181, 246, 0.15));
-            border-color: rgba(33, 150, 243, 0.2);
-            color: #0D47A1;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(96, 165, 250, 0.15));
+            border-color: rgba(59, 130, 246, 0.2);
+            color: #1E3A8A;
         }
         
         .alert-error {
-            background: linear-gradient(135deg, rgba(244, 67, 54, 0.1), rgba(239, 83, 80, 0.15));
-            border-color: rgba(244, 67, 54, 0.2);
-            color: #B71C1C;
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(248, 113, 113, 0.15));
+            border-color: rgba(239, 68, 68, 0.2);
+            color: #991B1B;
         }
         
         /* Navigation System */
@@ -512,8 +512,8 @@ class UIComponents:
         }
         
         .nav-item.active {
-            background: linear-gradient(135deg, rgba(103, 80, 164, 0.15), rgba(127, 103, 190, 0.1));
-            border-left: 4px solid #6750A4;
+            background: linear-gradient(135deg, rgba(20, 184, 166, 0.15), rgba(45, 212, 191, 0.1));
+            border-left: 4px solid #14B8A6;
         }
         
         /* Micro-animations */
@@ -602,7 +602,7 @@ class UIComponents:
         }
         
         .stButton button {
-            background: linear-gradient(135deg, #6750A4, #7F67BE) !important;
+            background: linear-gradient(135deg, #14B8A6, #2DD4BF) !important;
             color: white !important;
             border: none !important;
             border-radius: 12px !important;
@@ -614,8 +614,8 @@ class UIComponents:
         
         .stButton button:hover {
             transform: translateY(-2px) !important;
-            box-shadow: 0 8px 16px rgba(103, 80, 164, 0.4) !important;
-            background: linear-gradient(135deg, #5A4094, #7157B8) !important;
+            box-shadow: 0 8px 16px rgba(20, 184, 166, 0.4) !important;
+            background: linear-gradient(135deg, #0F766E, #14B8A6) !important;
         }
         
         /* Chart Containers */

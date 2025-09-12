@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-HRMS - Hệ thống Quản lý Nhân sự (Modern UI Version)
+XLAB HRMS - Hệ thống Quản lý Nhân sự (Modern UI Version)
 Giao diện được xây dựng lại hoàn toàn với Design System chuyên nghiệp
-Tham khảo Material Design 3, Fluent Design, Ant Design
+Tham khảo XLAB Design, Material Design 3, Fluent Design
 """
 
 import streamlit as st
@@ -52,8 +52,8 @@ from src.features.additional_features import (
 
 # Cấu hình trang với theme hiện đại
 st.set_page_config(
-    page_title="HRMS - Hệ thống Quản lý Nhân sự",
-    page_icon="🏢",
+    page_title="XLAB HRMS - Hệ thống Quản lý Nhân sự",
+    page_icon="⚡",
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
@@ -87,9 +87,9 @@ def login_page():
     st.markdown('<div style="height: 2rem;"></div>', unsafe_allow_html=True)
     
     ModernComponents.hero_header(
-        "HRMS", 
+        "XLAB HRMS", 
         "Hệ thống Quản lý Nhân sự Hiện đại",
-        "🏢"
+        "⚡"
     )
     
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -148,9 +148,9 @@ def login_page():
 # Main Dashboard với Modern Design
 def dashboard_page():
     ModernComponents.hero_header(
-        "Bảng điều khiển",
-        "Tổng quan hệ thống quản lý nhân sự",
-        "📊"
+        "XLAB HRMS Dashboard",
+        "Tổng quan hệ thống quản lý nhân sự hiện đại",
+        "⚡"
     )
     
     # Modern Metrics Row
@@ -273,8 +273,9 @@ def main_app():
     with st.sidebar:
         st.markdown(f"""
         <div style="text-align: center; padding: 1rem 0 2rem 0;">
-            <div style="font-size: 2rem; margin-bottom: 0.5rem;">👋</div>
-            <div class="title-medium" style="color: #1C1B1F;">Xin chào, {st.session_state.current_user}!</div>
+            <div style="font-size: 2.5rem; margin-bottom: 0.5rem; background: linear-gradient(135deg, #14B8A6, #2DD4BF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">⚡</div>
+            <div class="title-large" style="color: #1F2937; font-weight: 600;">XLAB HRMS</div>
+            <div class="body-medium" style="color: #6B7280; margin-top: 0.25rem;">Chào {st.session_state.current_user}!</div>
         </div>
         """, unsafe_allow_html=True)
         
