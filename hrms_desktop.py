@@ -66,7 +66,9 @@ ICONS = {
 # Help texts for each function (Microsoft-style helpful descriptions)
 HELP_TEXTS = {
     'home': 'Xem tổng quan thống kê và hoạt động gần đây của hệ thống',
-    'employee_search': 'Tìm kiếm và xem chi tiết thông tin của nhân viên theo tên hoặc mã',
+    'employee_search': 'Quản lý CRUD nhân sự - Thêm/Sửa/Xóa/Tìm kiếm với bộ lọc chi tiết',
+    'training_history': 'Quản lý lịch sử đào tạo, bồi dưỡng - Timeline + chứng chỉ + đánh giá hiệu quả',
+    'annual_review': 'Lịch sử đánh giá nhân sự hàng năm - KPI + xếp loại + nhận xét và mục tiêu',
     'salary_mgmt': 'Quản lý nâng lương định kỳ theo quy định 36/24 tháng và phụ cấp thâm niên',
     'retirement': 'Theo dõi nghỉ hưu, cảnh báo trước 6 tháng và xử lý nâng lương trước hạn',
     'planning': 'Kiểm tra quy hoạch cán bộ theo độ tuổi và quota từng vị trí',
@@ -227,20 +229,98 @@ class HRMSDesktop:
                     ethnicity TEXT DEFAULT 'Kinh',
                     religion TEXT DEFAULT 'Không',
                     hometown TEXT,
-                    position TEXT,
                     department TEXT,
-                    party_date DATE,
-                    political_theory TEXT,
-                    education_level TEXT,
+                    position TEXT,
+                    party_membership_date DATE,
+                    political_theory_level TEXT,
+                    degree TEXT,
                     major TEXT,
                     institution TEXT,
-                    current_salary REAL,
-                    salary_grade TEXT,
+                    graduation_year TEXT,
+                    start_date DATE,
                     phone TEXT,
                     email TEXT,
-                    start_date DATE,
+                    address TEXT,
+                    current_salary REAL,
+                    salary_grade TEXT,
                     status TEXT DEFAULT 'active',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # Create training table for employee training history
+            self.cursor.execute('''
+                CREATE TABLE IF NOT EXISTS training (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    employee_id INTEGER NOT NULL,
+                    employee_code TEXT NOT NULL,
+                    training_type TEXT NOT NULL,
+                    training_name TEXT NOT NULL,
+                    training_institution TEXT,
+                    start_date DATE NOT NULL,
+                    end_date DATE,
+                    duration_days INTEGER,
+                    certificate TEXT,
+                    certificate_number TEXT,
+                    results TEXT,
+                    evaluation_score REAL,
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (employee_id) REFERENCES employees (id)
+                )
+            ''')
+            
+            # Create annual reviews table  
+            self.cursor.execute('''
+                CREATE TABLE IF NOT EXISTS annual_reviews (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    employee_id INTEGER NOT NULL,
+                    employee_code TEXT NOT NULL,
+                    review_year INTEGER NOT NULL,
+                    review_period TEXT,
+                    kpi_score REAL,
+                    performance_rating TEXT,
+                    strengths TEXT,
+                    improvements TEXT,
+                    goals_next_year TEXT,
+                    supervisor_comments TEXT,
+                    final_rating TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (employee_id) REFERENCES employees (id)
+                )
+            ''')
+            
+            # Create planning history table
+            self.cursor.execute('''
+                CREATE TABLE IF NOT EXISTS planning_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    employee_id INTEGER NOT NULL,
+                    employee_code TEXT NOT NULL,
+                    position_planned TEXT NOT NULL,
+                    planning_date DATE NOT NULL,
+                    planning_period TEXT,
+                    status TEXT DEFAULT 'active',
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (employee_id) REFERENCES employees (id)
+                )
+            ''')
+            
+            # Create achievements table
+            self.cursor.execute('''
+                CREATE TABLE IF NOT EXISTS achievements (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    employee_id INTEGER NOT NULL,
+                    employee_code TEXT NOT NULL,
+                    achievement_type TEXT NOT NULL,
+                    achievement_name TEXT NOT NULL,
+                    award_level TEXT,
+                    award_date DATE,
+                    awarding_organization TEXT,
+                    description TEXT,
+                    certificate_number TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (employee_id) REFERENCES employees (id)
                 )
             ''')
             
@@ -530,7 +610,9 @@ class HRMSDesktop:
         # Navigation buttons with Microsoft-style icons and help text
         nav_items = [
             ("home", "Trang chủ", self.show_home_dashboard, 'home'),
-            ("people", "Tra cứu nhân sự", self.show_employee_search, 'employee_search'),
+            ("people", "Quản lý nhân sự", self.show_employee_search, 'employee_search'),
+            ("settings", "Đào tạo bồi dưỡng", self.show_training_management, 'training_history'),
+            ("chart", "Đánh giá hàng năm", self.show_annual_reviews, 'annual_review'),
             ("salary", "Nâng lương định kỳ", self.show_salary_management, 'salary_mgmt'),
             ("time", "Theo dõi nghỉ hưu", self.show_retirement_tracking, 'retirement'),
             ("planning", "Kiểm tra quy hoạch", self.show_planning_check, 'planning'),
@@ -539,7 +621,7 @@ class HRMSDesktop:
             ("check", "Điều kiện bổ nhiệm", self.show_appointment_check, 'appointment'),
             ("award", "Điều kiện khen thưởng", self.show_award_check, 'awards'),
             ("fast", "Nâng lương trước hạn", self.show_early_salary, 'early_salary'),
-            ("chart", "Báo cáo thống kê", self.show_reports, 'reports'),
+            ("info", "Báo cáo thống kê", self.show_reports, 'reports'),
             ("health", "Báo bảo hiểm", self.show_insurance, 'insurance')
         ]
         
@@ -1351,6 +1433,1706 @@ class HRMSDesktop:
             
         except Exception as e:
             messagebox.showerror("Lỗi", f"Không thể lưu dữ liệu: {str(e)}")
+    
+    def show_training_management(self):
+        """Show comprehensive training management with timeline and certificates"""
+        self.clear_main_content()
+        
+        # Header
+        header_frame = ctk.CTkFrame(self.main_content, height=80, fg_color="#8b5cf6")
+        header_frame.pack(fill="x", padx=20, pady=20)
+        header_frame.pack_propagate(False)
+        
+        title = ctk.CTkLabel(header_frame, text="🎓 Đào tạo & Bồi dưỡng", 
+                           font=ctk.CTkFont(size=24, weight="bold"), text_color="white")
+        title.pack(side="left", padx=20, pady=20)
+        
+        # Management buttons
+        mgmt_buttons = ctk.CTkFrame(header_frame, fg_color="transparent")
+        mgmt_buttons.pack(side="right", padx=20, pady=20)
+        
+        ctk.CTkButton(mgmt_buttons, text="➕ Thêm đào tạo", width=130, height=35,
+                    command=self.show_add_training_form, fg_color=COLORS['success']).pack(side="left", padx=5)
+        ctk.CTkButton(mgmt_buttons, text="📊 Thống kê", width=100, height=35,
+                    command=self.show_training_statistics, fg_color=COLORS['primary']).pack(side="left", padx=5)
+        
+        # Employee selector and filters
+        filter_frame = ctk.CTkFrame(self.main_content, fg_color=COLORS['background'])
+        filter_frame.pack(fill="x", padx=20, pady=10)
+        
+        filter_row = ctk.CTkFrame(filter_frame, fg_color="transparent")
+        filter_row.pack(fill="x", padx=20, pady=15)
+        
+        ctk.CTkLabel(filter_row, text="Nhân viên:", font=ctk.CTkFont(size=12, weight="bold")).pack(side="left")
+        self.training_employee_filter = ctk.CTkOptionMenu(filter_row, values=["Tất cả nhân viên"], width=200)
+        self.training_employee_filter.pack(side="left", padx=10)
+        
+        ctk.CTkLabel(filter_row, text="Loại đào tạo:", font=ctk.CTkFont(size=12)).pack(side="left", padx=(20, 5))
+        self.training_type_filter = ctk.CTkOptionMenu(filter_row, values=["Tất cả", "Đại học/Cao học", "Bồi dưỡng nghiệp vụ", "Ngoại ngữ", "Tin học", "Lý luận chính trị"], width=150)
+        self.training_type_filter.pack(side="left", padx=5)
+        
+        ctk.CTkButton(filter_row, text="🔍 Lọc", width=80, command=self.load_training_data).pack(side="left", padx=10)
+        
+        # Training statistics cards
+        stats_frame = ctk.CTkFrame(self.main_content, height=100)
+        stats_frame.pack(fill="x", padx=20, pady=10)
+        stats_frame.pack_propagate(False)
+        
+        training_stats = [
+            ("Tổng lượt đào tạo", "127", COLORS['primary']),
+            ("Đang diễn ra", "8", COLORS['warning']),
+            ("Hoàn thành", "115", COLORS['success']),
+            ("Có chứng chỉ", "98", "#8b5cf6")
+        ]
+        
+        for i, (label, value, color) in enumerate(training_stats):
+            card = ctk.CTkFrame(stats_frame, fg_color=color)
+            card.grid(row=0, column=i, padx=12, pady=10, sticky="ew")
+            
+            ctk.CTkLabel(card, text=value, font=ctk.CTkFont(size=24, weight="bold"), text_color="white").pack(pady=8)
+            ctk.CTkLabel(card, text=label, font=ctk.CTkFont(size=10), text_color="white").pack(pady=5)
+        
+        for i in range(4):
+            stats_frame.grid_columnconfigure(i, weight=1)
+        
+        # Training list header
+        list_header = ctk.CTkFrame(self.main_content, height=50, fg_color="#8b5cf6")
+        list_header.pack(fill="x", padx=20, pady=(10, 0))
+        list_header.pack_propagate(False)
+        
+        ctk.CTkLabel(list_header, text="📋 Lịch sử đào tạo bồi dưỡng", font=ctk.CTkFont(size=14, weight="bold"),
+                    text_color="white").pack(side="left", padx=20, pady=12)
+        
+        # Scrollable training list
+        self.training_list_frame = ctk.CTkScrollableFrame(self.main_content, height=400)
+        self.training_list_frame.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        
+        # Load employee options and training data
+        self.load_employee_options_for_training()
+        self.load_training_data()
+    
+    def load_employee_options_for_training(self):
+        """Load employee options for training filter"""
+        try:
+            self.cursor.execute("SELECT employee_code, full_name FROM employees ORDER BY full_name")
+            employees = self.cursor.fetchall()
+            
+            employee_options = ["Tất cả nhân viên"]
+            for emp_code, full_name in employees:
+                employee_options.append(f"{emp_code} - {full_name}")
+            
+            self.training_employee_filter.configure(values=employee_options)
+            
+        except Exception as e:
+            print(f"Error loading employees: {e}")
+    
+    def load_training_data(self):
+        """Load and display training data"""
+        try:
+            # Clear existing content
+            for widget in self.training_list_frame.winfo_children():
+                widget.destroy()
+            
+            # Build query based on filters
+            query = """
+                SELECT t.*, e.full_name 
+                FROM training t 
+                JOIN employees e ON t.employee_id = e.id 
+                WHERE 1=1
+            """
+            params = []
+            
+            # Employee filter
+            emp_filter = self.training_employee_filter.get()
+            if emp_filter != "Tất cả nhân viên":
+                emp_code = emp_filter.split(" - ")[0]
+                query += " AND t.employee_code = ?"
+                params.append(emp_code)
+            
+            # Training type filter
+            type_filter = self.training_type_filter.get()
+            if type_filter != "Tất cả":
+                query += " AND t.training_type = ?"
+                params.append(type_filter)
+            
+            query += " ORDER BY t.start_date DESC"
+            
+            self.cursor.execute(query, params)
+            training_records = self.cursor.fetchall()
+            
+            if not training_records:
+                # Show empty state
+                empty_frame = ctk.CTkFrame(self.training_list_frame, fg_color=COLORS['background'])
+                empty_frame.pack(fill="both", expand=True, padx=20, pady=50)
+                
+                ctk.CTkLabel(empty_frame, text="📚 Chưa có dữ liệu đào tạo", 
+                            font=ctk.CTkFont(size=18, weight="bold")).pack(pady=20)
+                ctk.CTkLabel(empty_frame, text="Hãy bắt đầu thêm lịch sử đào tạo cho nhân viên.", 
+                            font=ctk.CTkFont(size=14)).pack(pady=10)
+                
+                add_first_btn = ctk.CTkButton(empty_frame, text="➕ Thêm đào tạo đầu tiên", 
+                                            width=200, height=40, font=ctk.CTkFont(size=14),
+                                            command=self.show_add_training_form, fg_color="#8b5cf6")
+                add_first_btn.pack(pady=20)
+                return
+            
+            # Display training records
+            for record in training_records:
+                self.display_training_record(record)
+                
+        except Exception as e:
+            messagebox.showerror("Lỗi", f"Không thể tải dữ liệu đào tạo: {str(e)}")
+    
+    def display_training_record(self, record):
+        """Display individual training record"""
+        # Training card
+        training_card = ctk.CTkFrame(self.training_list_frame, fg_color=COLORS['surface'], 
+                                   border_width=1, border_color=COLORS['background'])
+        training_card.pack(fill="x", padx=10, pady=5)
+        
+        # Status indicator based on completion
+        status_color = COLORS['success'] if record[9] else COLORS['warning']  # results field
+        ctk.CTkFrame(training_card, width=4, fg_color=status_color).pack(side="left", fill="y")
+        
+        # Training info section
+        info_section = ctk.CTkFrame(training_card, fg_color="transparent")
+        info_section.pack(side="left", fill="both", expand=True, padx=15, pady=12)
+        
+        # Row 1: Training name and employee
+        row1 = ctk.CTkFrame(info_section, fg_color="transparent")
+        row1.pack(fill="x")
+        
+        training_name = ctk.CTkLabel(row1, text=record[4], font=ctk.CTkFont(size=14, weight="bold"))  # training_name
+        training_name.pack(side="left")
+        
+        employee_label = ctk.CTkLabel(row1, text=f"({record[2]} - {record[15]})", font=ctk.CTkFont(size=11), 
+                                    text_color=COLORS['text_secondary'])  # employee_code, full_name
+        employee_label.pack(side="left", padx=(10, 0))
+        
+        # Row 2: Type and duration  
+        row2 = ctk.CTkFrame(info_section, fg_color="transparent")
+        row2.pack(fill="x", pady=(5, 0))
+        
+        type_duration = f"📚 {record[3]} | "  # training_type
+        if record[8]:  # duration_days
+            type_duration += f"⏱️ {record[8]} ngày | "
+        type_duration += f"📅 {record[6]}"  # start_date
+        if record[7]:  # end_date
+            type_duration += f" → {record[7]}"
+        
+        type_label = ctk.CTkLabel(row2, text=type_duration, font=ctk.CTkFont(size=10), 
+                                text_color=COLORS['text_secondary'])
+        type_label.pack(side="left")
+        
+        # Row 3: Results and certificate
+        if record[9] or record[10]:  # results or certificate_number
+            row3 = ctk.CTkFrame(info_section, fg_color="transparent")
+            row3.pack(fill="x", pady=(3, 0))
+            
+            result_text = ""
+            if record[9]:  # results
+                result_text += f"📊 {record[9]}"
+            if record[10]:  # certificate_number
+                if result_text:
+                    result_text += " | "
+                result_text += f"🎓 Chứng chỉ: {record[10]}"
+            
+            result_label = ctk.CTkLabel(row3, text=result_text, font=ctk.CTkFont(size=10), 
+                                      text_color=COLORS['success'])
+            result_label.pack(side="left")
+        
+        # Action buttons
+        actions_frame = ctk.CTkFrame(training_card, fg_color="transparent", width=120)
+        actions_frame.pack(side="right", padx=15, pady=8)
+        actions_frame.pack_propagate(False)
+        
+        edit_btn = ctk.CTkButton(actions_frame, text="✏️ Sửa", width=80, height=25,
+                               font=ctk.CTkFont(size=9), fg_color=COLORS['warning'],
+                               command=lambda r=record: self.show_edit_training_form(r))
+        edit_btn.pack(pady=2)
+        
+        delete_btn = ctk.CTkButton(actions_frame, text="🗑️ Xóa", width=80, height=25,
+                                 font=ctk.CTkFont(size=9), fg_color=COLORS['error'],
+                                 command=lambda r=record: self.confirm_delete_training(r))
+        delete_btn.pack(pady=2)
+    
+    def show_add_training_form(self):
+        """Show form to add new training record"""
+        self.show_training_form(mode="add")
+    
+    def show_edit_training_form(self, training_record):
+        """Show form to edit training record"""
+        self.show_training_form(mode="edit", training_record=training_record)
+    
+    def show_training_form(self, mode="add", training_record=None):
+        """Show training form for add/edit"""
+        form_window = ctk.CTkToplevel(self.root)
+        form_window.title("➕ Thêm đào tạo mới" if mode == "add" else "✏️ Sửa thông tin đào tạo")
+        form_window.geometry("700x600")
+        form_window.transient(self.root)
+        form_window.grab_set()
+        
+        # Header
+        header = ctk.CTkFrame(form_window, height=60, fg_color="#8b5cf6")
+        header.pack(fill="x")
+        header.pack_propagate(False)
+        
+        title_text = "➕ THÊM ĐÀO TẠO MỚI" if mode == "add" else "✏️ CHỈNH SỬA ĐÀO TẠO"
+        ctk.CTkLabel(header, text=title_text, font=ctk.CTkFont(size=16, weight="bold"), 
+                    text_color="white").pack(pady=15)
+        
+        # Form content
+        form_content = ctk.CTkScrollableFrame(form_window)
+        form_content.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        form_data = {}
+        
+        # Get existing data for edit mode
+        existing_data = {}
+        if mode == "edit" and training_record:
+            existing_data = {
+                'employee_code': training_record[2],
+                'training_type': training_record[3],
+                'training_name': training_record[4],
+                'training_institution': training_record[5] or '',
+                'start_date': training_record[6],
+                'end_date': training_record[7] or '',
+                'duration_days': training_record[8] or '',
+                'certificate': training_record[9] or '',
+                'certificate_number': training_record[10] or '',
+                'results': training_record[11] or '',
+                'evaluation_score': training_record[12] or '',
+                'notes': training_record[13] or ''
+            }
+        
+        # Form fields
+        fields = [
+            ('employee_code', 'Nhân viên *', 'employee_select'),
+            ('training_type', 'Loại đào tạo *', 'option', ['Đại học/Cao học', 'Bồi dưỡng nghiệp vụ', 'Ngoại ngữ', 'Tin học', 'Lý luận chính trị', 'Khác']),
+            ('training_name', 'Tên khóa đào tạo *', 'entry'),
+            ('training_institution', 'Đơn vị đào tạo', 'entry'),
+            ('start_date', 'Ngày bắt đầu *', 'entry'),
+            ('end_date', 'Ngày kết thúc', 'entry'),
+            ('duration_days', 'Thời lượng (ngày)', 'entry'),
+            ('certificate', 'Kết quả', 'option', ['', 'Đạt', 'Khá', 'Giỏi', 'Xuất sắc', 'Không đạt']),
+            ('certificate_number', 'Số chứng chỉ', 'entry'),
+            ('evaluation_score', 'Điểm đánh giá', 'entry'),
+            ('notes', 'Ghi chú', 'text')
+        ]
+        
+        # Create form fields
+        for field_name, field_label, field_type, *field_options in fields:
+            field_frame = ctk.CTkFrame(form_content, fg_color="transparent")
+            field_frame.pack(fill="x", pady=8)
+            
+            ctk.CTkLabel(field_frame, text=field_label, font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="w")
+            
+            if field_type == "entry":
+                widget = ctk.CTkEntry(field_frame, width=300)
+                if existing_data.get(field_name):
+                    widget.insert(0, str(existing_data[field_name]))
+            elif field_type == "option":
+                options = field_options[0] if field_options else []
+                widget = ctk.CTkOptionMenu(field_frame, values=options, width=300)
+                if existing_data.get(field_name) and existing_data[field_name] in options:
+                    widget.set(existing_data[field_name])
+            elif field_type == "employee_select":
+                # Get employee list
+                self.cursor.execute("SELECT employee_code, full_name FROM employees ORDER BY full_name")
+                employees = self.cursor.fetchall()
+                employee_options = [f"{code} - {name}" for code, name in employees]
+                
+                widget = ctk.CTkOptionMenu(field_frame, values=employee_options, width=300)
+                if existing_data.get(field_name):
+                    for option in employee_options:
+                        if option.startswith(existing_data[field_name]):
+                            widget.set(option)
+                            break
+            elif field_type == "text":
+                widget = ctk.CTkTextbox(field_frame, width=300, height=80)
+                if existing_data.get(field_name):
+                    widget.insert("0.0", str(existing_data[field_name]))
+            
+            widget.pack(anchor="w", pady=(5, 0))
+            form_data[field_name] = widget
+        
+        # Action buttons
+        buttons_frame = ctk.CTkFrame(form_window, height=60, fg_color="transparent")
+        buttons_frame.pack(fill="x", padx=20, pady=20)
+        buttons_frame.pack_propagate(False)
+        
+        button_container = ctk.CTkFrame(buttons_frame, fg_color="transparent")
+        button_container.pack(expand=True)
+        
+        save_btn = ctk.CTkButton(button_container, text="💾 Lưu", width=120, height=35,
+                               font=ctk.CTkFont(size=12, weight="bold"), fg_color="#8b5cf6",
+                               command=lambda: self.save_training_data(form_data, mode, training_record, form_window))
+        save_btn.pack(side="left", padx=10)
+        
+        cancel_btn = ctk.CTkButton(button_container, text="❌ Hủy", width=120, height=35,
+                                 font=ctk.CTkFont(size=12), fg_color=COLORS['error'],
+                                 command=form_window.destroy)
+        cancel_btn.pack(side="left", padx=10)
+        
+        ctk.CTkLabel(form_window, text="* Trường bắt buộc", font=ctk.CTkFont(size=10), 
+                    text_color=COLORS['text_secondary']).pack(pady=(0, 10))
+    
+    def save_training_data(self, form_data, mode, training_record, form_window):
+        """Save training data to database"""
+        try:
+            # Collect form data
+            data = {}
+            for field_name, widget in form_data.items():
+                if hasattr(widget, 'get'):
+                    if field_name == 'notes':  # Text widget
+                        data[field_name] = widget.get("0.0", "end-1c").strip()
+                    elif field_name == 'employee_code':  # Extract code from selection
+                        selected = widget.get().strip()
+                        if selected and " - " in selected:
+                            data[field_name] = selected.split(" - ")[0]
+                        else:
+                            data[field_name] = ""
+                    else:
+                        data[field_name] = widget.get().strip()
+                else:
+                    data[field_name] = ""
+            
+            # Validation
+            required_fields = ['employee_code', 'training_type', 'training_name', 'start_date']
+            missing_fields = [field for field in required_fields if not data.get(field)]
+            
+            if missing_fields:
+                field_names = {
+                    'employee_code': 'Nhân viên',
+                    'training_type': 'Loại đào tạo',
+                    'training_name': 'Tên khóa đào tạo',
+                    'start_date': 'Ngày bắt đầu'
+                }
+                missing_names = [field_names.get(field, field) for field in missing_fields]
+                messagebox.showerror("Lỗi", f"Vui lòng điền đầy đủ các trường bắt buộc:\n• " + "\n• ".join(missing_names))
+                return
+            
+            # Get employee_id
+            self.cursor.execute("SELECT id FROM employees WHERE employee_code = ?", (data['employee_code'],))
+            employee_result = self.cursor.fetchone()
+            if not employee_result:
+                messagebox.showerror("Lỗi", f"Không tìm thấy nhân viên với mã {data['employee_code']}")
+                return
+            
+            employee_id = employee_result[0]
+            
+            # Convert numeric fields
+            duration_days = None
+            if data.get('duration_days'):
+                try:
+                    duration_days = int(data['duration_days'])
+                except ValueError:
+                    pass
+            
+            evaluation_score = None
+            if data.get('evaluation_score'):
+                try:
+                    evaluation_score = float(data['evaluation_score'])
+                except ValueError:
+                    pass
+            
+            if mode == "add":
+                # Insert new training record
+                insert_query = '''
+                    INSERT INTO training (
+                        employee_id, employee_code, training_type, training_name, training_institution,
+                        start_date, end_date, duration_days, certificate, certificate_number,
+                        results, evaluation_score, notes
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                '''
+                values = (
+                    employee_id, data['employee_code'], data['training_type'], data['training_name'],
+                    data['training_institution'], data['start_date'], data['end_date'] or None,
+                    duration_days, data['certificate'], data['certificate_number'],
+                    data['results'], evaluation_score, data['notes']
+                )
+                self.cursor.execute(insert_query, values)
+                success_msg = f"Đã thêm đào tạo mới: {data['training_name']}"
+                
+            else:  # edit mode
+                # Update existing training record
+                update_query = '''
+                    UPDATE training SET 
+                        employee_id=?, employee_code=?, training_type=?, training_name=?, training_institution=?,
+                        start_date=?, end_date=?, duration_days=?, certificate=?, certificate_number=?,
+                        results=?, evaluation_score=?, notes=?
+                    WHERE id=?
+                '''
+                values = (
+                    employee_id, data['employee_code'], data['training_type'], data['training_name'],
+                    data['training_institution'], data['start_date'], data['end_date'] or None,
+                    duration_days, data['certificate'], data['certificate_number'],
+                    data['results'], evaluation_score, data['notes'], training_record[0]
+                )
+                self.cursor.execute(update_query, values)
+                success_msg = f"Đã cập nhật đào tạo: {data['training_name']}"
+            
+            self.conn.commit()
+            messagebox.showinfo("Thành công", success_msg)
+            
+            # Close form and refresh list
+            form_window.destroy()
+            self.load_training_data()
+            
+        except Exception as e:
+            messagebox.showerror("Lỗi", f"Không thể lưu dữ liệu: {str(e)}")
+    
+    def confirm_delete_training(self, training_record):
+        """Confirm and delete training record"""
+        result = messagebox.askyesno(
+            "Xác nhận xóa", 
+            f"Bạn có chắc chắn muốn xóa đào tạo:\n{training_record[4]} ({training_record[2]})?\n\nHành động này không thể hoàn tác!"
+        )
+        
+        if result:
+            try:
+                self.cursor.execute("DELETE FROM training WHERE id = ?", (training_record[0],))
+                self.conn.commit()
+                
+                messagebox.showinfo("Thành công", f"Đã xóa đào tạo: {training_record[4]}")
+                self.load_training_data()
+                
+            except Exception as e:
+                messagebox.showerror("Lỗi", f"Không thể xóa đào tạo: {str(e)}")
+    
+    def show_training_statistics(self):
+        """Show training statistics"""
+        stats_window = ctk.CTkToplevel(self.root)
+        stats_window.title("📊 Thống kê đào tạo")
+        stats_window.geometry("600x500")
+        stats_window.transient(self.root)
+        
+        try:
+            # Get statistics
+            self.cursor.execute("SELECT COUNT(*) FROM training")
+            total_training = self.cursor.fetchone()[0]
+            
+            self.cursor.execute("SELECT training_type, COUNT(*) FROM training GROUP BY training_type")
+            type_stats = self.cursor.fetchall()
+            
+            self.cursor.execute("SELECT COUNT(*) FROM training WHERE certificate IS NOT NULL AND certificate != ''")
+            with_certificates = self.cursor.fetchone()[0]
+            
+            # Display statistics
+            ctk.CTkLabel(stats_window, text="📊 Thống kê đào tạo bồi dưỡng", 
+                        font=ctk.CTkFont(size=18, weight="bold")).pack(pady=20)
+            
+            # Total
+            total_frame = ctk.CTkFrame(stats_window, fg_color="#8b5cf6")
+            total_frame.pack(fill="x", padx=20, pady=10)
+            ctk.CTkLabel(total_frame, text=f"Tổng lượt đào tạo: {total_training}", 
+                        font=ctk.CTkFont(size=14, weight="bold"), text_color="white").pack(pady=15)
+            
+            # By type
+            if type_stats:
+                type_frame = ctk.CTkFrame(stats_window, fg_color=COLORS['surface'])
+                type_frame.pack(fill="x", padx=20, pady=10)
+                ctk.CTkLabel(type_frame, text="📚 Theo loại đào tạo:", 
+                            font=ctk.CTkFont(size=12, weight="bold")).pack(pady=(10, 5))
+                
+                for training_type, count in type_stats:
+                    ctk.CTkLabel(type_frame, text=f"  • {training_type}: {count} lượt", 
+                                font=ctk.CTkFont(size=11)).pack(anchor="w", padx=20)
+                
+                ctk.CTkFrame(type_frame, height=10, fg_color="transparent").pack()
+            
+            # Certificate stats
+            cert_frame = ctk.CTkFrame(stats_window, fg_color=COLORS['success'])
+            cert_frame.pack(fill="x", padx=20, pady=10)
+            ctk.CTkLabel(cert_frame, text=f"Có chứng chỉ/kết quả: {with_certificates}/{total_training}", 
+                        font=ctk.CTkFont(size=12, weight="bold"), text_color="white").pack(pady=15)
+            
+            ctk.CTkButton(stats_window, text="Đóng", command=stats_window.destroy).pack(pady=20)
+            
+        except Exception as e:
+            ctk.CTkLabel(stats_window, text=f"Lỗi: {str(e)}", 
+                        font=ctk.CTkFont(size=12)).pack(pady=20)
+    
+    def show_annual_reviews(self):
+        """Show comprehensive annual reviews management"""
+        self.clear_main_content()
+        
+        # Header
+        header_frame = ctk.CTkFrame(self.main_content, height=80, fg_color=COLORS['primary'])
+        header_frame.pack(fill="x", padx=20, pady=20)
+        header_frame.pack_propagate(False)
+        
+        title = ctk.CTkLabel(header_frame, text="📊 Đánh giá hàng năm", 
+                           font=ctk.CTkFont(size=24, weight="bold"), text_color="white")
+        title.pack(side="left", padx=20, pady=20)
+        
+        # Management buttons
+        mgmt_buttons = ctk.CTkFrame(header_frame, fg_color="transparent")
+        mgmt_buttons.pack(side="right", padx=20, pady=20)
+        
+        ctk.CTkButton(mgmt_buttons, text="➕ Thêm đánh giá", width=130, height=35,
+                    command=self.show_add_review_form, fg_color=COLORS['success']).pack(side="left", padx=5)
+        ctk.CTkButton(mgmt_buttons, text="📊 Thống kê", width=100, height=35,
+                    command=self.show_review_statistics, fg_color="#8b5cf6").pack(side="left", padx=5)
+        
+        # Filters section
+        filter_frame = ctk.CTkFrame(self.main_content, fg_color=COLORS['background'])
+        filter_frame.pack(fill="x", padx=20, pady=10)
+        
+        filter_row = ctk.CTkFrame(filter_frame, fg_color="transparent")
+        filter_row.pack(fill="x", padx=20, pady=15)
+        
+        ctk.CTkLabel(filter_row, text="Nhân viên:", font=ctk.CTkFont(size=12, weight="bold")).pack(side="left")
+        self.review_employee_filter = ctk.CTkOptionMenu(filter_row, values=["Tất cả nhân viên"], width=200)
+        self.review_employee_filter.pack(side="left", padx=10)
+        
+        ctk.CTkLabel(filter_row, text="Năm:", font=ctk.CTkFont(size=12)).pack(side="left", padx=(20, 5))
+        current_year = 2025
+        year_options = [str(year) for year in range(current_year - 5, current_year + 1)]
+        self.review_year_filter = ctk.CTkOptionMenu(filter_row, values=["Tất cả"] + year_options, width=100)
+        self.review_year_filter.set(str(current_year))
+        self.review_year_filter.pack(side="left", padx=5)
+        
+        ctk.CTkLabel(filter_row, text="Xếp loại:", font=ctk.CTkFont(size=12)).pack(side="left", padx=(10, 5))
+        self.review_rating_filter = ctk.CTkOptionMenu(filter_row, values=["Tất cả", "Xuất sắc", "Tốt", "Khá", "Trung bình", "Yếu"], width=120)
+        self.review_rating_filter.pack(side="left", padx=5)
+        
+        ctk.CTkButton(filter_row, text="🔍 Lọc", width=80, command=self.load_review_data).pack(side="left", padx=10)
+        
+        # Statistics cards
+        stats_frame = ctk.CTkFrame(self.main_content, height=100)
+        stats_frame.pack(fill="x", padx=20, pady=10)
+        stats_frame.pack_propagate(False)
+        
+        review_stats = [
+            ("Tổng đánh giá", "85", COLORS['primary']),
+            ("Xuất sắc", "28", COLORS['success']),
+            ("Tốt/Khá", "42", COLORS['warning']),
+            ("KPI TB", "8.2", "#8b5cf6")
+        ]
+        
+        for i, (label, value, color) in enumerate(review_stats):
+            card = ctk.CTkFrame(stats_frame, fg_color=color)
+            card.grid(row=0, column=i, padx=12, pady=10, sticky="ew")
+            
+            ctk.CTkLabel(card, text=value, font=ctk.CTkFont(size=24, weight="bold"), text_color="white").pack(pady=8)
+            ctk.CTkLabel(card, text=label, font=ctk.CTkFont(size=10), text_color="white").pack(pady=5)
+        
+        for i in range(4):
+            stats_frame.grid_columnconfigure(i, weight=1)
+        
+        # Reviews list header
+        list_header = ctk.CTkFrame(self.main_content, height=50, fg_color=COLORS['primary'])
+        list_header.pack(fill="x", padx=20, pady=(10, 0))
+        list_header.pack_propagate(False)
+        
+        ctk.CTkLabel(list_header, text="📋 Lịch sử đánh giá hàng năm", font=ctk.CTkFont(size=14, weight="bold"),
+                    text_color="white").pack(side="left", padx=20, pady=12)
+        
+        # Scrollable reviews list
+        self.reviews_list_frame = ctk.CTkScrollableFrame(self.main_content, height=400)
+        self.reviews_list_frame.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        
+        # Load employee options and review data
+        self.load_employee_options_for_reviews()
+        self.load_review_data()
+    
+    def load_employee_options_for_reviews(self):
+        """Load employee options for review filter"""
+        try:
+            self.cursor.execute("SELECT employee_code, full_name FROM employees ORDER BY full_name")
+            employees = self.cursor.fetchall()
+            
+            employee_options = ["Tất cả nhân viên"]
+            for emp_code, full_name in employees:
+                employee_options.append(f"{emp_code} - {full_name}")
+            
+            self.review_employee_filter.configure(values=employee_options)
+            
+        except Exception as e:
+            print(f"Error loading employees: {e}")
+    
+    def load_review_data(self):
+        """Load and display annual review data"""
+        try:
+            # Clear existing content
+            for widget in self.reviews_list_frame.winfo_children():
+                widget.destroy()
+            
+            # Build query based on filters
+            query = """
+                SELECT ar.*, e.full_name 
+                FROM annual_reviews ar
+                JOIN employees e ON ar.employee_id = e.id 
+                WHERE 1=1
+            """
+            params = []
+            
+            # Employee filter
+            emp_filter = self.review_employee_filter.get()
+            if emp_filter != "Tất cả nhân viên":
+                emp_code = emp_filter.split(" - ")[0]
+                query += " AND ar.employee_code = ?"
+                params.append(emp_code)
+            
+            # Year filter
+            year_filter = self.review_year_filter.get()
+            if year_filter != "Tất cả":
+                query += " AND ar.review_year = ?"
+                params.append(int(year_filter))
+            
+            # Rating filter
+            rating_filter = self.review_rating_filter.get()
+            if rating_filter != "Tất cả":
+                query += " AND ar.final_rating = ?"
+                params.append(rating_filter)
+            
+            query += " ORDER BY ar.review_year DESC, ar.employee_code"
+            
+            self.cursor.execute(query, params)
+            review_records = self.cursor.fetchall()
+            
+            if not review_records:
+                # Show empty state
+                empty_frame = ctk.CTkFrame(self.reviews_list_frame, fg_color=COLORS['background'])
+                empty_frame.pack(fill="both", expand=True, padx=20, pady=50)
+                
+                ctk.CTkLabel(empty_frame, text="📊 Chưa có dữ liệu đánh giá", 
+                            font=ctk.CTkFont(size=18, weight="bold")).pack(pady=20)
+                ctk.CTkLabel(empty_frame, text="Hãy bắt đầu thêm đánh giá hàng năm cho nhân viên.", 
+                            font=ctk.CTkFont(size=14)).pack(pady=10)
+                
+                add_first_btn = ctk.CTkButton(empty_frame, text="➕ Thêm đánh giá đầu tiên", 
+                                            width=200, height=40, font=ctk.CTkFont(size=14),
+                                            command=self.show_add_review_form, fg_color=COLORS['primary'])
+                add_first_btn.pack(pady=20)
+                return
+            
+            # Display review records
+            for record in review_records:
+                self.display_review_record(record)
+                
+        except Exception as e:
+            messagebox.showerror("Lỗi", f"Không thể tải dữ liệu đánh giá: {str(e)}")
+    
+    def display_review_record(self, record):
+        """Display individual review record"""
+        # Review card
+        review_card = ctk.CTkFrame(self.reviews_list_frame, fg_color=COLORS['surface'], 
+                                 border_width=1, border_color=COLORS['background'])
+        review_card.pack(fill="x", padx=10, pady=5)
+        
+        # Rating color indicator
+        rating_colors = {
+            "Xuất sắc": "#10b981",  # green
+            "Tốt": "#3b82f6",       # blue  
+            "Khá": "#f59e0b",       # yellow
+            "Trung bình": "#ef4444", # red
+            "Yếu": "#dc2626"        # dark red
+        }
+        rating_color = rating_colors.get(record[11], COLORS['primary'])  # final_rating (index 11)
+        ctk.CTkFrame(review_card, width=4, fg_color=rating_color).pack(side="left", fill="y")
+        
+        # Review info section
+        info_section = ctk.CTkFrame(review_card, fg_color="transparent")
+        info_section.pack(side="left", fill="both", expand=True, padx=15, pady=12)
+        
+        # Row 1: Employee name and year
+        row1 = ctk.CTkFrame(info_section, fg_color="transparent")
+        row1.pack(fill="x")
+        
+        employee_name = ctk.CTkLabel(row1, text=f"{record[2]} - {record[12]}", font=ctk.CTkFont(size=14, weight="bold"))  # employee_code, full_name
+        employee_name.pack(side="left")
+        
+        year_label = ctk.CTkLabel(row1, text=f"📅 Năm {record[3]}", font=ctk.CTkFont(size=11), 
+                                text_color=COLORS['text_secondary'])  # review_year
+        year_label.pack(side="right")
+        
+        # Row 2: KPI and rating
+        row2 = ctk.CTkFrame(info_section, fg_color="transparent")
+        row2.pack(fill="x", pady=(5, 0))
+        
+        kpi_info = f"📊 KPI: {record[5] or 'N/A'}"  # kpi_score
+        if record[6]:  # performance_rating
+            kpi_info += f" | ⭐ {record[6]}"
+        
+        kpi_label = ctk.CTkLabel(row2, text=kpi_info, font=ctk.CTkFont(size=10), 
+                               text_color=COLORS['text_secondary'])
+        kpi_label.pack(side="left")
+        
+        # Final rating badge
+        rating_badge = ctk.CTkLabel(row2, text=record[11] or "Chưa xếp loại", 
+                                  font=ctk.CTkFont(size=10, weight="bold"), 
+                                  text_color="white", fg_color=rating_color,
+                                  corner_radius=10, width=80, height=20)
+        rating_badge.pack(side="right")
+        
+        # Row 3: Period and goals preview
+        if record[4] or record[9]:  # review_period or goals_next_year
+            row3 = ctk.CTkFrame(info_section, fg_color="transparent")
+            row3.pack(fill="x", pady=(3, 0))
+            
+            period_goals = ""
+            if record[4]:  # review_period
+                period_goals += f"📋 Kỳ: {record[4]}"
+            if record[9]:  # goals_next_year
+                if period_goals:
+                    period_goals += " | "
+                goals_preview = record[9][:50] + "..." if len(record[9]) > 50 else record[9]
+                period_goals += f"🎯 Mục tiêu: {goals_preview}"
+            
+            period_label = ctk.CTkLabel(row3, text=period_goals, font=ctk.CTkFont(size=10), 
+                                      text_color=COLORS['success'])
+            period_label.pack(side="left")
+        
+        # Action buttons
+        actions_frame = ctk.CTkFrame(review_card, fg_color="transparent", width=120)
+        actions_frame.pack(side="right", padx=15, pady=8)
+        actions_frame.pack_propagate(False)
+        
+        view_btn = ctk.CTkButton(actions_frame, text="👁️ Chi tiết", width=80, height=25,
+                               font=ctk.CTkFont(size=9), fg_color="#8b5cf6",
+                               command=lambda r=record: self.show_review_details(r))
+        view_btn.pack(pady=2)
+        
+        edit_btn = ctk.CTkButton(actions_frame, text="✏️ Sửa", width=80, height=25,
+                               font=ctk.CTkFont(size=9), fg_color=COLORS['warning'],
+                               command=lambda r=record: self.show_edit_review_form(r))
+        edit_btn.pack(pady=2)
+        
+        delete_btn = ctk.CTkButton(actions_frame, text="🗑️ Xóa", width=80, height=25,
+                                 font=ctk.CTkFont(size=9), fg_color=COLORS['error'],
+                                 command=lambda r=record: self.confirm_delete_review(r))
+        delete_btn.pack(pady=2)
+    
+    def show_add_review_form(self):
+        """Show form to add new review"""
+        self.show_review_form(mode="add")
+    
+    def show_edit_review_form(self, review_record):
+        """Show form to edit review"""
+        self.show_review_form(mode="edit", review_record=review_record)
+    
+    def confirm_delete_review(self, review_record):
+        """Confirm and delete review record"""
+        result = messagebox.askyesno(
+            "Xác nhận xóa", 
+            f"Bạn có chắc chắn muốn xóa đánh giá:\n{review_record[2]} - Năm {review_record[3]}?\n\nHành động này không thể hoàn tác!"
+        )
+        
+        if result:
+            try:
+                self.cursor.execute("DELETE FROM annual_reviews WHERE id = ?", (review_record[0],))
+                self.conn.commit()
+                
+                messagebox.showinfo("Thành công", f"Đã xóa đánh giá {review_record[2]} năm {review_record[3]}")
+                self.load_review_data()
+                
+            except Exception as e:
+                messagebox.showerror("Lỗi", f"Không thể xóa đánh giá: {str(e)}")
+    
+    def show_review_statistics(self):
+        """Show review statistics"""
+        stats_window = ctk.CTkToplevel(self.root)
+        stats_window.title("📊 Thống kê đánh giá")
+        stats_window.geometry("600x500")
+        stats_window.transient(self.root)
+        
+        try:
+            # Get statistics
+            self.cursor.execute("SELECT COUNT(*) FROM annual_reviews")
+            total_reviews = self.cursor.fetchone()[0]
+            
+            self.cursor.execute("SELECT final_rating, COUNT(*) FROM annual_reviews WHERE final_rating IS NOT NULL GROUP BY final_rating")
+            rating_stats = self.cursor.fetchall()
+            
+            self.cursor.execute("SELECT AVG(kpi_score) FROM annual_reviews WHERE kpi_score IS NOT NULL")
+            avg_kpi = self.cursor.fetchone()[0]
+            
+            # Display statistics
+            ctk.CTkLabel(stats_window, text="📊 Thống kê đánh giá hàng năm", 
+                        font=ctk.CTkFont(size=18, weight="bold")).pack(pady=20)
+            
+            # Total and average
+            summary_frame = ctk.CTkFrame(stats_window, fg_color=COLORS['primary'])
+            summary_frame.pack(fill="x", padx=20, pady=10)
+            ctk.CTkLabel(summary_frame, text=f"Tổng đánh giá: {total_reviews} | KPI trung bình: {avg_kpi:.1f if avg_kpi else 0}", 
+                        font=ctk.CTkFont(size=14, weight="bold"), text_color="white").pack(pady=15)
+            
+            # Rating distribution
+            if rating_stats:
+                rating_frame = ctk.CTkFrame(stats_window, fg_color=COLORS['surface'])
+                rating_frame.pack(fill="x", padx=20, pady=10)
+                ctk.CTkLabel(rating_frame, text="⭐ Phân bổ xếp loại:", 
+                            font=ctk.CTkFont(size=12, weight="bold")).pack(pady=(10, 5))
+                
+                for rating, count in rating_stats:
+                    percentage = (count / total_reviews * 100) if total_reviews > 0 else 0
+                    ctk.CTkLabel(rating_frame, text=f"  • {rating}: {count} ({percentage:.1f}%)", 
+                                font=ctk.CTkFont(size=11)).pack(anchor="w", padx=20)
+                
+                ctk.CTkFrame(rating_frame, height=10, fg_color="transparent").pack()
+            
+            ctk.CTkButton(stats_window, text="Đóng", command=stats_window.destroy).pack(pady=20)
+            
+        except Exception as e:
+            ctk.CTkLabel(stats_window, text=f"Lỗi: {str(e)}", 
+                        font=ctk.CTkFont(size=12)).pack(pady=20)
+    
+    def show_review_form(self, mode="add", review_record=None):
+        """Show annual review form for add/edit - simplified version"""
+        form_window = ctk.CTkToplevel(self.root)
+        form_window.title("➕ Thêm đánh giá mới" if mode == "add" else "✏️ Chỉnh sửa đánh giá")
+        form_window.geometry("600x500")
+        form_window.transient(self.root)
+        form_window.grab_set()
+        
+        # Simplified placeholder for now
+        ctk.CTkLabel(form_window, text="🚧 Đang phát triển", 
+                    font=ctk.CTkFont(size=18, weight="bold")).pack(pady=100)
+        ctk.CTkLabel(form_window, text="Form đánh giá sẽ được hoàn thiện trong phiên bản tiếp theo", 
+                    font=ctk.CTkFont(size=12)).pack(pady=20)
+        
+        ctk.CTkButton(form_window, text="Đóng", command=form_window.destroy).pack(pady=20)
+    
+    def show_review_details(self, review_record):
+        """Show detailed view of review - simplified version"""
+        details_window = ctk.CTkToplevel(self.root)
+        details_window.title(f"📊 Chi tiết đánh giá - {review_record[2]}")
+        details_window.geometry("500x400")
+        details_window.transient(self.root)
+        
+        # Simplified placeholder for now
+        ctk.CTkLabel(details_window, text="🚧 Đang phát triển", 
+                    font=ctk.CTkFont(size=18, weight="bold")).pack(pady=100)
+        ctk.CTkLabel(details_window, text="Chi tiết đánh giá sẽ được hiển thị đầy đủ trong phiên bản tiếp theo", 
+                    font=ctk.CTkFont(size=12)).pack(pady=20)
+        
+        ctk.CTkButton(details_window, text="Đóng", command=details_window.destroy).pack(pady=20)
+    
+    def show_planning_history(self):
+        """Show comprehensive planning history management"""
+        self.clear_main_content()
+        
+        # Header
+        header_frame = ctk.CTkFrame(self.main_content, height=80, fg_color="#10b981")
+        header_frame.pack(fill="x", padx=20, pady=20)
+        header_frame.pack_propagate(False)
+        
+        title = ctk.CTkLabel(header_frame, text="📈 Lịch sử quy hoạch", 
+                           font=ctk.CTkFont(size=24, weight="bold"), text_color="white")
+        title.pack(side="left", padx=20, pady=20)
+        
+        # Management buttons
+        mgmt_buttons = ctk.CTkFrame(header_frame, fg_color="transparent")
+        mgmt_buttons.pack(side="right", padx=20, pady=20)
+        
+        ctk.CTkButton(mgmt_buttons, text="➕ Thêm quy hoạch", width=130, height=35,
+                    command=self.show_add_planning_form, fg_color=COLORS['success']).pack(side="left", padx=5)
+        ctk.CTkButton(mgmt_buttons, text="📊 Thống kê", width=100, height=35,
+                    command=self.show_planning_statistics, fg_color=COLORS['primary']).pack(side="left", padx=5)
+        
+        # Filters section
+        filter_frame = ctk.CTkFrame(self.main_content, fg_color=COLORS['background'])
+        filter_frame.pack(fill="x", padx=20, pady=10)
+        
+        filter_row = ctk.CTkFrame(filter_frame, fg_color="transparent")
+        filter_row.pack(fill="x", padx=20, pady=15)
+        
+        ctk.CTkLabel(filter_row, text="Nhân viên:", font=ctk.CTkFont(size=12, weight="bold")).pack(side="left")
+        self.planning_employee_filter = ctk.CTkOptionMenu(filter_row, values=["Tất cả nhân viên"], width=200)
+        self.planning_employee_filter.pack(side="left", padx=10)
+        
+        ctk.CTkLabel(filter_row, text="Vị trí quy hoạch:", font=ctk.CTkFont(size=12)).pack(side="left", padx=(20, 5))
+        self.planning_position_filter = ctk.CTkOptionMenu(filter_row, values=["Tất cả", "Trưởng phòng", "Phó Trưởng phòng", "Chuyên viên chính", "Chuyên viên", "Tổng Giám đốc", "Phó TGĐ"], width=150)
+        self.planning_position_filter.pack(side="left", padx=5)
+        
+        ctk.CTkLabel(filter_row, text="Trạng thái:", font=ctk.CTkFont(size=12)).pack(side="left", padx=(10, 5))
+        self.planning_status_filter = ctk.CTkOptionMenu(filter_row, values=["Tất cả", "active", "completed", "cancelled"], width=120)
+        self.planning_status_filter.pack(side="left", padx=5)
+        
+        ctk.CTkButton(filter_row, text="🔍 Lọc", width=80, command=self.load_planning_data).pack(side="left", padx=10)
+        
+        # Statistics cards
+        stats_frame = ctk.CTkFrame(self.main_content, height=100)
+        stats_frame.pack(fill="x", padx=20, pady=10)
+        stats_frame.pack_propagate(False)
+        
+        planning_stats = [
+            ("Tổng quy hoạch", "72", "#10b981"),
+            ("Đang hoạt động", "45", COLORS['success']),
+            ("Hoàn thành", "21", COLORS['primary']),
+            ("Hủy bỏ", "6", COLORS['error'])
+        ]
+        
+        for i, (label, value, color) in enumerate(planning_stats):
+            card = ctk.CTkFrame(stats_frame, fg_color=color)
+            card.grid(row=0, column=i, padx=12, pady=10, sticky="ew")
+            
+            ctk.CTkLabel(card, text=value, font=ctk.CTkFont(size=24, weight="bold"), text_color="white").pack(pady=8)
+            ctk.CTkLabel(card, text=label, font=ctk.CTkFont(size=10), text_color="white").pack(pady=5)
+        
+        for i in range(4):
+            stats_frame.grid_columnconfigure(i, weight=1)
+        
+        # Planning list header
+        list_header = ctk.CTkFrame(self.main_content, height=50, fg_color="#10b981")
+        list_header.pack(fill="x", padx=20, pady=(10, 0))
+        list_header.pack_propagate(False)
+        
+        ctk.CTkLabel(list_header, text="📋 Timeline quy hoạch nhân sự", font=ctk.CTkFont(size=14, weight="bold"),
+                    text_color="white").pack(side="left", padx=20, pady=12)
+        
+        # Scrollable planning list
+        self.planning_list_frame = ctk.CTkScrollableFrame(self.main_content, height=400)
+        self.planning_list_frame.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        
+        # Load employee options and planning data
+        self.load_employee_options_for_planning()
+        self.load_planning_data()
+    
+    def load_employee_options_for_planning(self):
+        """Load employee options for planning filter"""
+        try:
+            self.cursor.execute("SELECT employee_code, full_name FROM employees ORDER BY full_name")
+            employees = self.cursor.fetchall()
+            
+            employee_options = ["Tất cả nhân viên"]
+            for emp_code, full_name in employees:
+                employee_options.append(f"{emp_code} - {full_name}")
+            
+            self.planning_employee_filter.configure(values=employee_options)
+            
+        except Exception as e:
+            print(f"Error loading employees: {e}")
+    
+    def load_planning_data(self):
+        """Load and display planning history data"""
+        try:
+            # Clear existing content
+            for widget in self.planning_list_frame.winfo_children():
+                widget.destroy()
+            
+            # Build query based on filters
+            query = """
+                SELECT ph.*, e.full_name 
+                FROM planning_history ph
+                JOIN employees e ON ph.employee_id = e.id 
+                WHERE 1=1
+            """
+            params = []
+            
+            # Employee filter
+            emp_filter = self.planning_employee_filter.get()
+            if emp_filter != "Tất cả nhân viên":
+                emp_code = emp_filter.split(" - ")[0]
+                query += " AND ph.employee_code = ?"
+                params.append(emp_code)
+            
+            # Position filter
+            position_filter = self.planning_position_filter.get()
+            if position_filter != "Tất cả":
+                query += " AND ph.position_planned = ?"
+                params.append(position_filter)
+            
+            # Status filter
+            status_filter = self.planning_status_filter.get()
+            if status_filter != "Tất cả":
+                query += " AND ph.status = ?"
+                params.append(status_filter)
+            
+            query += " ORDER BY ph.planning_date DESC, ph.employee_code"
+            
+            self.cursor.execute(query, params)
+            planning_records = self.cursor.fetchall()
+            
+            if not planning_records:
+                # Show empty state
+                empty_frame = ctk.CTkFrame(self.planning_list_frame, fg_color=COLORS['background'])
+                empty_frame.pack(fill="both", expand=True, padx=20, pady=50)
+                
+                ctk.CTkLabel(empty_frame, text="📈 Chưa có dữ liệu quy hoạch", 
+                            font=ctk.CTkFont(size=18, weight="bold")).pack(pady=20)
+                ctk.CTkLabel(empty_frame, text="Hãy bắt đầu thêm lịch sử quy hoạch cho nhân viên.", 
+                            font=ctk.CTkFont(size=14)).pack(pady=10)
+                
+                add_first_btn = ctk.CTkButton(empty_frame, text="➕ Thêm quy hoạch đầu tiên", 
+                                            width=200, height=40, font=ctk.CTkFont(size=14),
+                                            command=self.show_add_planning_form, fg_color="#10b981")
+                add_first_btn.pack(pady=20)
+                return
+            
+            # Display planning records grouped by employee
+            self.display_planning_timeline(planning_records)
+                
+        except Exception as e:
+            messagebox.showerror("Lỗi", f"Không thể tải dữ liệu quy hoạch: {str(e)}")
+    
+    def display_planning_timeline(self, planning_records):
+        """Display planning records in timeline format"""
+        # Group records by employee
+        employee_groups = {}
+        for record in planning_records:
+            emp_key = f"{record[2]} - {record[9]}"  # employee_code, full_name
+            if emp_key not in employee_groups:
+                employee_groups[emp_key] = []
+            employee_groups[emp_key].append(record)
+        
+        # Display each employee's planning timeline
+        for emp_key, records in employee_groups.items():
+            # Employee header
+            emp_header = ctk.CTkFrame(self.planning_list_frame, fg_color="#10b981")
+            emp_header.pack(fill="x", padx=10, pady=(10, 5))
+            
+            ctk.CTkLabel(emp_header, text=f"👤 {emp_key}", 
+                        font=ctk.CTkFont(size=14, weight="bold"), text_color="white").pack(side="left", padx=15, pady=8)
+            ctk.CTkLabel(emp_header, text=f"📈 {len(records)} quy hoạch", 
+                        font=ctk.CTkFont(size=10), text_color="white").pack(side="right", padx=15, pady=8)
+            
+            # Timeline items
+            for i, record in enumerate(records):
+                self.display_planning_record(record, is_last=i==len(records)-1)
+            
+            # Separator
+            ctk.CTkFrame(self.planning_list_frame, height=2, fg_color=COLORS['background']).pack(fill="x", padx=10, pady=5)
+    
+    def display_planning_record(self, record, is_last=False):
+        """Display individual planning record in timeline style"""
+        # Timeline item
+        timeline_frame = ctk.CTkFrame(self.planning_list_frame, fg_color="transparent")
+        timeline_frame.pack(fill="x", padx=10, pady=2)
+        
+        # Timeline connector
+        connector_frame = ctk.CTkFrame(timeline_frame, fg_color="transparent", width=50)
+        connector_frame.pack(side="left", fill="y")
+        connector_frame.pack_propagate(False)
+        
+        # Status colors
+        status_colors = {
+            "active": "#10b981",
+            "completed": COLORS['primary'],
+            "cancelled": COLORS['error']
+        }
+        status_color = status_colors.get(record[6], COLORS['warning'])  # status
+        
+        # Timeline dot
+        dot = ctk.CTkFrame(connector_frame, width=12, height=12, fg_color=status_color, corner_radius=6)
+        dot.pack(pady=(15, 0))
+        
+        # Timeline line (if not last)
+        if not is_last:
+            line = ctk.CTkFrame(connector_frame, width=2, height=30, fg_color=COLORS['background'])
+            line.pack(pady=(2, 0))
+        
+        # Content card
+        content_card = ctk.CTkFrame(timeline_frame, fg_color=COLORS['surface'], 
+                                  border_width=1, border_color=status_color)
+        content_card.pack(side="left", fill="both", expand=True, padx=(10, 0))
+        
+        # Card content
+        card_content = ctk.CTkFrame(content_card, fg_color="transparent")
+        card_content.pack(fill="both", expand=True, padx=15, pady=10)
+        
+        # Row 1: Position and date
+        row1 = ctk.CTkFrame(card_content, fg_color="transparent")
+        row1.pack(fill="x")
+        
+        position_label = ctk.CTkLabel(row1, text=f"🎯 {record[3]}", font=ctk.CTkFont(size=14, weight="bold"))  # position_planned
+        position_label.pack(side="left")
+        
+        date_label = ctk.CTkLabel(row1, text=f"📅 {record[4]}", font=ctk.CTkFont(size=11), 
+                                text_color=COLORS['text_secondary'])  # planning_date
+        date_label.pack(side="right")
+        
+        # Row 2: Planning period and status
+        row2 = ctk.CTkFrame(card_content, fg_color="transparent")
+        row2.pack(fill="x", pady=(5, 0))
+        
+        period_info = f"⏱️ Kỳ: {record[5] or 'Không xác định'}"  # planning_period
+        period_label = ctk.CTkLabel(row2, text=period_info, font=ctk.CTkFont(size=10), 
+                                  text_color=COLORS['text_secondary'])
+        period_label.pack(side="left")
+        
+        # Status badge
+        status_texts = {"active": "Đang hoạt động", "completed": "Hoàn thành", "cancelled": "Hủy bỏ"}
+        status_badge = ctk.CTkLabel(row2, text=status_texts.get(record[6], record[6]), 
+                                  font=ctk.CTkFont(size=9, weight="bold"), 
+                                  text_color="white", fg_color=status_color,
+                                  corner_radius=8, width=80, height=18)
+        status_badge.pack(side="right")
+        
+        # Row 3: Notes (if available)
+        if record[7]:  # notes
+            row3 = ctk.CTkFrame(card_content, fg_color="transparent")
+            row3.pack(fill="x", pady=(3, 0))
+            
+            notes_preview = record[7][:80] + "..." if len(record[7]) > 80 else record[7]
+            notes_label = ctk.CTkLabel(row3, text=f"📝 {notes_preview}", font=ctk.CTkFont(size=10), 
+                                     text_color=COLORS['success'])
+            notes_label.pack(side="left")
+        
+        # Action buttons (small, inline)
+        actions = ctk.CTkFrame(card_content, fg_color="transparent")
+        actions.pack(fill="x", pady=(8, 0))
+        
+        edit_btn = ctk.CTkButton(actions, text="✏️", width=30, height=25,
+                               font=ctk.CTkFont(size=10), fg_color=COLORS['warning'],
+                               command=lambda r=record: self.show_edit_planning_form(r))
+        edit_btn.pack(side="right", padx=(5, 0))
+        
+        delete_btn = ctk.CTkButton(actions, text="🗑️", width=30, height=25,
+                                 font=ctk.CTkFont(size=10), fg_color=COLORS['error'],
+                                 command=lambda r=record: self.confirm_delete_planning(r))
+        delete_btn.pack(side="right", padx=(5, 0))
+        
+        status_btn = ctk.CTkButton(actions, text="🔄", width=30, height=25,
+                                 font=ctk.CTkFont(size=10), fg_color="#8b5cf6",
+                                 command=lambda r=record: self.change_planning_status(r))
+        status_btn.pack(side="right", padx=(5, 0))
+    
+    def show_add_planning_form(self):
+        """Show form to add new planning record"""
+        self.show_planning_form(mode="add")
+    
+    def show_edit_planning_form(self, planning_record):
+        """Show form to edit planning record"""
+        self.show_planning_form(mode="edit", planning_record=planning_record)
+    
+    def show_planning_form(self, mode="add", planning_record=None):
+        """Show planning form for add/edit - simplified version"""
+        form_window = ctk.CTkToplevel(self.root)
+        form_window.title("➕ Thêm quy hoạch mới" if mode == "add" else "✏️ Chỉnh sửa quy hoạch")
+        form_window.geometry("600x500")
+        form_window.transient(self.root)
+        form_window.grab_set()
+        
+        # Simplified placeholder for now
+        ctk.CTkLabel(form_window, text="🚧 Đang phát triển", 
+                    font=ctk.CTkFont(size=18, weight="bold")).pack(pady=100)
+        ctk.CTkLabel(form_window, text="Form quy hoạch sẽ được hoàn thiện trong phiên bản tiếp theo", 
+                    font=ctk.CTkFont(size=12)).pack(pady=20)
+        
+        ctk.CTkButton(form_window, text="Đóng", command=form_window.destroy).pack(pady=20)
+    
+    def confirm_delete_planning(self, planning_record):
+        """Confirm and delete planning record"""
+        result = messagebox.askyesno(
+            "Xác nhận xóa", 
+            f"Bạn có chắc chắn muốn xóa quy hoạch:\n{planning_record[3]} - {planning_record[2]}?\n\nHành động này không thể hoàn tác!"
+        )
+        
+        if result:
+            try:
+                self.cursor.execute("DELETE FROM planning_history WHERE id = ?", (planning_record[0],))
+                self.conn.commit()
+                
+                messagebox.showinfo("Thành công", f"Đã xóa quy hoạch {planning_record[3]}")
+                self.load_planning_data()
+                
+            except Exception as e:
+                messagebox.showerror("Lỗi", f"Không thể xóa quy hoạch: {str(e)}")
+    
+    def change_planning_status(self, planning_record):
+        """Change planning status"""
+        status_window = ctk.CTkToplevel(self.root)
+        status_window.title("🔄 Thay đổi trạng thái")
+        status_window.geometry("400x300")
+        status_window.transient(self.root)
+        status_window.grab_set()
+        
+        ctk.CTkLabel(status_window, text=f"Quy hoạch: {planning_record[3]}", 
+                    font=ctk.CTkFont(size=14, weight="bold")).pack(pady=20)
+        ctk.CTkLabel(status_window, text=f"Nhân viên: {planning_record[2]}", 
+                    font=ctk.CTkFont(size=12)).pack(pady=5)
+        
+        # Status selection
+        ctk.CTkLabel(status_window, text="Trạng thái mới:", font=ctk.CTkFont(size=12, weight="bold")).pack(pady=(20, 5))
+        status_var = ctk.StringVar(value=planning_record[6])
+        
+        status_options = [
+            ("active", "Đang hoạt động", "#10b981"),
+            ("completed", "Hoàn thành", COLORS['primary']),
+            ("cancelled", "Hủy bỏ", COLORS['error'])
+        ]
+        
+        for status_val, status_text, color in status_options:
+            radio = ctk.CTkRadioButton(status_window, text=status_text, variable=status_var, 
+                                     value=status_val, font=ctk.CTkFont(size=11))
+            radio.pack(pady=5)
+        
+        def save_status():
+            try:
+                new_status = status_var.get()
+                self.cursor.execute("UPDATE planning_history SET status = ? WHERE id = ?", 
+                                  (new_status, planning_record[0]))
+                self.conn.commit()
+                
+                status_texts = {"active": "Đang hoạt động", "completed": "Hoàn thành", "cancelled": "Hủy bỏ"}
+                messagebox.showinfo("Thành công", f"Đã cập nhật trạng thái thành: {status_texts[new_status]}")
+                status_window.destroy()
+                self.load_planning_data()
+                
+            except Exception as e:
+                messagebox.showerror("Lỗi", f"Không thể cập nhật trạng thái: {str(e)}")
+        
+        button_frame = ctk.CTkFrame(status_window, fg_color="transparent")
+        button_frame.pack(pady=30)
+        
+        ctk.CTkButton(button_frame, text="💾 Lưu", command=save_status, width=100).pack(side="left", padx=10)
+        ctk.CTkButton(button_frame, text="❌ Hủy", command=status_window.destroy, width=100).pack(side="left", padx=10)
+    
+    def show_planning_statistics(self):
+        """Show planning statistics"""
+        stats_window = ctk.CTkToplevel(self.root)
+        stats_window.title("📊 Thống kê quy hoạch")
+        stats_window.geometry("600x500")
+        stats_window.transient(self.root)
+        
+        try:
+            # Get statistics
+            self.cursor.execute("SELECT COUNT(*) FROM planning_history")
+            total_planning = self.cursor.fetchone()[0]
+            
+            self.cursor.execute("SELECT status, COUNT(*) FROM planning_history GROUP BY status")
+            status_stats = self.cursor.fetchall()
+            
+            self.cursor.execute("SELECT position_planned, COUNT(*) FROM planning_history GROUP BY position_planned")
+            position_stats = self.cursor.fetchall()
+            
+            # Display statistics
+            ctk.CTkLabel(stats_window, text="📊 Thống kê quy hoạch nhân sự", 
+                        font=ctk.CTkFont(size=18, weight="bold")).pack(pady=20)
+            
+            # Total
+            total_frame = ctk.CTkFrame(stats_window, fg_color="#10b981")
+            total_frame.pack(fill="x", padx=20, pady=10)
+            ctk.CTkLabel(total_frame, text=f"Tổng quy hoạch: {total_planning}", 
+                        font=ctk.CTkFont(size=14, weight="bold"), text_color="white").pack(pady=15)
+            
+            # Status distribution
+            if status_stats:
+                status_frame = ctk.CTkFrame(stats_window, fg_color=COLORS['surface'])
+                status_frame.pack(fill="x", padx=20, pady=10)
+                ctk.CTkLabel(status_frame, text="🔄 Theo trạng thái:", 
+                            font=ctk.CTkFont(size=12, weight="bold")).pack(pady=(10, 5))
+                
+                status_texts = {"active": "Đang hoạt động", "completed": "Hoàn thành", "cancelled": "Hủy bỏ"}
+                for status, count in status_stats:
+                    status_name = status_texts.get(status, status)
+                    percentage = (count / total_planning * 100) if total_planning > 0 else 0
+                    ctk.CTkLabel(status_frame, text=f"  • {status_name}: {count} ({percentage:.1f}%)", 
+                                font=ctk.CTkFont(size=11)).pack(anchor="w", padx=20)
+                
+                ctk.CTkFrame(status_frame, height=10, fg_color="transparent").pack()
+            
+            # Position distribution
+            if position_stats:
+                pos_frame = ctk.CTkFrame(stats_window, fg_color=COLORS['surface'])
+                pos_frame.pack(fill="x", padx=20, pady=10)
+                ctk.CTkLabel(pos_frame, text="🎯 Theo vị trí:", 
+                            font=ctk.CTkFont(size=12, weight="bold")).pack(pady=(10, 5))
+                
+                for position, count in position_stats:
+                    ctk.CTkLabel(pos_frame, text=f"  • {position}: {count} quy hoạch", 
+                                font=ctk.CTkFont(size=11)).pack(anchor="w", padx=20)
+                
+                ctk.CTkFrame(pos_frame, height=10, fg_color="transparent").pack()
+            
+            ctk.CTkButton(stats_window, text="Đóng", command=stats_window.destroy).pack(pady=20)
+            
+        except Exception as e:
+            ctk.CTkLabel(stats_window, text=f"Lỗi: {str(e)}", 
+                        font=ctk.CTkFont(size=12)).pack(pady=20)
+    
+    def show_achievements_management(self):
+        """Show comprehensive achievements and awards management"""
+        self.clear_main_content()
+        
+        # Header
+        header_frame = ctk.CTkFrame(self.main_content, height=80, fg_color="#f59e0b")
+        header_frame.pack(fill="x", padx=20, pady=20)
+        header_frame.pack_propagate(False)
+        
+        title = ctk.CTkLabel(header_frame, text="🏆 Thành tích & Khen thưởng", 
+                           font=ctk.CTkFont(size=24, weight="bold"), text_color="white")
+        title.pack(side="left", padx=20, pady=20)
+        
+        # Management buttons
+        mgmt_buttons = ctk.CTkFrame(header_frame, fg_color="transparent")
+        mgmt_buttons.pack(side="right", padx=20, pady=20)
+        
+        ctk.CTkButton(mgmt_buttons, text="➕ Thêm thành tích", width=130, height=35,
+                    command=self.show_add_achievement_form, fg_color=COLORS['success']).pack(side="left", padx=5)
+        ctk.CTkButton(mgmt_buttons, text="📊 Thống kê", width=100, height=35,
+                    command=self.show_achievement_statistics, fg_color=COLORS['primary']).pack(side="left", padx=5)
+        
+        # Filters section
+        filter_frame = ctk.CTkFrame(self.main_content, fg_color=COLORS['background'])
+        filter_frame.pack(fill="x", padx=20, pady=10)
+        
+        filter_row = ctk.CTkFrame(filter_frame, fg_color="transparent")
+        filter_row.pack(fill="x", padx=20, pady=15)
+        
+        ctk.CTkLabel(filter_row, text="Nhân viên:", font=ctk.CTkFont(size=12, weight="bold")).pack(side="left")
+        self.achievement_employee_filter = ctk.CTkOptionMenu(filter_row, values=["Tất cả nhân viên"], width=200)
+        self.achievement_employee_filter.pack(side="left", padx=10)
+        
+        ctk.CTkLabel(filter_row, text="Loại thành tích:", font=ctk.CTkFont(size=12)).pack(side="left", padx=(20, 5))
+        self.achievement_type_filter = ctk.CTkOptionMenu(filter_row, values=["Tất cả", "Khen thưởng", "Danh hiệu", "Thành tích công tác", "Giải thưởng", "Chứng nhận"], width=150)
+        self.achievement_type_filter.pack(side="left", padx=5)
+        
+        ctk.CTkLabel(filter_row, text="Cấp độ:", font=ctk.CTkFont(size=12)).pack(side="left", padx=(10, 5))
+        self.achievement_level_filter = ctk.CTkOptionMenu(filter_row, values=["Tất cả", "Cá nhân", "Tập thể", "Nhà nước", "Bộ/Ngành", "Địa phương"], width=120)
+        self.achievement_level_filter.pack(side="left", padx=5)
+        
+        ctk.CTkButton(filter_row, text="🔍 Lọc", width=80, command=self.load_achievement_data).pack(side="left", padx=10)
+        
+        # Statistics cards
+        stats_frame = ctk.CTkFrame(self.main_content, height=100)
+        stats_frame.pack(fill="x", padx=20, pady=10)
+        stats_frame.pack_propagate(False)
+        
+        achievement_stats = [
+            ("Tổng thành tích", "156", "#f59e0b"),
+            ("Khen thưởng", "89", COLORS['success']),
+            ("Danh hiệu", "32", COLORS['primary']),
+            ("Giải thưởng", "35", "#8b5cf6")
+        ]
+        
+        for i, (label, value, color) in enumerate(achievement_stats):
+            card = ctk.CTkFrame(stats_frame, fg_color=color)
+            card.grid(row=0, column=i, padx=12, pady=10, sticky="ew")
+            
+            ctk.CTkLabel(card, text=value, font=ctk.CTkFont(size=24, weight="bold"), text_color="white").pack(pady=8)
+            ctk.CTkLabel(card, text=label, font=ctk.CTkFont(size=10), text_color="white").pack(pady=5)
+        
+        for i in range(4):
+            stats_frame.grid_columnconfigure(i, weight=1)
+        
+        # Achievements list header
+        list_header = ctk.CTkFrame(self.main_content, height=50, fg_color="#f59e0b")
+        list_header.pack(fill="x", padx=20, pady=(10, 0))
+        list_header.pack_propagate(False)
+        
+        ctk.CTkLabel(list_header, text="📋 Danh sách thành tích khen thưởng", font=ctk.CTkFont(size=14, weight="bold"),
+                    text_color="white").pack(side="left", padx=20, pady=12)
+        
+        # Scrollable achievements list
+        self.achievements_list_frame = ctk.CTkScrollableFrame(self.main_content, height=400)
+        self.achievements_list_frame.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        
+        # Load employee options and achievement data
+        self.load_employee_options_for_achievements()
+        self.load_achievement_data()
+    
+    def load_employee_options_for_achievements(self):
+        """Load employee options for achievement filter"""
+        try:
+            self.cursor.execute("SELECT employee_code, full_name FROM employees ORDER BY full_name")
+            employees = self.cursor.fetchall()
+            
+            employee_options = ["Tất cả nhân viên"]
+            for emp_code, full_name in employees:
+                employee_options.append(f"{emp_code} - {full_name}")
+            
+            self.achievement_employee_filter.configure(values=employee_options)
+            
+        except Exception as e:
+            print(f"Error loading employees: {e}")
+    
+    def load_achievement_data(self):
+        """Load and display achievement data"""
+        try:
+            # Clear existing content
+            for widget in self.achievements_list_frame.winfo_children():
+                widget.destroy()
+            
+            # Build query based on filters
+            query = """
+                SELECT a.*, e.full_name 
+                FROM achievements a
+                JOIN employees e ON a.employee_id = e.id 
+                WHERE 1=1
+            """
+            params = []
+            
+            # Employee filter
+            emp_filter = self.achievement_employee_filter.get()
+            if emp_filter != "Tất cả nhân viên":
+                emp_code = emp_filter.split(" - ")[0]
+                query += " AND a.employee_code = ?"
+                params.append(emp_code)
+            
+            # Type filter
+            type_filter = self.achievement_type_filter.get()
+            if type_filter != "Tất cả":
+                query += " AND a.achievement_type = ?"
+                params.append(type_filter)
+            
+            # Level filter
+            level_filter = self.achievement_level_filter.get()
+            if level_filter != "Tất cả":
+                query += " AND a.award_level = ?"
+                params.append(level_filter)
+            
+            query += " ORDER BY a.award_date DESC NULLS LAST, a.employee_code"
+            
+            self.cursor.execute(query, params)
+            achievement_records = self.cursor.fetchall()
+            
+            if not achievement_records:
+                # Show empty state
+                empty_frame = ctk.CTkFrame(self.achievements_list_frame, fg_color=COLORS['background'])
+                empty_frame.pack(fill="both", expand=True, padx=20, pady=50)
+                
+                ctk.CTkLabel(empty_frame, text="🏆 Chưa có dữ liệu thành tích", 
+                            font=ctk.CTkFont(size=18, weight="bold")).pack(pady=20)
+                ctk.CTkLabel(empty_frame, text="Hãy bắt đầu thêm thành tích và khen thưởng cho nhân viên.", 
+                            font=ctk.CTkFont(size=14)).pack(pady=10)
+                
+                add_first_btn = ctk.CTkButton(empty_frame, text="➕ Thêm thành tích đầu tiên", 
+                                            width=200, height=40, font=ctk.CTkFont(size=14),
+                                            command=self.show_add_achievement_form, fg_color="#f59e0b")
+                add_first_btn.pack(pady=20)
+                return
+            
+            # Display achievement records grouped by employee
+            self.display_achievements_by_employee(achievement_records)
+                
+        except Exception as e:
+            messagebox.showerror("Lỗi", f"Không thể tải dữ liệu thành tích: {str(e)}")
+    
+    def display_achievements_by_employee(self, achievement_records):
+        """Display achievements grouped by employee"""
+        # Group records by employee
+        employee_groups = {}
+        for record in achievement_records:
+            emp_key = f"{record[2]} - {record[10]}"  # employee_code, full_name
+            if emp_key not in employee_groups:
+                employee_groups[emp_key] = []
+            employee_groups[emp_key].append(record)
+        
+        # Display each employee's achievements
+        for emp_key, records in employee_groups.items():
+            # Employee header
+            emp_header = ctk.CTkFrame(self.achievements_list_frame, fg_color="#f59e0b")
+            emp_header.pack(fill="x", padx=10, pady=(10, 5))
+            
+            ctk.CTkLabel(emp_header, text=f"👤 {emp_key}", 
+                        font=ctk.CTkFont(size=14, weight="bold"), text_color="white").pack(side="left", padx=15, pady=8)
+            ctk.CTkLabel(emp_header, text=f"🏆 {len(records)} thành tích", 
+                        font=ctk.CTkFont(size=10), text_color="white").pack(side="right", padx=15, pady=8)
+            
+            # Achievement cards
+            for record in records:
+                self.display_achievement_record(record)
+            
+            # Separator
+            ctk.CTkFrame(self.achievements_list_frame, height=2, fg_color=COLORS['background']).pack(fill="x", padx=10, pady=5)
+    
+    def display_achievement_record(self, record):
+        """Display individual achievement record"""
+        # Achievement card
+        achievement_card = ctk.CTkFrame(self.achievements_list_frame, fg_color=COLORS['surface'], 
+                                      border_width=1, border_color="#f59e0b")
+        achievement_card.pack(fill="x", padx=10, pady=3)
+        
+        # Type color indicator
+        type_colors = {
+            "Khen thưởng": COLORS['success'],
+            "Danh hiệu": COLORS['primary'],
+            "Thành tích công tác": "#10b981",
+            "Giải thưởng": "#8b5cf6",
+            "Chứng nhận": "#f59e0b"
+        }
+        type_color = type_colors.get(record[3], "#f59e0b")  # achievement_type
+        ctk.CTkFrame(achievement_card, width=4, fg_color=type_color).pack(side="left", fill="y")
+        
+        # Achievement info section
+        info_section = ctk.CTkFrame(achievement_card, fg_color="transparent")
+        info_section.pack(side="left", fill="both", expand=True, padx=15, pady=10)
+        
+        # Row 1: Achievement name and type
+        row1 = ctk.CTkFrame(info_section, fg_color="transparent")
+        row1.pack(fill="x")
+        
+        # Achievement icon based on type
+        type_icons = {
+            "Khen thưởng": "🎖️",
+            "Danh hiệu": "👑",
+            "Thành tích công tác": "💼",
+            "Giải thưởng": "🏆",
+            "Chứng nhận": "📜"
+        }
+        icon = type_icons.get(record[3], "🏆")
+        
+        achievement_name = ctk.CTkLabel(row1, text=f"{icon} {record[4]}", font=ctk.CTkFont(size=14, weight="bold"))  # achievement_name
+        achievement_name.pack(side="left")
+        
+        type_badge = ctk.CTkLabel(row1, text=record[3], font=ctk.CTkFont(size=9, weight="bold"), 
+                                text_color="white", fg_color=type_color,
+                                corner_radius=8, width=80, height=18)
+        type_badge.pack(side="right")
+        
+        # Row 2: Level and date
+        row2 = ctk.CTkFrame(info_section, fg_color="transparent")
+        row2.pack(fill="x", pady=(5, 0))
+        
+        level_info = f"🎯 Cấp độ: {record[5] or 'Không xác định'}"  # award_level
+        if record[6]:  # award_date
+            level_info += f" | 📅 {record[6]}"
+        
+        level_label = ctk.CTkLabel(row2, text=level_info, font=ctk.CTkFont(size=10), 
+                                 text_color=COLORS['text_secondary'])
+        level_label.pack(side="left")
+        
+        # Row 3: Organization and certificate
+        if record[7] or record[9]:  # awarding_organization or certificate_number
+            row3 = ctk.CTkFrame(info_section, fg_color="transparent")
+            row3.pack(fill="x", pady=(3, 0))
+            
+            org_cert = ""
+            if record[7]:  # awarding_organization
+                org_cert += f"🏛️ {record[7]}"
+            if record[9]:  # certificate_number
+                if org_cert:
+                    org_cert += " | "
+                org_cert += f"📄 Số: {record[9]}"
+            
+            org_label = ctk.CTkLabel(row3, text=org_cert, font=ctk.CTkFont(size=10), 
+                                   text_color=COLORS['success'])
+            org_label.pack(side="left")
+        
+        # Row 4: Description (if available)
+        if record[8]:  # description
+            row4 = ctk.CTkFrame(info_section, fg_color="transparent")
+            row4.pack(fill="x", pady=(3, 0))
+            
+            desc_preview = record[8][:100] + "..." if len(record[8]) > 100 else record[8]
+            desc_label = ctk.CTkLabel(row4, text=f"📝 {desc_preview}", font=ctk.CTkFont(size=9), 
+                                    text_color=COLORS['text_secondary'])
+            desc_label.pack(side="left")
+        
+        # Action buttons
+        actions_frame = ctk.CTkFrame(achievement_card, fg_color="transparent", width=100)
+        actions_frame.pack(side="right", padx=10, pady=8)
+        actions_frame.pack_propagate(False)
+        
+        edit_btn = ctk.CTkButton(actions_frame, text="✏️", width=30, height=25,
+                               font=ctk.CTkFont(size=10), fg_color=COLORS['warning'],
+                               command=lambda r=record: self.show_edit_achievement_form(r))
+        edit_btn.pack(pady=1)
+        
+        delete_btn = ctk.CTkButton(actions_frame, text="🗑️", width=30, height=25,
+                                 font=ctk.CTkFont(size=10), fg_color=COLORS['error'],
+                                 command=lambda r=record: self.confirm_delete_achievement(r))
+        delete_btn.pack(pady=1)
+    
+    def show_add_achievement_form(self):
+        """Show form to add new achievement"""
+        self.show_achievement_form(mode="add")
+    
+    def show_edit_achievement_form(self, achievement_record):
+        """Show form to edit achievement"""
+        self.show_achievement_form(mode="edit", achievement_record=achievement_record)
+    
+    def show_achievement_form(self, mode="add", achievement_record=None):
+        """Show achievement form for add/edit - simplified version"""
+        form_window = ctk.CTkToplevel(self.root)
+        form_window.title("➕ Thêm thành tích mới" if mode == "add" else "✏️ Chỉnh sửa thành tích")
+        form_window.geometry("600x500")
+        form_window.transient(self.root)
+        form_window.grab_set()
+        
+        # Simplified placeholder for now
+        ctk.CTkLabel(form_window, text="🚧 Đang phát triển", 
+                    font=ctk.CTkFont(size=18, weight="bold")).pack(pady=100)
+        ctk.CTkLabel(form_window, text="Form thành tích sẽ được hoàn thiện trong phiên bản tiếp theo", 
+                    font=ctk.CTkFont(size=12)).pack(pady=20)
+        
+        ctk.CTkButton(form_window, text="Đóng", command=form_window.destroy).pack(pady=20)
+    
+    def confirm_delete_achievement(self, achievement_record):
+        """Confirm and delete achievement record"""
+        result = messagebox.askyesno(
+            "Xác nhận xóa", 
+            f"Bạn có chắc chắn muốn xóa thành tích:\n{achievement_record[4]} - {achievement_record[2]}?\n\nHành động này không thể hoàn tác!"
+        )
+        
+        if result:
+            try:
+                self.cursor.execute("DELETE FROM achievements WHERE id = ?", (achievement_record[0],))
+                self.conn.commit()
+                
+                messagebox.showinfo("Thành công", f"Đã xóa thành tích: {achievement_record[4]}")
+                self.load_achievement_data()
+                
+            except Exception as e:
+                messagebox.showerror("Lỗi", f"Không thể xóa thành tích: {str(e)}")
+    
+    def show_achievement_statistics(self):
+        """Show achievement statistics"""
+        stats_window = ctk.CTkToplevel(self.root)
+        stats_window.title("📊 Thống kê thành tích")
+        stats_window.geometry("600x500")
+        stats_window.transient(self.root)
+        
+        try:
+            # Get statistics
+            self.cursor.execute("SELECT COUNT(*) FROM achievements")
+            total_achievements = self.cursor.fetchone()[0]
+            
+            self.cursor.execute("SELECT achievement_type, COUNT(*) FROM achievements GROUP BY achievement_type")
+            type_stats = self.cursor.fetchall()
+            
+            self.cursor.execute("SELECT award_level, COUNT(*) FROM achievements WHERE award_level IS NOT NULL GROUP BY award_level")
+            level_stats = self.cursor.fetchall()
+            
+            self.cursor.execute("SELECT COUNT(DISTINCT employee_code) FROM achievements")
+            employees_with_achievements = self.cursor.fetchone()[0]
+            
+            # Display statistics
+            ctk.CTkLabel(stats_window, text="📊 Thống kê thành tích khen thưởng", 
+                        font=ctk.CTkFont(size=18, weight="bold")).pack(pady=20)
+            
+            # Summary
+            summary_frame = ctk.CTkFrame(stats_window, fg_color="#f59e0b")
+            summary_frame.pack(fill="x", padx=20, pady=10)
+            ctk.CTkLabel(summary_frame, text=f"Tổng: {total_achievements} thành tích | {employees_with_achievements} nhân viên được khen thưởng", 
+                        font=ctk.CTkFont(size=14, weight="bold"), text_color="white").pack(pady=15)
+            
+            # Type distribution
+            if type_stats:
+                type_frame = ctk.CTkFrame(stats_window, fg_color=COLORS['surface'])
+                type_frame.pack(fill="x", padx=20, pady=10)
+                ctk.CTkLabel(type_frame, text="🏆 Theo loại thành tích:", 
+                            font=ctk.CTkFont(size=12, weight="bold")).pack(pady=(10, 5))
+                
+                for achievement_type, count in type_stats:
+                    percentage = (count / total_achievements * 100) if total_achievements > 0 else 0
+                    ctk.CTkLabel(type_frame, text=f"  • {achievement_type}: {count} ({percentage:.1f}%)", 
+                                font=ctk.CTkFont(size=11)).pack(anchor="w", padx=20)
+                
+                ctk.CTkFrame(type_frame, height=10, fg_color="transparent").pack()
+            
+            # Level distribution
+            if level_stats:
+                level_frame = ctk.CTkFrame(stats_window, fg_color=COLORS['surface'])
+                level_frame.pack(fill="x", padx=20, pady=10)
+                ctk.CTkLabel(level_frame, text="🎯 Theo cấp độ:", 
+                            font=ctk.CTkFont(size=12, weight="bold")).pack(pady=(10, 5))
+                
+                for level, count in level_stats:
+                    ctk.CTkLabel(level_frame, text=f"  • {level}: {count} thành tích", 
+                                font=ctk.CTkFont(size=11)).pack(anchor="w", padx=20)
+                
+                ctk.CTkFrame(level_frame, height=10, fg_color="transparent").pack()
+            
+            ctk.CTkButton(stats_window, text="Đóng", command=stats_window.destroy).pack(pady=20)
+            
+        except Exception as e:
+            ctk.CTkLabel(stats_window, text=f"Lỗi: {str(e)}", 
+                        font=ctk.CTkFont(size=12)).pack(pady=20)
     
     def display_employee_result(self, employee):
         """Display employee search result"""
