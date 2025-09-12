@@ -6,3 +6,16 @@ python-docx==1.1.0
 openpyxl==3.1.2
 Pillow==10.0.1
 plotly==5.17.0
+
+# Modern UI Frameworks
+flet==0.21.2
+customtkinter==5.2.0
+nicegui==1.4.21
+gradio==4.15.0
+
+# Enhanced Streamlit Components
+streamlit-option-menu==0.3.6
+streamlit-card==0.0.61
+streamlit-elements==0.1.0
+streamlit-aggrid==0.3.4.post3
+streamlit-lottie==0.0.5

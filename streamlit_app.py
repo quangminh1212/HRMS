@@ -31,44 +31,275 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS tùy chỉnh
+# CSS hiện đại và đẹp mắt
 st.markdown("""
 <style>
+    /* Import Google Fonts */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    /* Reset và base styles */
+    .stApp {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    .main .block-container {
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+    }
+    
+    /* Header hiện đại với glassmorphism */
     .main-header {
-        background: linear-gradient(90deg, #1f77b4, #ff7f0e);
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
         color: white;
-        padding: 1rem;
-        border-radius: 10px;
+        padding: 2rem;
+        border-radius: 20px;
         text-align: center;
         margin-bottom: 2rem;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        animation: fadeInUp 0.8s ease;
     }
+    
+    .main-header h1 {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin: 0;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    /* Cards với hiệu ứng hover đẹp */
     .metric-card {
-        background: white;
-        padding: 1rem;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        border-left: 4px solid #1f77b4;
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(10px);
+        padding: 1.5rem;
+        border-radius: 16px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        margin: 0.5rem;
+        position: relative;
+        overflow: hidden;
     }
+    
+    .metric-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, #667eea, #764ba2);
+    }
+    
+    .metric-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        background: rgba(255, 255, 255, 0.95);
+    }
+    
+    /* Employee cards với design system hiện đại */
     .employee-card {
-        background: #f8f9fa;
-        padding: 1rem;
-        border-radius: 8px;
-        margin: 0.5rem 0;
-        border-left: 4px solid #28a745;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        padding: 1.5rem;
+        border-radius: 16px;
+        margin: 1rem 0;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
     }
+    
+    .employee-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 4px;
+        background: linear-gradient(180deg, #4CAF50, #2E7D32);
+    }
+    
+    .employee-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 16px 32px rgba(0,0,0,0.12);
+    }
+    
+    /* Status boxes với màu sắc hiện đại */
     .warning-box {
-        background: #fff3cd;
-        border: 1px solid #ffeaa7;
-        padding: 1rem;
-        border-radius: 8px;
+        background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+        border: none;
+        padding: 1.5rem;
+        border-radius: 16px;
         margin: 1rem 0;
+        box-shadow: 0 8px 24px rgba(255, 193, 7, 0.2);
+        border-left: 4px solid #ffc107;
+        animation: slideInLeft 0.6s ease;
     }
+    
     .success-box {
-        background: #d4edda;
-        border: 1px solid #c3e6cb;
-        padding: 1rem;
-        border-radius: 8px;
+        background: linear-gradient(135deg, #d4edda, #c3e6cb);
+        border: none;
+        padding: 1.5rem;
+        border-radius: 16px;
         margin: 1rem 0;
+        box-shadow: 0 8px 24px rgba(40, 167, 69, 0.2);
+        border-left: 4px solid #28a745;
+        animation: slideInRight 0.6s ease;
+    }
+    
+    .error-box {
+        background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+        border: none;
+        padding: 1.5rem;
+        border-radius: 16px;
+        margin: 1rem 0;
+        box-shadow: 0 8px 24px rgba(220, 53, 69, 0.2);
+        border-left: 4px solid #dc3545;
+        animation: shake 0.6s ease;
+    }
+    
+    .info-box {
+        background: linear-gradient(135deg, #d1ecf1, #bee5eb);
+        border: none;
+        padding: 1.5rem;
+        border-radius: 16px;
+        margin: 1rem 0;
+        box-shadow: 0 8px 24px rgba(23, 162, 184, 0.2);
+        border-left: 4px solid #17a2b8;
+        animation: fadeIn 0.6s ease;
+    }
+    
+    /* Sidebar styling */
+    .css-1d391kg {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+    }
+    
+    /* Buttons với hiệu ứng đẹp */
+    .stButton button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        border-radius: 12px;
+        color: white;
+        font-weight: 500;
+        padding: 0.75rem 1.5rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+    
+    .stButton button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+    }
+    
+    /* Animations */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    @keyframes slideInLeft {
+        from {
+            opacity: 0;
+            transform: translateX(-30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+    
+    @keyframes slideInRight {
+        from {
+            opacity: 0;
+            transform: translateX(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+    
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+    
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-5px); }
+        75% { transform: translateX(5px); }
+    }
+    
+    /* Metrics styling */
+    div[data-testid="metric-container"] {
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 1rem;
+        border-radius: 16px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        backdrop-filter: blur(10px);
+    }
+    
+    /* DataFrames với styling đẹp */
+    .stDataFrame {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    }
+    
+    /* Selectbox và inputs */
+    .stSelectbox > div > div {
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .stTextInput > div > div > input {
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        font-family: 'Inter', sans-serif;
+    }
+    
+    /* Tab styling */
+    .stTabs [data-baseweb="tab-list"] {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        padding: 0.5rem;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 12px;
+        color: rgba(255, 255, 255, 0.8);
+        font-weight: 500;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: rgba(255, 255, 255, 0.9) !important;
+        color: #333 !important;
+    }
+    
+    /* Plotly charts container */
+    .js-plotly-plot {
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.08);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -228,18 +459,22 @@ def dashboard_page():
     with col1:
         st.markdown("""
         <div class="warning-box">
-            <h4>💰 Nâng lương sắp tới</h4>
-            <p>Có 25 nhân viên đủ điều kiện nâng lương trong quý này.</p>
-            <small>Cần xử lý trước ngày 15/12/2024</small>
+            <h4>⚡ Nâng lương sắp tới</h4>
+            <p><strong>25 nhân viên</strong> đủ điều kiện nâng lương trong quý này</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem; opacity: 0.8;">
+                <i>📅 Cần xử lý trước ngày 15/12/2024</i>
+            </p>
         </div>
         """, unsafe_allow_html=True)
     
     with col2:
         st.markdown("""
-        <div class="success-box">
-            <h4>⏰ Nghỉ hưu</h4>
-            <p>12 nhân viên sẽ nghỉ hưu trong 6 tháng tới.</p>
-            <small>Cần chuẩn bị thủ tục</small>
+        <div class="info-box">
+            <h4>🏖️ Nghỉ hưu</h4>
+            <p><strong>12 nhân viên</strong> sẽ nghỉ hưu trong 6 tháng tới</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem; opacity: 0.8;">
+                <i>📋 Cần chuẩn bị thủ tục và hồ sơ</i>
+            </p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -297,9 +532,11 @@ def employee_search_page():
             # Cảnh báo nâng lương
             st.markdown("""
             <div class="success-box">
-                <h4>✅ Đủ điều kiện nâng lương</h4>
-                <p>Nhân viên đã đủ 36 tháng kể từ lần nâng lương gần nhất.</p>
-                <p><strong>Dự kiến nâng lên:</strong> Hệ số 3.66</p>
+                <h4>🎉 Đủ điều kiện nâng lương</h4>
+                <p>Nhân viên đã đủ <strong>36 tháng</strong> kể từ lần nâng lương gần nhất</p>
+                <p style="margin: 0.5rem 0 0 0;">
+                    <i>🔼 Dự kiến nâng lên hệ số: <strong>3.66</strong></i>
+                </p>
             </div>
             """, unsafe_allow_html=True)
         
