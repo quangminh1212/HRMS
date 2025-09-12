@@ -1288,12 +1288,83 @@ def appointment_page():
             st.success("✅ Đã tạo báo cáo thống kê bổ nhiệm năm 2024!")
 
 def award_page():
-    st.markdown('<div class="main-header"><h1>🏆 Điều kiện khen thưởng</h1></div>', unsafe_allow_html=True)
-    st.info("Chức năng đang được phát triển...")
+    st.markdown('<div class="main-header"><h1>🏆 Xem điều kiện khen thưởng</h1></div>', unsafe_allow_html=True)
+    
+    # Chọn nhân viên
+    selected_employee = st.selectbox("👤 Chọn nhân viên:", 
+        ["Nguyễn Văn A", "Trần Thị B", "Lê Văn C"])
+    
+    # Chọn loại khen thưởng
+    award_type = st.selectbox("🎯 Loại khen thưởng:",
+        ["Lao động tiên tiến", "Chiến sỹ thi đua cơ sở", "Bằng khen Thủ tướng", "Huân chương Lao động"])
+    
+    if st.button("🔍 Kiểm tra điều kiện khen thưởng"):
+        st.subheader(f"📋 Điều kiện {award_type} cho {selected_employee}")
+        
+        # Mô phỏng điều kiện khen thưởng
+        award_conditions = [
+            {"criteria": "Hoàn thành xuất sắc nhiệm vụ", "status": True, "details": "3 năm liên tiếp đạt xuất sắc"},
+            {"criteria": "Không vi phạm kỷ luật", "status": True, "details": "Không có kỷ luật trong 5 năm gần nhất"},
+            {"criteria": "Có thành tích nổi bật", "status": True, "details": "Dẫn đầu đơn vị về hiệu quả công việc"},
+            {"criteria": "Thời gian công tác", "status": True, "details": "15 năm (≥ 5 năm yêu cầu)"}
+        ]
+        
+        all_eligible = all(c['status'] for c in award_conditions)
+        
+        for condition in award_conditions:
+            if condition['status']:
+                st.success(f"✅ **{condition['criteria']}**: {condition['details']}")
+            else:
+                st.error(f"❌ **{condition['criteria']}**: {condition['details']}")
+        
+        if all_eligible:
+            st.success(f"🎉 **ĐỦ ĐIỀU KIỆN** nhận {award_type}!")
+        else:
+            st.error(f"❌ **CHƯA ĐỦ ĐIỀU KIỆN** nhận {award_type}")
+    
+    st.info("💡 **Lưu ý**: Chức năng sẽ được cập nhật thêm các tiêu chí cụ thể")
 
 def early_salary_page():
-    st.markdown('<div class="main-header"><h1>⚡ Nâng lương trước thời hạn</h1></div>', unsafe_allow_html=True)
-    st.info("Chức năng đang được phát triển...")
+    st.markdown('<div class="main-header"><h1>⚡ Nâng lương trước thời hạn do thành tích</h1></div>', unsafe_allow_html=True)
+    
+    st.subheader("🏆 Danh sách đề xuất nâng lương trước thời hạn")
+    
+    # Dữ liệu mẫu
+    early_salary_candidates = [
+        {
+            "name": "Trần Văn X", "achievement": "Giải nhất cuộc thi sáng kiến cải tiến",
+            "current_salary": "A2/3.2", "proposed_salary": "A2/3.45",
+            "recommendation_date": "15/11/2024", "status": "pending"
+        },
+        {
+            "name": "Nguyễn Thị Y", "achievement": "Hoàn thành xuất sắc dự án trọng điểm",
+            "current_salary": "A1/2.5", "proposed_salary": "A1/2.67", 
+            "recommendation_date": "20/10/2024", "status": "approved"
+        }
+    ]
+    
+    for candidate in early_salary_candidates:
+        status_color = "#e8f5e8" if candidate['status'] == 'approved' else "#fff3e0"
+        status_text = "✅ Đã duyệt" if candidate['status'] == 'approved' else "⏳ Chờ duyệt"
+        
+        st.markdown(f"""
+        <div style="border-left: 4px solid #4caf50; padding: 1rem; margin: 1rem 0; 
+                   background: {status_color}; border-radius: 8px;">
+            <h4>🏆 {candidate['name']} ({status_text})</h4>
+            <p><strong>Thành tích:</strong> {candidate['achievement']}</p>
+            <p><strong>Lương hiện tại:</strong> {candidate['current_salary']} → <strong>Đề xuất:</strong> {candidate['proposed_salary']}</p>
+            <p><strong>Ngày đề xuất:</strong> {candidate['recommendation_date']}</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if candidate['status'] == 'pending':
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button(f"✅ Phê duyệt", key=f"approve_{candidate['name']}"):
+                    st.success("✅ Đã phê duyệt nâng lương trước thời hạn!")
+            with col2:
+                if st.button(f"📄 Xuất quyết định", key=f"export_{candidate['name']}"):
+                    st.success("✅ Đã xuất quyết định nâng lương!")
 
 def reports_page():
     st.markdown('<div class="main-header"><h1>📊 Báo cáo thống kê</h1></div>', unsafe_allow_html=True)
