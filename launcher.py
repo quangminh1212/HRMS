@@ -105,7 +105,7 @@ def run_modern():
     """Chạy phiên bản HRMS Modern"""
     print("🚀 Khởi động HRMS Modern...")
     try:
-        subprocess.run([sys.executable, "run_modern.py"])
+        subprocess.run([sys.executable, "run.py"])
     except Exception as e:
         print(f"❌ Lỗi: {e}")
 
@@ -113,7 +113,7 @@ def run_streamlit():
     """Chạy phiên bản Streamlit Classic"""
     print("🚀 Khởi động HRMS với Streamlit Classic...")
     try:
-        subprocess.run([sys.executable, "run_streamlit.py"])
+        subprocess.run([sys.executable, "run_classic.py"])
     except Exception as e:
         print(f"❌ Lỗi: {e}")
 

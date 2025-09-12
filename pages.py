@@ -7,7 +7,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, date
-from ui_design_system import DesignTokens, UIComponents
+from design import DesignTokens, UIComponents
 
 class ModernPages:
     """Class chứa các trang bổ sung cho HRMS Modern"""
@@ -15,7 +15,7 @@ class ModernPages:
     @staticmethod
     def salary_management_page():
         """Trang quản lý nâng lương hiện đại"""
-        from hrms_modern import ModernComponents
+        from app import ModernComponents
         
         ModernComponents.hero_header(
             "Quản lý nâng lương",
@@ -208,7 +208,7 @@ class ModernPages:
     @staticmethod
     def retirement_tracking_page():
         """Trang theo dõi nghỉ hưu hiện đại"""
-        from hrms_modern import ModernComponents
+        from app import ModernComponents
         
         ModernComponents.hero_header(
             "Theo dõi nghỉ hưu", 
@@ -310,7 +310,7 @@ class ModernPages:
     @staticmethod
     def reports_dashboard():
         """Dashboard báo cáo hiện đại"""
-        from hrms_modern import ModernComponents
+        from app import ModernComponents
         
         ModernComponents.hero_header(
             "Báo cáo & Thống kê",

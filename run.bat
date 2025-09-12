@@ -47,13 +47,13 @@ if "%choice%"=="1" (
     echo 💎 Đang khởi động HRMS Modern...
     echo 🌐 Mở trình duyệt tại: http://localhost:8501
     echo ⚠️  Nhấn Ctrl+C để dừng
-    python run_modern.py
+    python run.py
 ) else if "%choice%"=="2" (
     echo 🎮 Đang mở Launcher Menu...
-    python launch_hrms.py
+    python launcher.py
 ) else if "%choice%"=="3" (
     echo 🌐 Đang khởi động Streamlit Classic...
-    python run_streamlit.py
+    python run_classic.py
 ) else if "%choice%"=="4" (
     echo 📱 Đang khởi động Flet...
     python run_flet.py
@@ -63,7 +63,7 @@ if "%choice%"=="1" (
 ) else (
     echo ❌ Lựa chọn không hợp lệ!
     echo 💡 Mặc định chạy HRMS Modern...
-    python run_modern.py
+    python run.py
 )
 
 echo.

@@ -50,7 +50,7 @@ def main():
         print("📱 Giao diện sẽ tự động mở trong trình duyệt")
         
         # Import và chạy app
-        from hrms_flet import main as flet_main
+        from app_flet import main as flet_main
         import flet as ft
         
         ft.app(

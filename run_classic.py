@@ -37,7 +37,7 @@ def main():
     try:
         # Sử dụng subprocess để chạy streamlit run
         cmd = [
-            sys.executable, "-m", "streamlit", "run", "streamlit_app.py",
+            sys.executable, "-m", "streamlit", "run", "app_classic.py",
             "--server.port", "8501",
             "--server.address", "0.0.0.0",
             "--browser.gatherUsageStats", "false"

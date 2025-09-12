@@ -50,7 +50,7 @@ def main():
         print("🌐 Giao diện sẽ tự động mở trong trình duyệt")
         
         # Import và chạy app
-        from hrms_nicegui import main as nicegui_main
+        from app_nicegui import main as nicegui_main
         nicegui_main()
         
     except KeyboardInterrupt:

@@ -15,11 +15,11 @@ from io import BytesIO
 import os
 
 # Import Design System
-from ui_design_system import DesignTokens, UIComponents
+from design import DesignTokens, UIComponents
 
 # Import models và utils
-from models_streamlit import init_database, Employee, User, SalaryHistory, WorkHistory, Training, Achievement, Evaluation, Council, Insurance, Planning
-from utils_streamlit import (
+from models import init_database, Employee, User, SalaryHistory, WorkHistory, Training, Achievement, Evaluation, Council, Insurance, Planning
+from utils import (
     calculate_retirement_date, 
     check_salary_increase_eligibility,
     check_appointment_eligibility,
@@ -29,7 +29,7 @@ from utils_streamlit import (
 )
 
 # Import additional modern pages
-from hrms_pages_modern import ModernPages
+from pages import ModernPages
 
 # Cấu hình trang với theme hiện đại
 st.set_page_config(

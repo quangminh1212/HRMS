@@ -23,13 +23,13 @@ quick-start.bat
 ### **Cách 2: Python trực tiếp**
 ```bash
 # Launcher (khuyến nghị)
-python launch_hrms.py
+python launcher.py
 
 # HRMS Modern (đẹp nhất)  
-python run_modern.py
+python run.py
 
 # Các phiên bản khác
-python run_streamlit.py    # Classic
+python run_classic.py      # Classic
 python run_flet.py         # Flutter UI  
 python run_nicegui.py      # Tailwind CSS
 ```
@@ -113,32 +113,33 @@ python run_nicegui.py      # Tailwind CSS
 ```
 🏢 HRMS/
 ├── 💎 Modern UI
-│   ├── hrms_modern.py           # Main HRMS Modern app
-│   ├── ui_design_system.py      # Design tokens & components  
-│   ├── hrms_pages_modern.py     # Additional modern pages
-│   └── run_modern.py            # Modern launcher
+│   ├── app.py                  # Main HRMS Modern app
+│   ├── design.py               # Design tokens & components  
+│   ├── pages.py                # Additional modern pages
+│   └── run.py                  # Modern launcher
 │
 ├── 🌐 Multi-Framework
-│   ├── streamlit_app.py         # Classic Streamlit
-│   ├── hrms_flet.py            # Flet version
-│   ├── hrms_nicegui.py         # NiceGUI version
+│   ├── app_classic.py          # Classic Streamlit
+│   ├── app_flet.py             # Flet version
+│   ├── app_nicegui.py          # NiceGUI version
 │   └── run_*.py                # Individual launchers
 │
 ├── 🎮 Launchers & Setup
-│   ├── launch_hrms.py          # Multi-framework launcher
+│   ├── launcher.py             # Multi-framework launcher
 │   ├── setup.bat               # Windows setup  
 │   ├── run.bat                 # Windows run with menu
 │   └── quick-start.bat         # Quick HRMS Modern start
 │
 ├── 🗄️ Backend
-│   ├── models_streamlit.py     # Database models
-│   ├── utils_streamlit.py      # Utility functions
+│   ├── models.py               # Database models
+│   ├── utils.py                # Utility functions
+│   ├── database.db             # SQLite database
 │   └── requirements.txt        # Python dependencies
 │
 └── 📚 Documentation
     ├── README.md               # This file
-    ├── README_HRMS_MODERN.md   # Modern UI guide
-    └── README_UI_FRAMEWORKS.md # Framework comparison
+    ├── README_MODERN.md        # Modern UI guide
+    └── README_FRAMEWORKS.md    # Framework comparison
 ```
 
 ---

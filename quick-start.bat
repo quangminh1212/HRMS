@@ -26,4 +26,4 @@ echo 🌐 URL: http://localhost:8501
 echo 🔑 admin/admin123
 echo.
 
-python run_modern.py
+python run.py

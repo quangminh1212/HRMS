@@ -43,7 +43,7 @@ def main():
         
         # Sử dụng subprocess để chạy streamlit run
         cmd = [
-            sys.executable, "-m", "streamlit", "run", "hrms_modern.py",
+            sys.executable, "-m", "streamlit", "run", "app.py",
             "--server.port", "8501",
             "--server.address", "0.0.0.0", 
             "--browser.gatherUsageStats", "false",
@@ -64,7 +64,7 @@ def main():
         print("   - Kiểm tra port 8501 có bị chiếm không")
         print("   - Chạy lại script với quyền admin")
         print("   - Cài đặt lại dependencies: pip install -r requirements.txt")
-        print("   - Đảm bảo file ui_design_system.py tồn tại")
+        print("   - Đảm bảo file design.py tồn tại")
         sys.exit(1)
 
 if __name__ == "__main__":
