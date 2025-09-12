@@ -1,111 +1,251 @@
-# HRMS - Hệ thống Quản lý Nhân sự
+# 🏢 HRMS - Hệ thống Quản lý Nhân sự Hiện đại
 
-**🎯 Frontend + Backend 100% Python với Streamlit**
+**🎯 100% Python với bộ sưu tập giao diện hiện đại**
 
-Hệ thống quản lý nhân sự toàn diện đáp ứng đầy đủ 11 yêu cầu nghiệp vụ.
-
-## Tính năng chính
-
-### 1. Quản lý nhân sự
-- Tra cứu thông tin nhân sự (150+ người)
-- Thêm, sửa, xóa thông tin nhân viên
-- Quản lý hồ sơ chi tiết: thông tin cá nhân, công việc, lương, đào tạo, thành tích
-
-### 2. Quản lý lương & phụ cấp
-- Theo dõi và cảnh báo nâng lương định kỳ
-- Tính toán tự động theo quy định (36 tháng cho Chuyên viên, 24 tháng cho Nhân viên)
-- Xuất quyết định nâng lương
-
-### 3. Quản lý nghỉ hưu
-- Theo dõi nhân viên sắp nghỉ hưu
-- Cảnh báo trước 6 tháng, quyết định trước 3 tháng
-- Kiểm tra nâng lương trước thời hạn khi nghỉ hưu
-
-### 4. Các chức năng khác
-- Kiểm tra quy hoạch cán bộ
-- Quản lý quá trình công tác
-- Quản lý hợp đồng lao động
-- Kiểm tra điều kiện bổ nhiệm
-- Báo cáo thống kê đa dạng
-- Xuất file Word, Excel
-
-## Cài đặt và chạy
-
-### Yêu cầu
-- Python 3.8 trở lên
-- pip
-
-### Các bước thực hiện
-
-1. **Cài đặt dependencies:**
-```bash
-pip install -r requirements.txt
-```
-
-2. **Chạy ứng dụng:**
-```bash
-python run_streamlit.py
-```
-
-3. **Truy cập hệ thống:**
-- Mở trình duyệt: http://localhost:8501
-- Đăng nhập:
-  - **Tên đăng nhập:** admin
-  - **Mật khẩu:** admin123
-
-## Cấu trúc dự án
-
-```
-HRMS/
-├── streamlit_app.py      # Ứng dụng Streamlit chính (100% Python)
-├── run_streamlit.py      # Script khởi chạy
-├── models_streamlit.py   # Database models đầy đủ
-├── utils_streamlit.py    # Logic nghiệp vụ
-├── requirements.txt      # Dependencies Streamlit
-├── exports/             # File xuất ra
-└── hrms_streamlit.db    # SQLite database
-```
-
-## ✨ Đặc điểm nổi bật
-
-- 🎯 **100% Python**: Frontend Streamlit + Backend Python
-- 📋 **Đầy đủ 11 chức năng**: Theo đúng yêu cầu nghiệp vụ
-- 💰 **Logic nâng lương phức tạp**: 36/24 tháng + phụ cấp thâm niên 
-- ⏰ **Cảnh báo thông minh**: Nghỉ hưu, nâng lương theo lịch
-- 📊 **Giao diện hiện đại**: Responsive, biểu đồ tương tác
-- 📄 **Xuất file chuyên nghiệp**: Word, Excel theo mẫu chuẩn
-
-## Testing
-
-Chạy tests:
-```bash
-python -m pytest tests/
-```
-
-## Hướng dẫn sử dụng
-
-### Tra cứu nhân sự
-1. Đăng nhập vào hệ thống
-2. Chọn menu "Nhân sự" > "Danh sách nhân sự"
-3. Sử dụng ô tìm kiếm hoặc bộ lọc để tìm nhân viên
-4. Click vào tên nhân viên để xem chi tiết
-
-### Quản lý nâng lương
-1. Chọn menu "Lương & Phụ cấp" > "Quản lý nâng lương"
-2. Hệ thống tự động liệt kê nhân viên đủ điều kiện
-3. Chọn nhân viên cần xử lý
-4. Xuất quyết định nâng lương
-
-### Xuất báo cáo
-1. Chọn menu "Báo cáo"
-2. Chọn loại báo cáo cần xuất
-3. Chọn định dạng file (Word/Excel)
-4. File sẽ được lưu trong thư mục exports/
-
-## Ghi chú
-- Tài khoản mặc định: admin / admin123  
-- Database được tạo tự động khi chạy lần đầu
-- File export sẽ lưu trong thư mục exports/
+Hệ thống quản lý nhân sự toàn diện với **4 framework UI khác nhau**, từ Material Design 3 đến Flutter components.
 
 ---
-© 2024 HRMS - Hệ thống Quản lý Nhân sự
+
+## 🚀 Quick Start
+
+### **Cách 1: Setup & Run (Khuyến nghị)**
+```bash
+# Cài đặt
+setup.bat
+
+# Chạy với menu chọn framework  
+run.bat
+
+# Hoặc chạy nhanh HRMS Modern
+quick-start.bat
+```
+
+### **Cách 2: Python trực tiếp**
+```bash
+# Launcher (khuyến nghị)
+python launch_hrms.py
+
+# HRMS Modern (đẹp nhất)  
+python run_modern.py
+
+# Các phiên bản khác
+python run_streamlit.py    # Classic
+python run_flet.py         # Flutter UI  
+python run_nicegui.py      # Tailwind CSS
+```
+
+### **🔑 Login Info**
+- **Username**: `admin`
+- **Password**: `admin123`
+
+---
+
+## 💎 Framework Collection
+
+### **1. HRMS Modern** (🔥 MỚI NHẤT)
+- **🎨 Design**: Material Design 3 system  
+- **🌐 Port**: 8501
+- **✨ Tính năng**: Component library, Design tokens, Glassmorphism
+- **📱 UI**: Hero headers, Metric cards, Interactive charts
+
+### **2. Streamlit Classic** 
+- **🎨 Design**: Enhanced Streamlit với CSS hiện đại
+- **🌐 Port**: 8501  
+- **✨ Tính năng**: Glassmorphism effects, Gradient backgrounds
+- **📱 UI**: Responsive layout, Smooth animations
+
+### **3. Flet (Flutter for Python)**
+- **🎨 Design**: Material Design components
+- **🌐 Port**: 8080
+- **✨ Tính năng**: Cross-platform, Native feel
+- **📱 UI**: Flutter widgets, Smooth transitions
+
+### **4. NiceGUI**  
+- **🎨 Design**: Tailwind CSS tích hợp
+- **🌐 Port**: 8090
+- **✨ Tính năng**: Real-time updates, Vue.js-like
+- **📱 UI**: Modern web components, Responsive
+
+---
+
+## 🎯 Tính năng chính
+
+### ✅ **Hoàn thành (HRMS Modern)**
+1. **🏠 Dashboard** - Metrics, charts, cảnh báo hiện đại  
+2. **👥 Tra cứu nhân sự** - Search, tabs, action buttons
+3. **💰 Quản lý nâng lương** - Timeline, filters, export
+4. **⏰ Theo dõi nghỉ hưu** - Priority alerts, notifications
+5. **📊 Báo cáo thống kê** - Interactive charts, insights
+
+### 🚧 **Đang phát triển**
+6. **📋 Quy hoạch cán bộ** (+ AI evaluation)
+7. **💼 Quá trình công tác** (+ Interactive timeline)  
+8. **📄 Hợp đồng lao động** (+ Digital management)
+9. **✅ Điều kiện bổ nhiệm** (+ Auto checking)
+10. **🏆 Khen thưởng** (+ Smart evaluation)
+11. **⚡ Nâng lương trước hạn** (+ Workflow)
+12. **🏥 Báo bảo hiểm** (+ API integration)
+
+---
+
+## 🛠️ Tech Stack
+
+### **Backend**
+- 🐍 **Python 3.8+**
+- 📊 **SQLAlchemy** - Database ORM
+- 📈 **Pandas** - Data processing
+- 📉 **Plotly** - Interactive charts
+
+### **Frontend Frameworks**  
+- 🌐 **Streamlit** - Web app framework
+- 📱 **Flet** - Flutter for Python
+- ✨ **NiceGUI** - Modern web UI
+- 🎨 **Custom CSS** - Material Design 3
+
+### **Database**
+- 🗄️ **SQLite** - Local database
+- 📋 **Models** - Employee, Salary, Contract, etc.
+
+---
+
+## 📁 Cấu trúc Project
+
+```
+🏢 HRMS/
+├── 💎 Modern UI
+│   ├── hrms_modern.py           # Main HRMS Modern app
+│   ├── ui_design_system.py      # Design tokens & components  
+│   ├── hrms_pages_modern.py     # Additional modern pages
+│   └── run_modern.py            # Modern launcher
+│
+├── 🌐 Multi-Framework
+│   ├── streamlit_app.py         # Classic Streamlit
+│   ├── hrms_flet.py            # Flet version
+│   ├── hrms_nicegui.py         # NiceGUI version
+│   └── run_*.py                # Individual launchers
+│
+├── 🎮 Launchers & Setup
+│   ├── launch_hrms.py          # Multi-framework launcher
+│   ├── setup.bat               # Windows setup  
+│   ├── run.bat                 # Windows run with menu
+│   └── quick-start.bat         # Quick HRMS Modern start
+│
+├── 🗄️ Backend
+│   ├── models_streamlit.py     # Database models
+│   ├── utils_streamlit.py      # Utility functions
+│   └── requirements.txt        # Python dependencies
+│
+└── 📚 Documentation
+    ├── README.md               # This file
+    ├── README_HRMS_MODERN.md   # Modern UI guide
+    └── README_UI_FRAMEWORKS.md # Framework comparison
+```
+
+---
+
+## 📊 Framework Comparison
+
+| Framework | Độ đẹp | Hiệu năng | Dễ dùng | Cross-platform | Ecosystem |
+|-----------|--------|-----------|---------|----------------|-----------|
+| **HRMS Modern** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | Web only | ⭐⭐⭐⭐⭐ |
+| **Streamlit Classic** | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | Web only | ⭐⭐⭐⭐⭐ |
+| **Flet** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
+| **NiceGUI** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | Web only | ⭐⭐⭐ |
+
+---
+
+## 🎨 Screenshots
+
+### HRMS Modern - Material Design 3
+- 🏠 **Dashboard**: Glassmorphism hero + gradient metrics
+- 👥 **Employee Search**: Modern tabs + surface containers  
+- 💰 **Salary Management**: Interactive timeline + filters
+- ⏰ **Retirement Tracking**: Priority alerts + action buttons
+- 📊 **Reports**: Plotly charts + insights panel
+
+*📸 Screenshots sẽ được cập nhật trong phiên bản tiếp theo*
+
+---
+
+## ⚙️ Requirements
+
+### **System**
+- 🖥️ **Windows 10/11** (Linux/Mac support coming)
+- 🐍 **Python 3.8+** 
+- 💾 **500MB** disk space
+- 🌐 **Modern browser** (Chrome, Edge, Firefox)
+
+### **Python Packages**  
+```txt
+streamlit>=1.28.1
+plotly>=5.17.0
+pandas>=2.1.4
+sqlalchemy>=2.0.21
+python-docx>=1.1.0
+flet>=0.21.2
+nicegui>=1.4.21
+```
+
+---
+
+## 🤝 Contributing
+
+### **Báo lỗi**
+1. 🐛 Tạo **GitHub Issue** với label `bug`
+2. 📝 Mô tả chi tiết: browser, Python version, steps
+3. 📷 Attach screenshots nếu có UI issues
+
+### **Feature Request**  
+1. 💡 Tạo **GitHub Issue** với label `enhancement` 
+2. 🎯 Mô tả tính năng và use case
+3. 🎨 Mockups/wireframes nếu có
+
+### **Development**
+1. 🍴 Fork repository
+2. 🌿 Create branch: `feature/your-feature-name`
+3. 💻 Code với comment tiếng Việt
+4. ✅ Test trên multiple frameworks
+5. 📤 Create Pull Request
+
+---
+
+## 📈 Roadmap
+
+### **v1.2 (Q1 2025)**
+- [ ] 🤖 AI-powered features 
+- [ ] 🌙 Dark mode support
+- [ ] 📱 Mobile optimization
+- [ ] 🔄 Real-time sync
+
+### **v1.3 (Q2 2025)**  
+- [ ] 🔐 Advanced authentication
+- [ ] 📊 Advanced analytics
+- [ ] 🌍 API integrations  
+- [ ] 📦 PWA support
+
+### **v2.0 (Q3 2025)**
+- [ ] 🚀 FastAPI + React frontend
+- [ ] 🏗️ Microservices architecture
+- [ ] ☁️ Cloud deployment
+- [ ] 📊 Business Intelligence
+
+---
+
+## 📜 License
+
+**MIT License** - Free to use, modify, and distribute
+
+---
+
+## 💬 Support
+
+- 📧 **Email**: support@hrms.vn
+- 💬 **Chat**: GitHub Discussions  
+- 📚 **Docs**: [README_HRMS_MODERN.md](README_HRMS_MODERN.md)
+- 🎥 **Video**: YouTube tutorials coming soon
+
+---
+
+**🎉 Cảm ơn bạn đã sử dụng HRMS! Hãy chạy `quick-start.bat` để trải nghiệm ngay!**
+
+*💎 "Hệ thống quản lý nhân sự Python đẹp nhất Việt Nam" - Built with ❤️*
