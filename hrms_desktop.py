@@ -760,34 +760,69 @@ class HRMSDesktop:
             widget.destroy()
     
     def show_employee_search(self):
-        """Show employee search interface"""
+        """Show comprehensive employee management with CRUD operations"""
         self.clear_main_content()
         
-        # Title
-        title = ctk.CTkLabel(self.main_content, text="👥 Tra cứu thông tin nhân sự", 
-                           font=ctk.CTkFont(size=20, weight="bold"))
-        title.pack(pady=20)
+        # Header with management options
+        header_frame = ctk.CTkFrame(self.main_content, height=80, fg_color=COLORS['success'])
+        header_frame.pack(fill="x", padx=20, pady=20)
+        header_frame.pack_propagate(False)
         
-        # Search frame
-        search_frame = ctk.CTkFrame(self.main_content)
+        title = ctk.CTkLabel(header_frame, text="👥 Quản lý nhân sự", 
+                           font=ctk.CTkFont(size=24, weight="bold"), text_color="white")
+        title.pack(side="left", padx=20, pady=20)
+        
+        # Management buttons
+        mgmt_buttons = ctk.CTkFrame(header_frame, fg_color="transparent")
+        mgmt_buttons.pack(side="right", padx=20, pady=20)
+        
+        ctk.CTkButton(mgmt_buttons, text="➕ Thêm mới", width=100, height=35,
+                    command=self.show_add_employee_form, fg_color=COLORS['primary']).pack(side="left", padx=5)
+        ctk.CTkButton(mgmt_buttons, text="📊 Thống kê", width=100, height=35,
+                    command=self.show_employee_statistics, fg_color="#8b5cf6").pack(side="left", padx=5)
+        
+        # Search and filter section
+        search_frame = ctk.CTkFrame(self.main_content, fg_color=COLORS['background'])
         search_frame.pack(fill="x", padx=20, pady=10)
         
-        search_label = ctk.CTkLabel(search_frame, text="🔍 Nhập tên nhân viên cần tìm:")
-        search_label.pack(pady=10)
+        # Search row
+        search_row = ctk.CTkFrame(search_frame, fg_color="transparent")
+        search_row.pack(fill="x", padx=20, pady=15)
         
-        self.search_entry = ctk.CTkEntry(search_frame, width=300, placeholder_text="VD: Nguyễn Văn A")
-        self.search_entry.pack(pady=5)
+        ctk.CTkLabel(search_row, text="🔍 Tìm kiếm:", font=ctk.CTkFont(size=12, weight="bold")).pack(side="left")
+        self.search_entry = ctk.CTkEntry(search_row, width=250, placeholder_text="Tên hoặc mã nhân viên...")
+        self.search_entry.pack(side="left", padx=10)
         
-        search_btn = ctk.CTkButton(search_frame, text="🔍 Tìm kiếm", 
-                                 command=self.search_employee)
-        search_btn.pack(pady=10)
+        # Department filter
+        ctk.CTkLabel(search_row, text="Đơn vị:", font=ctk.CTkFont(size=12)).pack(side="left", padx=(20, 5))
+        self.dept_filter = ctk.CTkOptionMenu(search_row, values=["Tất cả", "Phòng TCHC", "Phòng TCKT", "Phòng KD"], width=120)
+        self.dept_filter.pack(side="left", padx=5)
         
-        # Results frame
-        self.results_frame = ctk.CTkFrame(self.main_content)
-        self.results_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        # Position filter
+        ctk.CTkLabel(search_row, text="Chức vụ:", font=ctk.CTkFont(size=12)).pack(side="left", padx=(10, 5))
+        self.pos_filter = ctk.CTkOptionMenu(search_row, values=["Tất cả", "Trưởng phòng", "Phó Trưởng phòng", "Chuyên viên chính", "Chuyên viên", "Nhân viên"], width=130)
+        self.pos_filter.pack(side="left", padx=5)
         
-        # Bind Enter key
-        self.search_entry.bind("<Return>", lambda e: self.search_employee())
+        # Search button
+        search_btn = ctk.CTkButton(search_row, text="🔍 Tìm", width=80,
+                                 command=self.search_employee_enhanced)
+        search_btn.pack(side="left", padx=10)
+        
+        # Results section with actions
+        results_header = ctk.CTkFrame(self.main_content, height=50, fg_color=COLORS['primary'])
+        results_header.pack(fill="x", padx=20, pady=(10, 0))
+        results_header.pack_propagate(False)
+        
+        ctk.CTkLabel(results_header, text="📋 Danh sách nhân sự", font=ctk.CTkFont(size=14, weight="bold"),
+                    text_color="white").pack(side="left", padx=20, pady=12)
+        
+        # Results frame with scrollable list
+        self.results_frame = ctk.CTkScrollableFrame(self.main_content, height=400)
+        self.results_frame.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        
+        # Bind Enter key and load initial data
+        self.search_entry.bind("<Return>", lambda e: self.search_employee_enhanced())
+        self.load_all_employees()  # Load all employees initially
     
     def search_employee(self):
         """Search for employee"""
@@ -818,6 +853,504 @@ class HRMSDesktop:
         # Show results
         for emp in results:
             self.display_employee_result(emp)
+    
+    def search_employee_enhanced(self):
+        """Enhanced search with filters"""
+        search_term = self.search_entry.get().strip()
+        dept_filter = self.dept_filter.get()
+        pos_filter = self.pos_filter.get()
+        
+        # Clear previous results
+        for widget in self.results_frame.winfo_children():
+            widget.destroy()
+        
+        # Build dynamic query
+        query = "SELECT * FROM employees WHERE 1=1"
+        params = []
+        
+        if search_term:
+            query += " AND (full_name LIKE ? OR employee_code LIKE ?)"
+            params.extend([f'%{search_term}%', f'%{search_term}%'])
+        
+        if dept_filter != "Tất cả":
+            query += " AND department = ?"
+            params.append(dept_filter)
+        
+        if pos_filter != "Tất cả":
+            query += " AND position = ?"
+            params.append(pos_filter)
+        
+        query += " ORDER BY full_name"
+        
+        try:
+            self.cursor.execute(query, params)
+            results = self.cursor.fetchall()
+            
+            if not results:
+                no_result = ctk.CTkLabel(self.results_frame, text="❌ Không tìm thấy nhân viên phù hợp với điều kiện tìm kiếm", 
+                                       font=ctk.CTkFont(size=14))
+                no_result.pack(pady=20)
+                return
+            
+            # Show results with enhanced display
+            self.display_employees_list(results)
+            
+        except Exception as e:
+            messagebox.showerror("Lỗi", f"Lỗi tìm kiếm: {str(e)}")
+    
+    def load_all_employees(self):
+        """Load all employees initially"""
+        try:
+            self.cursor.execute("SELECT * FROM employees ORDER BY full_name")
+            results = self.cursor.fetchall()
+            
+            # Clear previous results
+            for widget in self.results_frame.winfo_children():
+                widget.destroy()
+            
+            if not results:
+                # No employees yet, show welcome message
+                welcome_frame = ctk.CTkFrame(self.results_frame, fg_color=COLORS['background'])
+                welcome_frame.pack(fill="both", expand=True, padx=20, pady=50)
+                
+                ctk.CTkLabel(welcome_frame, text="👋 Chào mừng đến với Quản lý Nhân sự!", 
+                            font=ctk.CTkFont(size=18, weight="bold")).pack(pady=20)
+                ctk.CTkLabel(welcome_frame, text="Hiện chưa có dữ liệu nhân sự nào.\nHãy bắt đầu bằng cách thêm nhân viên đầu tiên.", 
+                            font=ctk.CTkFont(size=14)).pack(pady=10)
+                
+                add_first_btn = ctk.CTkButton(welcome_frame, text="➕ Thêm nhân viên đầu tiên", 
+                                            width=200, height=40, font=ctk.CTkFont(size=14),
+                                            command=self.show_add_employee_form, fg_color=COLORS['success'])
+                add_first_btn.pack(pady=20)
+                return
+            
+            self.display_employees_list(results)
+            
+        except Exception as e:
+            messagebox.showerror("Lỗi", f"Không thể tải danh sách nhân viên: {str(e)}")
+    
+    def display_employees_list(self, employees):
+        """Display list of employees with enhanced cards"""
+        for i, emp in enumerate(employees):
+            # Employee card
+            emp_card = ctk.CTkFrame(self.results_frame, fg_color=COLORS['surface'], 
+                                  border_width=1, border_color=COLORS['background'])
+            emp_card.pack(fill="x", padx=10, pady=5)
+            
+            # Status indicator
+            status_colors = [COLORS['success'], COLORS['primary'], COLORS['warning'], "#8b5cf6"]
+            status_color = status_colors[i % len(status_colors)]
+            ctk.CTkFrame(emp_card, width=4, fg_color=status_color).pack(side="left", fill="y")
+            
+            # Employee info section
+            info_section = ctk.CTkFrame(emp_card, fg_color="transparent")
+            info_section.pack(side="left", fill="both", expand=True, padx=15, pady=12)
+            
+            # Row 1: Basic info
+            row1 = ctk.CTkFrame(info_section, fg_color="transparent")
+            row1.pack(fill="x")
+            
+            name_label = ctk.CTkLabel(row1, text=f"{emp[2]} ({emp[1]})", 
+                                    font=ctk.CTkFont(size=14, weight="bold"))
+            name_label.pack(side="left")
+            
+            dept_pos_label = ctk.CTkLabel(row1, text=f"{emp[8]} - {emp[9]}", 
+                                        font=ctk.CTkFont(size=11), text_color=COLORS['text_secondary'])
+            dept_pos_label.pack(side="left", padx=(15, 0))
+            
+            # Row 2: Contact info
+            row2 = ctk.CTkFrame(info_section, fg_color="transparent")
+            row2.pack(fill="x", pady=(5, 0))
+            
+            contact_info = f"📞 {emp[17] or 'N/A'} | 📧 {emp[18] or 'N/A'}"
+            if len(contact_info) > 50:
+                contact_info = contact_info[:50] + "..."
+            
+            contact_label = ctk.CTkLabel(row2, text=contact_info, 
+                                       font=ctk.CTkFont(size=10), text_color=COLORS['text_secondary'])
+            contact_label.pack(side="left")
+            
+            # Action buttons
+            actions_frame = ctk.CTkFrame(emp_card, fg_color="transparent", width=180)
+            actions_frame.pack(side="right", padx=15, pady=8)
+            actions_frame.pack_propagate(False)
+            
+            # Button row 1
+            btn_row1 = ctk.CTkFrame(actions_frame, fg_color="transparent")
+            btn_row1.pack(fill="x")
+            
+            detail_btn = ctk.CTkButton(btn_row1, text="👁️ Chi tiết", width=80, height=30,
+                                     font=ctk.CTkFont(size=9),
+                                     command=lambda e=emp: self.show_employee_detail(e))
+            detail_btn.pack(side="left", padx=2)
+            
+            edit_btn = ctk.CTkButton(btn_row1, text="✏️ Sửa", width=80, height=30,
+                                   font=ctk.CTkFont(size=9), fg_color=COLORS['warning'],
+                                   command=lambda e=emp: self.show_edit_employee_form(e))
+            edit_btn.pack(side="left", padx=2)
+            
+            # Button row 2
+            btn_row2 = ctk.CTkFrame(actions_frame, fg_color="transparent")
+            btn_row2.pack(fill="x", pady=(5, 0))
+            
+            export_btn = ctk.CTkButton(btn_row2, text="📄 Xuất", width=80, height=30,
+                                     font=ctk.CTkFont(size=9), fg_color=COLORS['primary'],
+                                     command=lambda e=emp: self.export_employee_word(e))
+            export_btn.pack(side="left", padx=2)
+            
+            delete_btn = ctk.CTkButton(btn_row2, text="🗑️ Xóa", width=80, height=30,
+                                     font=ctk.CTkFont(size=9), fg_color=COLORS['error'],
+                                     command=lambda e=emp: self.confirm_delete_employee(e))
+            delete_btn.pack(side="left", padx=2)
+    
+    def show_add_employee_form(self):
+        """Show form to add new employee"""
+        self.show_employee_form(mode="add")
+    
+    def show_edit_employee_form(self, employee):
+        """Show form to edit existing employee"""
+        self.show_employee_form(mode="edit", employee=employee)
+    
+    def confirm_delete_employee(self, employee):
+        """Confirm and delete employee"""
+        result = messagebox.askyesno(
+            "Xác nhận xóa", 
+            f"Bạn có chắc chắn muốn xóa nhân viên:\n{employee[2]} ({employee[1]})?\n\nHành động này không thể hoàn tác!"
+        )
+        
+        if result:
+            try:
+                self.cursor.execute("DELETE FROM employees WHERE id = ?", (employee[0],))
+                self.conn.commit()
+                
+                messagebox.showinfo("Thành công", f"Đã xóa nhân viên {employee[2]}")
+                self.load_all_employees()  # Refresh the list
+                
+            except Exception as e:
+                messagebox.showerror("Lỗi", f"Không thể xóa nhân viên: {str(e)}")
+    
+    def show_employee_statistics(self):
+        """Show employee statistics"""
+        stats_window = ctk.CTkToplevel(self.root)
+        stats_window.title("📊 Thống kê nhân sự")
+        stats_window.geometry("600x500")
+        stats_window.transient(self.root)
+        
+        # Get statistics
+        try:
+            # Total employees
+            self.cursor.execute("SELECT COUNT(*) FROM employees")
+            total = self.cursor.fetchone()[0]
+            
+            # By department
+            self.cursor.execute("SELECT department, COUNT(*) FROM employees GROUP BY department")
+            dept_stats = self.cursor.fetchall()
+            
+            # By position
+            self.cursor.execute("SELECT position, COUNT(*) FROM employees GROUP BY position")
+            pos_stats = self.cursor.fetchall()
+            
+            # Display statistics
+            ctk.CTkLabel(stats_window, text="📊 Thống kê nhân sự", 
+                        font=ctk.CTkFont(size=20, weight="bold")).pack(pady=20)
+            
+            # Total
+            total_frame = ctk.CTkFrame(stats_window, fg_color=COLORS['primary'])
+            total_frame.pack(fill="x", padx=20, pady=10)
+            ctk.CTkLabel(total_frame, text=f"Tổng số nhân viên: {total} người", 
+                        font=ctk.CTkFont(size=16, weight="bold"), text_color="white").pack(pady=15)
+            
+            # By department
+            if dept_stats:
+                dept_frame = ctk.CTkFrame(stats_window, fg_color=COLORS['surface'])
+                dept_frame.pack(fill="x", padx=20, pady=10)
+                ctk.CTkLabel(dept_frame, text="📋 Theo đơn vị:", 
+                            font=ctk.CTkFont(size=14, weight="bold")).pack(pady=(10, 5))
+                
+                for dept, count in dept_stats:
+                    ctk.CTkLabel(dept_frame, text=f"  • {dept}: {count} người", 
+                                font=ctk.CTkFont(size=12)).pack(anchor="w", padx=20)
+                
+                ctk.CTkFrame(dept_frame, height=10, fg_color="transparent").pack()
+            
+            # By position
+            if pos_stats:
+                pos_frame = ctk.CTkFrame(stats_window, fg_color=COLORS['surface'])
+                pos_frame.pack(fill="x", padx=20, pady=10)
+                ctk.CTkLabel(pos_frame, text="👔 Theo chức vụ:", 
+                            font=ctk.CTkFont(size=14, weight="bold")).pack(pady=(10, 5))
+                
+                for pos, count in pos_stats:
+                    ctk.CTkLabel(pos_frame, text=f"  • {pos}: {count} người", 
+                                font=ctk.CTkFont(size=12)).pack(anchor="w", padx=20)
+                
+                ctk.CTkFrame(pos_frame, height=10, fg_color="transparent").pack()
+            
+            # Close button
+            ctk.CTkButton(stats_window, text="Đóng", width=100, 
+                         command=stats_window.destroy).pack(pady=20)
+            
+        except Exception as e:
+            ctk.CTkLabel(stats_window, text=f"Lỗi: {str(e)}", 
+                        font=ctk.CTkFont(size=14)).pack(pady=20)
+    
+    def show_employee_form(self, mode="add", employee=None):
+        """Show comprehensive employee form for add/edit"""
+        form_window = ctk.CTkToplevel(self.root)
+        form_window.title("➕ Thêm nhân sự mới" if mode == "add" else f"✏️ Sửa thông tin - {employee[2]}")
+        form_window.geometry("900x700")
+        form_window.transient(self.root)
+        form_window.grab_set()
+        
+        # Header
+        header = ctk.CTkFrame(form_window, height=60, fg_color=COLORS['success'] if mode == "add" else COLORS['warning'])
+        header.pack(fill="x")
+        header.pack_propagate(False)
+        
+        title_text = "➕ THÊM NHÂN SỰ MỚI" if mode == "add" else f"✏️ CHỈNH SỬA THÔNG TIN"
+        ctk.CTkLabel(header, text=title_text, font=ctk.CTkFont(size=18, weight="bold"), 
+                    text_color="white").pack(pady=15)
+        
+        # Scrollable form content
+        form_content = ctk.CTkScrollableFrame(form_window)
+        form_content.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Form data storage
+        form_data = {}
+        
+        # Helper function to create form section
+        def create_form_section(parent, title, fields):
+            section = ctk.CTkFrame(parent, fg_color=COLORS['surface'])
+            section.pack(fill="x", pady=10)
+            
+            # Section header
+            section_header = ctk.CTkFrame(section, height=40, fg_color=COLORS['primary'])
+            section_header.pack(fill="x")
+            section_header.pack_propagate(False)
+            
+            ctk.CTkLabel(section_header, text=title, font=ctk.CTkFont(size=14, weight="bold"), 
+                        text_color="white").pack(side="left", padx=15, pady=8)
+            
+            # Fields grid
+            fields_frame = ctk.CTkFrame(section, fg_color="transparent")
+            fields_frame.pack(fill="x", padx=15, pady=15)
+            
+            for i, (field_name, field_label, field_type, default_value, options) in enumerate(fields):
+                row = i // 2
+                col = i % 2
+                
+                # Field container
+                field_container = ctk.CTkFrame(fields_frame, fg_color="transparent")
+                field_container.grid(row=row, column=col, padx=10, pady=8, sticky="ew")
+                
+                # Label
+                ctk.CTkLabel(field_container, text=field_label, font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="w")
+                
+                # Input field
+                if field_type == "entry":
+                    widget = ctk.CTkEntry(field_container, width=200)
+                    if default_value:
+                        widget.insert(0, str(default_value))
+                elif field_type == "option":
+                    widget = ctk.CTkOptionMenu(field_container, values=options, width=200)
+                    if default_value and default_value in options:
+                        widget.set(default_value)
+                elif field_type == "text":
+                    widget = ctk.CTkTextbox(field_container, width=200, height=60)
+                    if default_value:
+                        widget.insert("0.0", str(default_value))
+                
+                widget.pack(anchor="w", pady=(5, 0))
+                form_data[field_name] = widget
+            
+            # Configure grid weights
+            fields_frame.grid_columnconfigure(0, weight=1)
+            fields_frame.grid_columnconfigure(1, weight=1)
+        
+        # Get existing data for edit mode
+        existing_data = {}
+        if mode == "edit" and employee:
+            existing_data = {
+                'employee_code': employee[1],
+                'full_name': employee[2],
+                'birth_date': employee[3],
+                'gender': employee[4],
+                'ethnicity': employee[5],
+                'religion': employee[6],
+                'hometown': employee[7],
+                'department': employee[8],
+                'position': employee[9],
+                'party_membership_date': employee[10],
+                'political_theory_level': employee[11],
+                'degree': employee[12],
+                'major': employee[13],
+                'institution': employee[14],
+                'graduation_year': employee[15],
+                'start_date': employee[16],
+                'phone': employee[17],
+                'email': employee[18],
+                'address': employee[19]
+            }
+        
+        # Section 1: Basic Information
+        basic_fields = [
+            ('employee_code', 'Mã nhân viên *', 'entry', existing_data.get('employee_code', ''), []),
+            ('full_name', 'Họ và tên *', 'entry', existing_data.get('full_name', ''), []),
+            ('birth_date', 'Ngày sinh *', 'entry', existing_data.get('birth_date', ''), []),
+            ('gender', 'Giới tính *', 'option', existing_data.get('gender', 'Nam'), ['Nam', 'Nữ']),
+            ('ethnicity', 'Dân tộc', 'entry', existing_data.get('ethnicity', ''), []),
+            ('religion', 'Tôn giáo', 'entry', existing_data.get('religion', ''), []),
+        ]
+        create_form_section(form_content, "👤 Thông tin cơ bản", basic_fields)
+        
+        # Section 2: Work Information  
+        work_fields = [
+            ('department', 'Đơn vị *', 'option', existing_data.get('department', 'Phòng TCHC'), 
+             ['Phòng TCHC', 'Phòng TCKT', 'Phòng Kinh doanh', 'Phòng Kỹ thuật', 'Ban Kiểm soát']),
+            ('position', 'Chức vụ *', 'option', existing_data.get('position', 'Nhân viên'), 
+             ['Giám đốc', 'Phó Giám đốc', 'Trưởng phòng', 'Phó Trưởng phòng', 'Chuyên viên chính', 'Chuyên viên', 'Nhân viên']),
+            ('start_date', 'Ngày bắt đầu làm việc *', 'entry', existing_data.get('start_date', ''), []),
+            ('party_membership_date', 'Ngày vào Đảng', 'entry', existing_data.get('party_membership_date', ''), []),
+        ]
+        create_form_section(form_content, "💼 Thông tin công việc", work_fields)
+        
+        # Section 3: Education
+        education_fields = [
+            ('degree', 'Bằng cấp cao nhất', 'option', existing_data.get('degree', 'Đại học'), 
+             ['Tiến sĩ', 'Thạc sĩ', 'Đại học', 'Cao đẳng', 'Trung cấp', 'THPT']),
+            ('major', 'Chuyên ngành', 'entry', existing_data.get('major', ''), []),
+            ('institution', 'Trường đào tạo', 'entry', existing_data.get('institution', ''), []),
+            ('graduation_year', 'Năm tốt nghiệp', 'entry', existing_data.get('graduation_year', ''), []),
+            ('political_theory_level', 'Trình độ lý luận chính trị', 'option', existing_data.get('political_theory_level', ''), 
+             ['', 'Cử nhân LLCT', 'Cao cấp LLCT', 'Trung cấp LLCT', 'Sơ cấp LLCT']),
+        ]
+        create_form_section(form_content, "🎓 Thông tin học vấn", education_fields)
+        
+        # Section 4: Contact Information
+        contact_fields = [
+            ('hometown', 'Quê quán', 'entry', existing_data.get('hometown', ''), []),
+            ('address', 'Địa chỉ hiện tại', 'text', existing_data.get('address', ''), []),
+            ('phone', 'Số điện thoại *', 'entry', existing_data.get('phone', ''), []),
+            ('email', 'Email', 'entry', existing_data.get('email', ''), []),
+        ]
+        create_form_section(form_content, "📞 Thông tin liên hệ", contact_fields)
+        
+        # Action buttons
+        buttons_frame = ctk.CTkFrame(form_window, height=80, fg_color="transparent")
+        buttons_frame.pack(fill="x", padx=20, pady=20)
+        buttons_frame.pack_propagate(False)
+        
+        button_container = ctk.CTkFrame(buttons_frame, fg_color="transparent")
+        button_container.pack(expand=True)
+        
+        # Save button
+        save_text = "💾 Thêm nhân sự" if mode == "add" else "💾 Lưu thay đổi"
+        save_color = COLORS['success'] if mode == "add" else COLORS['warning']
+        save_btn = ctk.CTkButton(button_container, text=save_text, width=150, height=40,
+                                font=ctk.CTkFont(size=14, weight="bold"), fg_color=save_color,
+                                command=lambda: self.save_employee_data(form_data, mode, employee, form_window))
+        save_btn.pack(side="left", padx=10)
+        
+        # Cancel button
+        cancel_btn = ctk.CTkButton(button_container, text="❌ Hủy bỏ", width=150, height=40,
+                                  font=ctk.CTkFont(size=14), fg_color=COLORS['error'],
+                                  command=form_window.destroy)
+        cancel_btn.pack(side="left", padx=10)
+        
+        # Required fields note
+        note_label = ctk.CTkLabel(form_window, text="* Trường bắt buộc", 
+                                font=ctk.CTkFont(size=10), text_color=COLORS['text_secondary'])
+        note_label.pack(pady=(0, 10))
+        
+    def save_employee_data(self, form_data, mode, employee, form_window):
+        """Save employee data to database"""
+        try:
+            # Collect form data
+            data = {}
+            for field_name, widget in form_data.items():
+                if hasattr(widget, 'get'):
+                    if field_name == 'address':  # Text widget
+                        data[field_name] = widget.get("0.0", "end-1c").strip()
+                    else:
+                        data[field_name] = widget.get().strip()
+                else:
+                    data[field_name] = ""
+            
+            # Validation
+            required_fields = ['employee_code', 'full_name', 'birth_date', 'gender', 'department', 'position', 'start_date', 'phone']
+            missing_fields = [field for field in required_fields if not data.get(field)]
+            
+            if missing_fields:
+                missing_names = []
+                field_names = {
+                    'employee_code': 'Mã nhân viên',
+                    'full_name': 'Họ và tên', 
+                    'birth_date': 'Ngày sinh',
+                    'gender': 'Giới tính',
+                    'department': 'Đơn vị',
+                    'position': 'Chức vụ',
+                    'start_date': 'Ngày bắt đầu làm việc',
+                    'phone': 'Số điện thoại'
+                }
+                missing_names = [field_names.get(field, field) for field in missing_fields]
+                messagebox.showerror("Lỗi", f"Vui lòng điền đầy đủ các trường bắt buộc:\n• " + "\n• ".join(missing_names))
+                return
+            
+            # Check duplicate employee code (except for edit mode with same employee)
+            if mode == "add" or (mode == "edit" and data['employee_code'] != employee[1]):
+                self.cursor.execute("SELECT id FROM employees WHERE employee_code = ?", (data['employee_code'],))
+                if self.cursor.fetchone():
+                    messagebox.showerror("Lỗi", f"Mã nhân viên '{data['employee_code']}' đã tồn tại!")
+                    return
+            
+            if mode == "add":
+                # Insert new employee
+                insert_query = '''
+                    INSERT INTO employees (
+                        employee_code, full_name, birth_date, gender, ethnicity, religion, hometown,
+                        department, position, party_membership_date, political_theory_level,
+                        degree, major, institution, graduation_year, start_date, phone, email, address
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                '''
+                values = (
+                    data['employee_code'], data['full_name'], data['birth_date'], data['gender'],
+                    data['ethnicity'], data['religion'], data['hometown'], data['department'],
+                    data['position'], data['party_membership_date'], data['political_theory_level'],
+                    data['degree'], data['major'], data['institution'], data['graduation_year'],
+                    data['start_date'], data['phone'], data['email'], data['address']
+                )
+                self.cursor.execute(insert_query, values)
+                success_msg = f"Đã thêm nhân viên mới: {data['full_name']}"
+                
+            else:  # edit mode
+                # Update existing employee  
+                update_query = '''
+                    UPDATE employees SET 
+                        employee_code=?, full_name=?, birth_date=?, gender=?, ethnicity=?, religion=?, hometown=?,
+                        department=?, position=?, party_membership_date=?, political_theory_level=?,
+                        degree=?, major=?, institution=?, graduation_year=?, start_date=?, phone=?, email=?, address=?
+                    WHERE id=?
+                '''
+                values = (
+                    data['employee_code'], data['full_name'], data['birth_date'], data['gender'],
+                    data['ethnicity'], data['religion'], data['hometown'], data['department'],
+                    data['position'], data['party_membership_date'], data['political_theory_level'],
+                    data['degree'], data['major'], data['institution'], data['graduation_year'],
+                    data['start_date'], data['phone'], data['email'], data['address'], employee[0]
+                )
+                self.cursor.execute(update_query, values)
+                success_msg = f"Đã cập nhật thông tin nhân viên: {data['full_name']}"
+            
+            self.conn.commit()
+            messagebox.showinfo("Thành công", success_msg)
+            
+            # Close form and refresh employee list
+            form_window.destroy()
+            if hasattr(self, 'load_all_employees'):
+                self.load_all_employees()
+            
+        except Exception as e:
+            messagebox.showerror("Lỗi", f"Không thể lưu dữ liệu: {str(e)}")
     
     def display_employee_result(self, employee):
         """Display employee search result"""
