@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Quản lý hợp đồng - HRMS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-file-contract"></i> Quản lý hợp đồng lao động</h2>
+        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addContractModal">
+            <i class="fas fa-plus"></i> Thêm hợp đồng mới
+        </button>
+    </div>
+    
+    <!-- Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h6>Đang hiệu lực</h6>
+                    <h3>{{ contracts|selectattr('status', 'equalto', 'active')|list|length }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <h6>Sắp hết hạn (30 ngày)</h6>
+                    <h3>0</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <h6>Đã hết hạn</h6>
+                    <h3>{{ contracts|selectattr('status', 'equalto', 'expired')|list|length }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h6>Tổng hợp đồng</h6>
+                    <h3>{{ contracts|length }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Contracts Table -->
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>STT</th>
+                            <th>Số hợp đồng</th>
+                            <th>Nhân viên</th>
+                            <th>Loại hợp đồng</th>
+                            <th>Chức vụ</th>
+                            <th>Ngày ký</th>
+                            <th>Ngày hết hạn</th>
+                            <th>Trạng thái</th>
+                            <th>Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for contract in contracts %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td>{{ contract.contract_number }}</td>
+                            <td>
+                                <a href="{{ url_for('employee_detail', id=contract.employee_id) }}">
+                                    {{ contract.employee.full_name if contract.employee else '' }}
+                                </a>
+                            </td>
+                            <td>{{ contract.contract_type }}</td>
+                            <td>{{ contract.position }}</td>
+                            <td>{{ contract.start_date.strftime('%d/%m/%Y') if contract.start_date else '' }}</td>
+                            <td>{{ contract.end_date.strftime('%d/%m/%Y') if contract.end_date else 'Không xác định' }}</td>
+                            <td>
+                                {% if contract.status == 'active' %}
+                                <span class="badge bg-success">Đang hiệu lực</span>
+                                {% elif contract.status == 'expired' %}
+                                <span class="badge bg-danger">Đã hết hạn</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ contract.status }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-info" title="Xem">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-outline-warning" title="Sửa">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="9" class="text-center text-muted">Chưa có hợp đồng nào</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Contract Modal -->
+<div class="modal fade" id="addContractModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Thêm hợp đồng mới</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Số hợp đồng</label>
+                            <input type="text" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Nhân viên</label>
+                            <select class="form-select" required>
+                                <option value="">-- Chọn nhân viên --</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Loại hợp đồng</label>
+                            <select class="form-select" required>
+                                <option value="">-- Chọn --</option>
+                                <option>Không xác định thời hạn</option>
+                                <option>Có thời hạn</option>
+                                <option>Thử việc</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Chức vụ</label>
+                            <input type="text" class="form-control">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Ngày bắt đầu</label>
+                            <input type="date" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Ngày kết thúc</label>
+                            <input type="date" class="form-control">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-primary">Lưu hợp đồng</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

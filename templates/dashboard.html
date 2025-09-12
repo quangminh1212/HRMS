@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - HRMS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h2 class="mb-4">
+        <i class="fas fa-tachometer-alt"></i> Bảng điều khiển
+    </h2>
+    
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title mb-0">Tổng nhân sự</h6>
+                            <h2 class="mb-0">{{ total_employees }}</h2>
+                        </div>
+                        <div>
+                            <i class="fas fa-users fa-3x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-primary-dark">
+                    <a href="{{ url_for('employees') }}" class="text-white text-decoration-none">
+                        Xem chi tiết <i class="fas fa-arrow-circle-right"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title mb-0">Sắp nghỉ hưu</h6>
+                            <h2 class="mb-0">{{ retiring_soon }}</h2>
+                        </div>
+                        <div>
+                            <i class="fas fa-user-clock fa-3x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-warning-dark">
+                    <a href="{{ url_for('retirement_management') }}" class="text-white text-decoration-none">
+                        Xem chi tiết <i class="fas fa-arrow-circle-right"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title mb-0">Đến kỳ nâng lương</h6>
+                            <h2 class="mb-0">{{ salary_alerts }}</h2>
+                        </div>
+                        <div>
+                            <i class="fas fa-coins fa-3x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-success-dark">
+                    <a href="{{ url_for('salary_management') }}" class="text-white text-decoration-none">
+                        Xem chi tiết <i class="fas fa-arrow-circle-right"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title mb-0">Hợp đồng</h6>
+                            <h2 class="mb-0">0</h2>
+                        </div>
+                        <div>
+                            <i class="fas fa-file-contract fa-3x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-info-dark">
+                    <a href="{{ url_for('contracts') }}" class="text-white text-decoration-none">
+                        Xem chi tiết <i class="fas fa-arrow-circle-right"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Actions -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="fas fa-bolt"></i> Thao tác nhanh</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 mb-2">
+                            <button class="btn btn-outline-primary w-100" onclick="showSearchModal()">
+                                <i class="fas fa-search"></i> Tra cứu nhân sự
+                            </button>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="{{ url_for('add_employee') }}" class="btn btn-outline-success w-100">
+                                <i class="fas fa-user-plus"></i> Thêm nhân sự mới
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="{{ url_for('salary_management') }}" class="btn btn-outline-warning w-100">
+                                <i class="fas fa-chart-line"></i> Kiểm tra nâng lương
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="{{ url_for('reports') }}" class="btn btn-outline-info w-100">
+                                <i class="fas fa-file-alt"></i> Xuất báo cáo
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent Activities & Notifications -->
+    <div class="row">
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="fas fa-bell"></i> Thông báo & Nhắc nhở</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1 text-warning">
+                                    <i class="fas fa-exclamation-triangle"></i> Sắp đến kỳ nâng lương
+                                </h6>
+                                <small>Q1/2024</small>
+                            </div>
+                            <p class="mb-1">Có {{ salary_alerts }} nhân viên đủ điều kiện nâng lương trong quý tới.</p>
+                        </div>
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1 text-info">
+                                    <i class="fas fa-info-circle"></i> Nghỉ hưu
+                                </h6>
+                                <small>6 tháng tới</small>
+                            </div>
+                            <p class="mb-1">{{ retiring_soon }} nhân viên sẽ nghỉ hưu trong 6 tháng tới.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="fas fa-calendar-alt"></i> Lịch làm việc</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">Rà soát danh sách nâng lương Q1</h6>
+                                <small class="text-muted">15/02/2024</small>
+                            </div>
+                        </div>
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">Báo cáo nhân sự định kỳ</h6>
+                                <small class="text-muted">30/01/2024</small>
+                            </div>
+                        </div>
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">Cập nhật hồ sơ nhân sự</h6>
+                                <small class="text-muted">Hàng tuần</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showSearchModal() {
+    $('#searchModal').modal('show');
+    $('#quickSearch').focus();
+}
+
+// Quick search functionality
+$('#quickSearch').on('input', function() {
+    const query = $(this).val();
+    if (query.length < 2) {
+        $('#searchResults').html('');
+        return;
+    }
+    
+    $.get('/api/search-employees', {q: query}, function(data) {
+        let html = '<div class="list-group">';
+        data.forEach(function(emp) {
+            html += `
+                <a href="/employee/${emp.id}" class="list-group-item list-group-item-action">
+                    <div class="d-flex w-100 justify-content-between">
+                        <h6 class="mb-1">${emp.name} (${emp.code})</h6>
+                    </div>
+                    <p class="mb-1">${emp.position || ''} - ${emp.department || ''}</p>
+                </a>
+            `;
+        });
+        html += '</div>';
+        $('#searchResults').html(html);
+    });
+});
+</script>
+{% endblock %}

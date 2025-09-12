@@ -1,0 +1,380 @@
+{% extends "base.html" %}
+
+{% block title %}{{ employee.full_name }} - HRMS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+            <i class="fas fa-user"></i> {{ employee.full_name }}
+            <span class="badge bg-{{ 'success' if employee.status == 'active' else 'secondary' }}">
+                {{ 'Đang làm việc' if employee.status == 'active' else 'Nghỉ hưu' }}
+            </span>
+        </h2>
+        <div>
+            <a href="{{ url_for('edit_employee', id=employee.id) }}" class="btn btn-warning">
+                <i class="fas fa-edit"></i> Sửa thông tin
+            </a>
+            <div class="btn-group">
+                <button type="button" class="btn btn-success dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="fas fa-download"></i> Xuất file
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="{{ url_for('export_document', export_type='word', employee_id=employee.id) }}">
+                        <i class="fas fa-file-word"></i> Xuất Word
+                    </a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('export_document', export_type='excel', employee_id=employee.id) }}">
+                        <i class="fas fa-file-excel"></i> Xuất Excel
+                    </a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Nav tabs -->
+    <ul class="nav nav-tabs mb-4" role="tablist">
+        <li class="nav-item">
+            <a class="nav-link active" data-bs-toggle="tab" href="#info">Thông tin cá nhân</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#work">Quá trình công tác</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#salary">Lương & Phụ cấp</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#training">Đào tạo & Bồi dưỡng</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#achievement">Thành tích</a>
+        </li>
+    </ul>
+    
+    <!-- Tab content -->
+    <div class="tab-content">
+        <!-- Personal Info Tab -->
+        <div id="info" class="tab-pane active">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h5 class="mb-0"><i class="fas fa-user-circle"></i> Thông tin cơ bản</h5>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <th width="40%">Mã nhân viên:</th>
+                                    <td>{{ employee.employee_code }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Họ và tên:</th>
+                                    <td><strong>{{ employee.full_name }}</strong></td>
+                                </tr>
+                                <tr>
+                                    <th>Ngày sinh:</th>
+                                    <td>{{ employee.date_of_birth.strftime('%d/%m/%Y') if employee.date_of_birth else '' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Giới tính:</th>
+                                    <td>{{ employee.gender or '' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Dân tộc:</th>
+                                    <td>{{ employee.ethnicity or '' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Tôn giáo:</th>
+                                    <td>{{ employee.religion or '' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Quê quán:</th>
+                                    <td>{{ employee.hometown or '' }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h5 class="mb-0"><i class="fas fa-briefcase"></i> Thông tin công việc</h5>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <th width="40%">Chức vụ:</th>
+                                    <td><strong>{{ employee.position or '' }}</strong></td>
+                                </tr>
+                                <tr>
+                                    <th>Đơn vị:</th>
+                                    <td>{{ employee.department or '' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Ngày vào Đảng:</th>
+                                    <td>{{ employee.party_join_date.strftime('%d/%m/%Y') if employee.party_join_date else '' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Trình độ LLCT:</th>
+                                    <td>{{ employee.political_theory_level or '' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Trình độ chuyên môn:</th>
+                                    <td>{{ employee.professional_level or '' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Ngày bắt đầu công tác:</th>
+                                    <td>{{ employee.start_date.strftime('%d/%m/%Y') if employee.start_date else '' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Ngày nghỉ hưu dự kiến:</th>
+                                    <td class="text-danger">
+                                        <strong>{{ employee.retirement_date.strftime('%d/%m/%Y') if employee.retirement_date else '' }}</strong>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <h5 class="mb-0"><i class="fas fa-address-card"></i> Thông tin liên hệ</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <strong>Điện thoại:</strong> {{ employee.phone or '' }}
+                                </div>
+                                <div class="col-md-4">
+                                    <strong>Email:</strong> {{ employee.email or '' }}
+                                </div>
+                                <div class="col-md-4">
+                                    <strong>Địa chỉ:</strong> {{ employee.address or '' }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Work History Tab -->
+        <div id="work" class="tab-pane">
+            <div class="card">
+                <div class="card-header bg-light d-flex justify-content-between">
+                    <h5 class="mb-0"><i class="fas fa-history"></i> Quá trình công tác</h5>
+                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addWorkModal">
+                        <i class="fas fa-plus"></i> Thêm
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Thời gian</th>
+                                    <th>Chức vụ</th>
+                                    <th>Đơn vị/Tổ chức</th>
+                                    <th>Ghi chú</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for work in work_history %}
+                                <tr>
+                                    <td>
+                                        {{ work.start_date.strftime('%m/%Y') if work.start_date else '' }}
+                                        - {{ work.end_date.strftime('%m/%Y') if work.end_date else 'Nay' }}
+                                    </td>
+                                    <td>{{ work.position }}</td>
+                                    <td>{{ work.department }} - {{ work.organization or '' }}</td>
+                                    <td>{{ work.description or '' }}</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">Chưa có dữ liệu</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Salary Tab -->
+        <div id="salary" class="tab-pane">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h5 class="mb-0"><i class="fas fa-money-bill-wave"></i> Thông tin lương hiện tại</h5>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <th>Ngạch lương:</th>
+                                    <td><strong>{{ employee.current_salary_level or '' }}</strong></td>
+                                </tr>
+                                <tr>
+                                    <th>Hệ số lương:</th>
+                                    <td><strong class="text-primary">{{ employee.current_salary_coefficient or '' }}</strong></td>
+                                </tr>
+                                <tr>
+                                    <th>Phụ cấp chức vụ:</th>
+                                    <td>{{ employee.position_allowance or 0 }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Ngày nâng lương gần nhất:</th>
+                                    <td>{{ employee.last_salary_increase_date.strftime('%d/%m/%Y') if employee.last_salary_increase_date else '' }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h5 class="mb-0"><i class="fas fa-chart-line"></i> Dự kiến nâng lương</h5>
+                        </div>
+                        <div class="card-body">
+                            <p>Đang tính toán...</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <h5 class="mb-0"><i class="fas fa-history"></i> Lịch sử nâng lương</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Ngạch lương</th>
+                                            <th>Hệ số</th>
+                                            <th>Từ ngày</th>
+                                            <th>Đến ngày</th>
+                                            <th>Lý do</th>
+                                            <th>Số quyết định</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for salary in salary_history %}
+                                        <tr>
+                                            <td>{{ salary.salary_level }}</td>
+                                            <td>{{ salary.salary_coefficient }}</td>
+                                            <td>{{ salary.effective_date.strftime('%d/%m/%Y') if salary.effective_date else '' }}</td>
+                                            <td>{{ salary.end_date.strftime('%d/%m/%Y') if salary.end_date else '' }}</td>
+                                            <td>{{ salary.reason or '' }}</td>
+                                            <td>{{ salary.decision_number or '' }}</td>
+                                        </tr>
+                                        {% else %}
+                                        <tr>
+                                            <td colspan="6" class="text-center text-muted">Chưa có lịch sử nâng lương</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Training Tab -->
+        <div id="training" class="tab-pane">
+            <div class="card">
+                <div class="card-header bg-light d-flex justify-content-between">
+                    <h5 class="mb-0"><i class="fas fa-graduation-cap"></i> Đào tạo & Bồi dưỡng</h5>
+                    <button class="btn btn-sm btn-primary">
+                        <i class="fas fa-plus"></i> Thêm
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Loại hình</th>
+                                    <th>Tên khóa học</th>
+                                    <th>Cơ sở đào tạo</th>
+                                    <th>Bằng cấp/Chứng chỉ</th>
+                                    <th>Thời gian</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for training in trainings %}
+                                <tr>
+                                    <td>{{ training.training_type }}</td>
+                                    <td>{{ training.training_name }}</td>
+                                    <td>{{ training.institution }}</td>
+                                    <td>{{ training.degree or '' }}</td>
+                                    <td>
+                                        {{ training.start_date.strftime('%m/%Y') if training.start_date else '' }}
+                                        - {{ training.end_date.strftime('%m/%Y') if training.end_date else '' }}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted">Chưa có dữ liệu</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Achievement Tab -->
+        <div id="achievement" class="tab-pane">
+            <div class="card">
+                <div class="card-header bg-light d-flex justify-content-between">
+                    <h5 class="mb-0"><i class="fas fa-trophy"></i> Thành tích & Khen thưởng</h5>
+                    <button class="btn btn-sm btn-primary">
+                        <i class="fas fa-plus"></i> Thêm
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Loại</th>
+                                    <th>Tên/Danh hiệu</th>
+                                    <th>Cấp</th>
+                                    <th>Ngày</th>
+                                    <th>Cơ quan ban hành</th>
+                                    <th>Số quyết định</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for ach in achievements %}
+                                <tr>
+                                    <td>{{ ach.achievement_type }}</td>
+                                    <td><strong>{{ ach.achievement_name }}</strong></td>
+                                    <td>{{ ach.level }}</td>
+                                    <td>{{ ach.date.strftime('%d/%m/%Y') if ach.date else '' }}</td>
+                                    <td>{{ ach.issuing_authority or '' }}</td>
+                                    <td>{{ ach.decision_number or '' }}</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted">Chưa có dữ liệu</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
