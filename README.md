@@ -1,12 +1,6 @@
-# HRMS - Human Resource Management System
+# HRMS - Hệ thống Quản lý Nhân sự
 
-[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
-[![Flask](https://img.shields.io/badge/Flask-3.0+-green.svg)](https://flask.palletsprojects.com/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Code Style](https://img.shields.io/badge/code%20style-black-black.svg)](https://github.com/psf/black)
-
-## Overview
-HRMS (Human Resource Management System) is a comprehensive HR management system developed with Python Flask, designed for Vietnamese organizations to manage their human resources efficiently.
+Hệ thống quản lý nhân sự toàn diện được phát triển bằng Python Flask.
 
 ## Tính năng chính
 
