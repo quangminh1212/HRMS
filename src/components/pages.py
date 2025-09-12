@@ -7,7 +7,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, date
-from design import DesignTokens, UIComponents
+from src.components.design import DesignTokens, UIComponents
 
 class ModernPages:
     """Class chứa các trang bổ sung cho HRMS Modern"""

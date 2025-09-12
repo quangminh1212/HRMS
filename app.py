@@ -15,11 +15,12 @@ from io import BytesIO
 import os
 
 # Import Design System
-from design import DesignTokens, UIComponents
+from src.components.design import DesignTokens, UIComponents
 
 # Import models và utils
-from models import init_database, Employee, User, SalaryHistory, WorkHistory, Training, Achievement, Evaluation, Council, Insurance, Planning
-from utils import (
+from src.models.models_enhanced import init_enhanced_database, Employee, SalaryHistory, WorkHistory, Training, Achievement, Evaluation, CouncilMembership, InsuranceReport, Planning
+from src.models.models import User
+from src.utils.utils import (
     calculate_retirement_date, 
     check_salary_increase_eligibility,
     check_appointment_eligibility,
@@ -29,16 +30,16 @@ from utils import (
 )
 
 # Import additional modern pages
-from pages import ModernPages
+from src.components.pages import ModernPages
 
-# Import components
-from components import ModernComponents
+# Import components  
+from src.components.components import ModernComponents
 
-# Import enhanced features  
-from hr_search import render_employee_search_page
-from salary_management import render_salary_management_page
-from retirement_management import render_retirement_management_page
-from additional_features import (
+# Import enhanced features
+from src.features.hr_search import render_employee_search_page
+from src.features.salary_management import render_salary_management_page
+from src.features.retirement_management import render_retirement_management_page
+from src.features.additional_features import (
     render_planning_management_page,
     render_work_history_page,
     render_contract_management_page,
@@ -68,7 +69,7 @@ st.markdown(UIComponents.get_base_css(), unsafe_allow_html=True)
 # Khởi tạo database
 @st.cache_resource
 def init_db():
-    return init_database()
+    return init_enhanced_database()
 
 # Khởi tạo session state
 def init_session_state():

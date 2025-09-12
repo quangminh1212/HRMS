@@ -8,8 +8,8 @@ import pandas as pd
 from datetime import datetime, date, timedelta
 from dateutil.relativedelta import relativedelta
 from sqlalchemy.orm import sessionmaker
-from models_enhanced import *
-from components import ModernComponents
+from src.models.models_enhanced import *
+from src.components.components import ModernComponents
 import plotly.express as px
 import plotly.graph_objects as go
 from typing import List, Dict, Tuple
