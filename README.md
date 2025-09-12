@@ -70,90 +70,10 @@ HRMS/
 
 ## Testing
 
-Run the test suite:
+Chạy tests:
 ```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=. --cov-report=html
-
-# Run specific test file
-pytest tests/test_app.py
-
-# Run with verbose output
-pytest -v
+python -m pytest tests/
 ```
-
-## Code Quality
-
-This project uses several tools to maintain code quality:
-
-- **Black**: Code formatting
-- **Flake8**: Style guide enforcement
-- **MyPy**: Static type checking
-- **pytest**: Testing framework
-
-Run quality checks:
-```bash
-make lint      # Run all linting
-make format    # Format code with black
-```
-
-## Docker Support
-
-Build and run with Docker:
-```bash
-# Build image
-docker build -t hrms .
-
-# Run container
-docker run -p 5000:5000 hrms
-```
-
-## Deployment
-
-### Production Deployment
-
-1. Set environment to production:
-```bash
-export FLASK_ENV=production
-```
-
-2. Use a production WSGI server:
-```bash
-pip install -r requirements-prod.txt
-gunicorn --bind 0.0.0.0:5000 run:app
-```
-
-### Environment Variables
-
-Key environment variables for production:
-- `FLASK_ENV`: Set to 'production'
-- `SECRET_KEY`: Strong secret key for sessions
-- `DATABASE_URL`: Database connection string
-- `MAIL_SERVER`: Email server for notifications
-
-## API Documentation
-
-The application provides REST API endpoints for integration:
-- `/api/search-employees`: Employee search
-- More endpoints available in the application
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Development Guidelines
-
-- Follow PEP 8 style guide
-- Write tests for new features
-- Update documentation
-- Use meaningful commit messages
 
 ## Hướng dẫn sử dụng
 
