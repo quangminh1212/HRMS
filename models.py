@@ -328,8 +328,8 @@ class Planning(Base):
 # Database initialization
 def init_database():
     """Khởi tạo database"""
-    if not os.path.exists('hrms_streamlit.db'):
-        engine = create_engine('sqlite:///hrms_streamlit.db', echo=False)
+    if not os.path.exists('database.db'):
+        engine = create_engine('sqlite:///database.db', echo=False)
         Base.metadata.create_all(engine)
         
         # Tạo session
@@ -342,7 +342,7 @@ def init_database():
         session.close()
         print("✅ Database initialized successfully!")
     
-    return create_engine('sqlite:///hrms_streamlit.db', echo=False)
+    return create_engine('sqlite:///database.db', echo=False)
 
 def create_sample_data(session):
     """Tạo dữ liệu mẫu"""
