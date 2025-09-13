@@ -800,7 +800,7 @@ class MainWindow(QWidget):
                 db.close()
 
     def send_quarter_salary_email(self):
-        # Gửi email danh sách nâng lương quý hiện tại kèm file Excel
+        # Ghi EmailLog tổng hợp cho nâng lương quý sau khi gửi (đã có ghi audit)
         role = (self.current_user.get('role') or '').lower()
         if role not in ('admin','hr'):
             QMessageBox.warning(self, "Không có quyền", "Chỉ admin/HR mới gửi email")

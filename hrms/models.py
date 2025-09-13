@@ -150,6 +150,21 @@ class AuditLog(Base):
     details = Column(String(500), nullable=True)
 
 
+class EmailLog(Base):
+    __tablename__ = "email_logs"
+    id = Column(Integer, primary_key=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    type = Column(String(100), nullable=False)  # salary_due, bhxh_monthly, contracts_expiring, quick_report, retirement
+    unit_name = Column(String(255), nullable=True)
+    recipients = Column(String(1000), nullable=True)  # comma-separated
+    subject = Column(String(255), nullable=False)
+    body = Column(String(1000), nullable=True)
+    attachments = Column(String(2000), nullable=True)  # comma-separated paths
+    status = Column(String(50), nullable=False, default="sent")  # sent/failed
+    error = Column(String(500), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+
 class Setting(Base):
     __tablename__ = "settings"
     id = Column(Integer, primary_key=True)

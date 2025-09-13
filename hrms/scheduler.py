@@ -193,7 +193,16 @@ def schedule_jobs():
             Path('exports').mkdir(exist_ok=True)
             out = Path('exports')/f"bhxh_{prev_year}_{prev_month:02d}.xlsx"
             export_insurance_to_excel(db, start, end, str(out), username='Scheduler')
-            send_email_with_attachment('[HRMS] Báo cáo BHXH tháng', f'Đính kèm BHXH {prev_month:02d}/{prev_year}', [str(out)])
+# Gửi tổng hợp
+            ok = send_email_with_attachment('[HRMS] Báo cáo BHXH tháng', f'Đính kèm BHXH {prev_month:02d}/{prev_year}', [str(out)])
+            try:
+                # Log email tổng hợp
+                from .db import SessionLocal
+                from .models import EmailLog
+                s = SessionLocal();
+                s.add(EmailLog(type='bhxh_monthly', unit_name=None, recipients='', subject='[HRMS] Báo cáo BHXH tháng', body=f'BHXH {prev_month:02d}/{prev_year}', attachments=str(out), status='sent' if ok else 'failed'))
+                s.commit(); s.close()
+            except Exception: pass
             # Theo đơn vị + ZIP tổng hợp nếu bật
             from .models import Unit
             units = db.query(Unit).all()
@@ -235,7 +244,12 @@ def schedule_jobs():
             Path('exports').mkdir(exist_ok=True)
             out = Path('exports')/f"contracts_expiring_{today.isoformat()}_{days}d.xlsx"
             export_contracts_expiring_to_excel(db, today, end, str(out))
-            send_email_with_attachment('[HRMS] HĐ sắp hết hạn', f'Đính kèm HĐ sắp hết hạn trong {days} ngày tới', [str(out)])
+            ok = send_email_with_attachment('[HRMS] HĐ sắp hết hạn', f'Đính kèm HĐ sắp hết hạn trong {days} ngày tới', [str(out)])
+            try:
+                from .db import SessionLocal
+                from .models import EmailLog
+                s = SessionLocal(); s.add(EmailLog(type='contracts_expiring', unit_name=None, recipients='', subject='[HRMS] HĐ sắp hết hạn', body=f'{days} ngày', attachments=str(out), status='sent' if ok else 'failed')); s.commit(); s.close()
+            except Exception: pass
             # Theo đơn vị + ZIP tổng hợp nếu bật
             from .models import Unit
             units = db.query(Unit).all()
@@ -267,7 +281,5 @@ def schedule_jobs():
     sched.add_job(run_insurance_monthly, 'cron', day=1, hour=9, minute=15)
     sched.add_job(run_contracts_expiring, 'cron', hour=9, minute=20)
 
-    sched.start()
-    return sched
     sched.start()
     return sched

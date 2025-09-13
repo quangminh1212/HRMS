@@ -44,6 +44,22 @@ def send_alert(subject: str, body: str, to: List[str] | None = None) -> bool:
         return False
 
 
+def _shorten_recipients(recipients: List[str]) -> str:
+    try:
+        # Ẩn phần tên người dùng, chỉ hiện domain để không lộ thông tin đầy đủ
+        masked = []
+        for r in recipients or []:
+            r = str(r or '').strip()
+            if '@' in r:
+                user, dom = r.split('@', 1)
+                masked.append(f"***@{dom}")
+            elif r:
+                masked.append("***")
+        return ", ".join(masked)
+    except Exception:
+        return ", ".join(recipients or [])
+
+
 def send_email_with_attachment(subject: str, body: str, attachments: List[str], to: List[str] | None = None) -> bool:
     settings = load_settings()
     recipients = to or settings.alert_emails or []
@@ -76,8 +92,46 @@ def send_email_with_attachment(subject: str, body: str, attachments: List[str], 
             if settings.smtp_user and settings.smtp_password:
                 server.login(settings.smtp_user, settings.smtp_password)
             server.send_message(msg)
+        # Ghi EmailLog (best-effort)
+        try:
+            from .db import SessionLocal
+            from .models import EmailLog
+            s = SessionLocal()
+            log = EmailLog(
+                type="generic",
+                unit_name=None,
+                recipients=", ".join(to or settings.alert_emails or []),
+                subject=_apply_subject_prefix(subject),
+                body=(body or '')[:1000],
+                attachments=", ".join(attachments or [])[:2000],
+                status="sent",
+                error=None,
+                user_id=None,
+            )
+            s.add(log); s.commit(); s.close()
+        except Exception:
+            pass
         return True
-    except Exception:
+    except Exception as ex:
+        # Ghi log thất bại
+        try:
+            from .db import SessionLocal
+            from .models import EmailLog
+            s = SessionLocal()
+            log = EmailLog(
+                type="generic",
+                unit_name=None,
+                recipients=", ".join(to or settings.alert_emails or []),
+                subject=_apply_subject_prefix(subject),
+                body=(body or '')[:1000],
+                attachments=", ".join(attachments or [])[:2000],
+                status="failed",
+                error=str(ex)[:500],
+                user_id=None,
+            )
+            s.add(log); s.commit(); s.close()
+        except Exception:
+            pass
         return False
 
 
