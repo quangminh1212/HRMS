@@ -1323,8 +1323,8 @@ class MainWindow(QWidget):
         f.addRow("XLSX_FREEZE_COL:salary_due", freeze_salary_due)
         f.addRow("XLSX_FREEZE_COL:salary_history", freeze_salary_history)
         f.addRow("XLSX_FREEZE_COL:salary_histories", freeze_salary_histories)
-        btn_ok = QPushButton("Lưu"); btn_cancel = QPushButton("Đóng"); btn_unit_emails = QPushButton("Email theo đơn vị…"); btn_unit_emails_db = QPushButton("QL email theo đơn vị (DB)…")
-        row = QHBoxLayout(); row.addWidget(btn_ok); row.addWidget(btn_cancel); row.addWidget(btn_unit_emails); row.addWidget(btn_unit_emails_db)
+        btn_ok = QPushButton("Lưu"); btn_cancel = QPushButton("Đóng"); btn_unit_emails = QPushButton("Email theo đơn vị…"); btn_unit_emails_db = QPushButton("QL email theo đơn vị (DB)…"); btn_test_smtp = QPushButton("Test SMTP")
+        row = QHBoxLayout(); row.addWidget(btn_ok); row.addWidget(btn_cancel); row.addWidget(btn_unit_emails); row.addWidget(btn_unit_emails_db); row.addWidget(btn_test_smtp)
         f.addRow(row)
 
         def save():
@@ -1431,6 +1431,9 @@ class MainWindow(QWidget):
             table = QTableWidget(0, 3); table.setHorizontalHeaderLabels(["Email", "Active", "Created"])
             lay.addWidget(table)
             email_edit = QLineEdit(); lay.addWidget(email_edit)
+            # Import từ settings
+            btn_import_settings = QPushButton("Nhập từ settings")
+            lay.addWidget(btn_import_settings)
             def load_rows():
                 table.setRowCount(0)
                 uid = unit_box.currentData();
@@ -1486,8 +1489,62 @@ class MainWindow(QWidget):
                     s2.rollback(); QMessageBox.critical(md, "Lỗi", str(ex))
                 finally:
                     s2.close(); load_rows()
-            btn_load.clicked.connect(load_rows); btn_add.clicked.connect(do_add); btn_del.clicked.connect(do_del); btn_toggle.clicked.connect(do_toggle)
-            md.resize(700, 500); md.exec()
+            def do_import_settings():
+                try:
+                    from .settings_service import get_setting
+                    raw = get_setting('UNIT_EMAILS','') or ''
+                    if not raw.strip():
+                        QMessageBox.information(md, "Không có dữ liệu", "UNIT_EMAILS đang trống")
+                        return
+                    import json
+                    mapping: dict[str, list[str]] = {}
+                    try:
+                        obj = json.loads(raw)
+                        if isinstance(obj, dict):
+                            for k, v in obj.items():
+                                if isinstance(v, list):
+                                    emails = [str(x).strip() for x in v if str(x).strip()]
+                                else:
+                                    emails = [e.strip() for e in str(v).split(',') if e.strip()]
+                                if emails:
+                                    mapping[str(k).strip()] = emails
+                    except Exception:
+                        parts = [p for p in raw.split(';') if p.strip()]
+                        for p in parts:
+                            if '=' in p:
+                                name, emails = p.split('=', 1)
+                                vals = [e.strip() for e in emails.split(',') if e.strip()]
+                                if vals:
+                                    mapping[name.strip()] = vals
+                    if not mapping:
+                        QMessageBox.information(md, "Không có dữ liệu", "Không thể parse UNIT_EMAILS")
+                        return
+                    s2 = _SL();
+                    try:
+                        # duyệt theo tên đơn vị, map sang id
+                        units_by_name = {u.name.strip().lower(): u.id for u in s2.query(Unit).all()}
+                        added = 0
+                        for name, emails in mapping.items():
+                            uid = units_by_name.get((name or '').strip().lower())
+                            if not uid:
+                                continue
+                            for em in emails:
+                                try:
+                                    s2.add(UnitEmailRecipient(unit_id=uid, email=em, active=True)); s2.commit(); added += 1
+                                    # Audit
+                                    try:
+                                        log_action(SessionLocal(), self.current_user.get('id'), 'unit_email_import', 'UnitEmailRecipient', None, f"unit={name};email={em}")
+                                    except Exception:
+                                        pass
+                                except Exception:
+                                    s2.rollback()
+                        QMessageBox.information(md, "Đã nhập", f"Đã thêm {added} địa chỉ")
+                    finally:
+                        s2.close(); load_rows()
+                except Exception as ex:
+                    QMessageBox.critical(md, "Lỗi", str(ex))
+            btn_load.clicked.connect(load_rows); btn_add.clicked.connect(do_add); btn_del.clicked.connect(do_del); btn_toggle.clicked.connect(do_toggle); btn_import_settings.clicked.connect(do_import_settings)
+            md.resize(760, 560); md.exec()
         btn_ok.clicked.connect(save)
         btn_cancel.clicked.connect(dlg.reject)
         btn_unit_emails.clicked.connect(edit_unit_emails)
@@ -1495,6 +1552,17 @@ class MainWindow(QWidget):
             btn_unit_emails_db.clicked.connect(manage_unit_emails_db)
         except Exception:
             pass
+        def test_smtp():
+            try:
+                from .mailer import send_alert
+                ok = send_alert('[HRMS] SMTP test', 'This is a test email from HRMS settings')
+                if ok:
+                    QMessageBox.information(dlg, "OK", "Đã gửi email thử nghiệm (kiểm tra hộp thư ALERT_EMAILS)")
+                else:
+                    QMessageBox.warning(dlg, "Chưa gửi", "Gửi email thử nghiệm thất bại — kiểm tra cấu hình SMTP/ALERT_EMAILS")
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_test_smtp.clicked.connect(test_smtp)
         dlg.exec()
 
     def open_email_history(self):
@@ -1503,7 +1571,7 @@ class MainWindow(QWidget):
         if role not in ('admin','hr'):
             QMessageBox.warning(self, "Không có quyền", "Chỉ admin/HR mới truy cập")
             return
-        from PySide6.QtWidgets import QDialog, QFormLayout, QTableWidget, QTableWidgetItem, QPushButton, QCheckBox
+        from PySide6.QtWidgets import QDialog, QFormLayout, QTableWidget, QTableWidgetItem, QPushButton, QCheckBox, QFileDialog
         dlg = QDialog(self); dlg.setWindowTitle("Lịch sử Email")
         lay = QVBoxLayout(dlg)
         # Bộ lọc
@@ -1529,7 +1597,10 @@ class MainWindow(QWidget):
         f.addRow("User ID", user_id_edit)
         btn_resend = QPushButton("Gửi lại")
         btn_resend_all = QPushButton("Gửi lại tất cả (lọc)")
-        hb = QHBoxLayout(); hb.addWidget(btn_refresh); hb.addWidget(btn_export); hb.addWidget(btn_view); hb.addWidget(btn_resend); hb.addWidget(btn_resend_all); f.addRow(hb)
+        btn_open_exports = QPushButton("Mở exports")
+        btn_delete = QPushButton("Xoá")
+        btn_delete_all = QPushButton("Xoá tất cả (lọc)")
+        hb = QHBoxLayout(); hb.addWidget(btn_refresh); hb.addWidget(btn_export); hb.addWidget(btn_view); hb.addWidget(btn_resend); hb.addWidget(btn_resend_all); hb.addWidget(btn_open_exports); hb.addWidget(btn_delete); hb.addWidget(btn_delete_all); f.addRow(hb)
         lay.addLayout(f)
         # Bảng kết quả
         table = QTableWidget(0, 8)
@@ -1573,6 +1644,7 @@ class MainWindow(QWidget):
                 for r in rows:
                     i = table.rowCount(); table.insertRow(i)
                     it0 = QTableWidgetItem(str(getattr(r, 'created_at', '')))
+                    it0.setData(Qt.UserRole, getattr(r, 'id', None))
                     it1 = QTableWidgetItem(getattr(r, 'type', '') or '')
                     it2 = QTableWidgetItem(getattr(r, 'unit_name', '') or '')
                     it3 = QTableWidgetItem(getattr(r, 'subject', '') or '')
@@ -1680,6 +1752,58 @@ class MainWindow(QWidget):
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_resend.clicked.connect(resend_selected)
+        def open_exports():
+            try:
+                import os, sys, subprocess
+                p = 'exports'
+                if sys.platform.startswith('win'):
+                    os.startfile(p)
+                elif sys.platform == 'darwin':
+                    subprocess.Popen(['open', p])
+                else:
+                    subprocess.Popen(['xdg-open', p])
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_open_exports.clicked.connect(open_exports)
+        def delete_selected():
+            i = table.currentRow()
+            if i < 0:
+                QMessageBox.information(dlg, "Chưa chọn", "Chọn một dòng để xoá")
+                return
+            try:
+                eid = table.item(i,0).data(Qt.UserRole) if table.item(i,0) else None
+                if not eid:
+                    QMessageBox.warning(dlg, "Không xác định", "Không xác định ID")
+                    return
+                from .db import SessionLocal
+                from .models import EmailLog
+                s = SessionLocal(); s.query(EmailLog).filter(EmailLog.id==eid).delete(); s.commit(); s.close()
+                table.removeRow(i)
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_delete.clicked.connect(delete_selected)
+        def delete_all_filtered():
+            from PySide6.QtWidgets import QMessageBox as _QMB
+            if _QMB.question(dlg, "Xác nhận", "Xoá tất cả bản ghi đang hiển thị?", _QMB.Yes|_QMB.No) != _QMB.Yes:
+                return
+            try:
+                ids = []
+                for i in range(table.rowCount()):
+                    eid = table.item(i,0).data(Qt.UserRole) if table.item(i,0) else None
+                    if eid:
+                        ids.append(eid)
+                if not ids:
+                    return
+                from .db import SessionLocal
+                from .models import EmailLog
+                s = SessionLocal();
+                for eid in ids:
+                    s.query(EmailLog).filter(EmailLog.id==eid).delete()
+                s.commit(); s.close()
+                load()
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_delete_all.clicked.connect(delete_all_filtered)
         def resend_all_filtered():
             try:
                 total = 0; sent = 0; failed = 0
