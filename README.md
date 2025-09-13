@@ -1,8 +1,8 @@
-# 🏢 HRMS - Hệ thống Quản lý Nhân sự Hiện đại
+# 🏢 HRMS - Hệ thống Quản lý Nhân sự Modern
 
-**🎯 100% Python với bộ sưu tập giao diện hiện đại**
+**🎯 100% Python với giao diện Material Design 3**
 
-Hệ thống quản lý nhân sự toàn diện với **4 framework UI khác nhau**, từ Material Design 3 đến Flutter components.
+Hệ thống quản lý nhân sự toàn diện với giao diện hiện đại và tính năng Auto Keep-Alive.
 
 ---
 
@@ -13,28 +13,14 @@ Hệ thống quản lý nhân sự toàn diện với **4 framework UI khác nha
 # Cài đặt
 setup.bat
 
-# Chạy với menu chọn framework  
+# Chạy HRMS Modern với Auto Keep-Alive
 run.bat
-
-# Hoặc chạy nhanh HRMS Modern
-quick-start.bat
-
-# Duy trì localhost tự động (khuyến nghị)
-keep-alive.bat
 ```
 
 ### **Cách 2: Python trực tiếp**
 ```bash
-# Launcher (khuyến nghị)
-python launcher.py
-
-# HRMS Modern (đẹp nhất)  
+# HRMS Modern (giao diện tốt nhất)
 python run.py
-
-# Các phiên bản khác
-python run_classic.py      # Classic
-python run_flet.py         # Flutter UI  
-python run_nicegui.py      # Tailwind CSS
 ```
 
 ### **🔑 Login Info**
@@ -43,31 +29,13 @@ python run_nicegui.py      # Tailwind CSS
 
 ---
 
-## 💎 Framework Collection
+## 💎 HRMS Modern
 
-### **1. HRMS Modern** (🔥 MỚI NHẤT)
-- **🎨 Design**: Material Design 3 system  
+### **Giao diện tốt nhất** (🔥 MỚI NHẤT)
+- **🎨 Design**: Material Design 3 system
 - **🌐 Port**: 3000
-- **✨ Tính năng**: Component library, Design tokens, Glassmorphism
-- **📱 UI**: Hero headers, Metric cards, Interactive charts
-
-### **2. Streamlit Classic** 
-- **🎨 Design**: Enhanced Streamlit với CSS hiện đại
-- **🌐 Port**: 3000  
-- **✨ Tính năng**: Glassmorphism effects, Gradient backgrounds
-- **📱 UI**: Responsive layout, Smooth animations
-
-### **3. Flet (Flutter for Python)**
-- **🎨 Design**: Material Design components
-- **🌐 Port**: 8080
-- **✨ Tính năng**: Cross-platform, Native feel
-- **📱 UI**: Flutter widgets, Smooth transitions
-
-### **4. NiceGUI**  
-- **🎨 Design**: Tailwind CSS tích hợp
-- **🌐 Port**: 8090
-- **✨ Tính năng**: Real-time updates, Vue.js-like
-- **📱 UI**: Modern web components, Responsive
+- **✨ Tính năng**: Component library, Design tokens, Glassmorphism, Auto Keep-Alive
+- **📱 UI**: Hero headers, Metric cards, Interactive charts, Responsive layout
 
 ---
 
