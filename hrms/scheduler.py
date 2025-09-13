@@ -56,6 +56,8 @@ def schedule_jobs():
                     send_email_with_attachment("[HRMS] Danh sách đến hạn nâng lương", body, [str(out)])
                 except Exception:
                     pass
+                # Gửi theo đơn vị nếu có mapping
+                run_salary_alert_by_unit(items, end)
         finally:
             db.close()
 
@@ -105,9 +107,79 @@ def schedule_jobs():
         finally:
             db.close()
 
+    # BHXH hàng tháng: ngày 1 hàng tháng lúc 09:15
+    def run_insurance_monthly():
+        from datetime import date
+        from calendar import monthrange
+        from pathlib import Path
+        from .insurance import export_insurance_to_excel
+        from .mailer import send_email_with_attachment, get_recipients_for_unit
+        today = date.today()
+        # khoảng tháng trước
+        prev_month = (today.month - 2) % 12 + 1
+        prev_year = today.year - 1 if today.month == 1 else today.year
+        start = date(prev_year, prev_month, 1)
+        last_day = monthrange(prev_year, prev_month)[1]
+        end = date(prev_year, prev_month, last_day)
+        db = SessionLocal()
+        try:
+            Path('exports').mkdir(exist_ok=True)
+            # tổng hợp chung
+            out = Path('exports')/f"bhxh_{prev_year}_{prev_month:02d}.xlsx"
+            export_insurance_to_excel(db, start, end, str(out), username='Scheduler')
+            send_email_with_attachment('[HRMS] Báo cáo BHXH tháng', f'Đính kèm BHXH {prev_month:02d}/{prev_year}', [str(out)])
+            # theo đơn vị
+            from .models import Unit
+            units = db.query(Unit).all()
+            for u in units:
+                recips = get_recipients_for_unit(u.name)
+                if not recips:
+                    continue
+                outu = Path('exports')/f"bhxh_{prev_year}_{prev_month:02d}_{u.name.replace(' ', '_')}.xlsx"
+                export_insurance_to_excel(db, start, end, str(outu), username='Scheduler', unit_id=u.id)
+                send_email_with_attachment('[HRMS] BHXH tháng theo đơn vị', f'Đính kèm BHXH {prev_month:02d}/{prev_year} - {u.name}', [str(outu)], to=recips)
+        except Exception:
+            pass
+        finally:
+            db.close()
+
+    # Hợp đồng hết hạn trong N ngày tới
+    def run_contracts_expiring():
+        from datetime import timedelta, date
+        from pathlib import Path
+        from .contracts import export_contracts_expiring_to_excel
+        from .mailer import send_email_with_attachment, get_recipients_for_unit
+        from .settings_service import get_setting
+        today = date.today()
+        days = int(get_setting('CONTRACT_ALERT_DAYS', '30') or '30')
+        end = today + timedelta(days=days)
+        db = SessionLocal()
+        try:
+            Path('exports').mkdir(exist_ok=True)
+            # tổng hợp chung
+            out = Path('exports')/f"contracts_expiring_{today.isoformat()}_{days}d.xlsx"
+            export_contracts_expiring_to_excel(db, today, end, str(out))
+            send_email_with_attachment('[HRMS] Hợp đồng sắp hết hạn', f'Đính kèm danh sách HĐ sắp hết hạn trong {days} ngày tới', [str(out)])
+            # theo đơn vị
+            from .models import Unit
+            units = db.query(Unit).all()
+            for u in units:
+                recips = get_recipients_for_unit(u.name)
+                if not recips:
+                    continue
+                outu = Path('exports')/f"contracts_expiring_{today.isoformat()}_{days}d_{u.name.replace(' ', '_')}.xlsx"
+                export_contracts_expiring_to_excel(db, today, end, str(outu), unit_id=u.id)
+                send_email_with_attachment('[HRMS] HĐ sắp hết hạn theo đơn vị', f'Đính kèm HĐ sắp hết hạn trong {days} ngày tới - {u.name}', [str(outu)], to=recips)
+        except Exception:
+            pass
+        finally:
+            db.close()
+
     # Chạy hàng ngày lúc 09:00
     sched.add_job(run_salary_alert, 'cron', hour=9, minute=0)
     sched.add_job(run_retirement_alert, 'cron', hour=9, minute=5)
+    sched.add_job(run_insurance_monthly, 'cron', day=1, hour=9, minute=15)
+    sched.add_job(run_contracts_expiring, 'cron', hour=9, minute=20)
 
     sched.start()
     return sched
