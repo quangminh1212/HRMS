@@ -1015,9 +1015,10 @@ class MainWindow(QWidget):
         f.addRow("XLSX_FREEZE_COL:salary_due", freeze_salary_due)
         f.addRow("XLSX_FREEZE_COL:salary_history", freeze_salary_history)
         f.addRow("XLSX_FREEZE_COL:salary_histories", freeze_salary_histories)
-        btn_ok = QPushButton("Lưu"); btn_cancel = QPushButton("Đóng")
-        row = QHBoxLayout(); row.addWidget(btn_ok); row.addWidget(btn_cancel)
+        btn_ok = QPushButton("Lưu"); btn_cancel = QPushButton("Đóng"); btn_unit_emails = QPushButton("Email theo đơn vị…")
+        row = QHBoxLayout(); row.addWidget(btn_ok); row.addWidget(btn_cancel); row.addWidget(btn_unit_emails)
         f.addRow(row)
+
         def save():
             set_setting('SMTP_HOST', smtp_host.text())
             set_setting('SMTP_PORT', smtp_port.text())
@@ -1034,8 +1035,72 @@ class MainWindow(QWidget):
             if freeze_salary_history.text(): set_setting('XLSX_FREEZE_COL:salary_history', freeze_salary_history.text().upper())
             if freeze_salary_histories.text(): set_setting('XLSX_FREEZE_COL:salary_histories', freeze_salary_histories.text().upper())
             QMessageBox.information(dlg, "Đã lưu", "Lưu cấu hình thành công")
+
+        def edit_unit_emails():
+            # Dialog cấu hình email theo đơn vị
+            udlg = QDialog(dlg); udlg.setWindowTitle("Email theo đơn vị");
+            from PySide6.QtWidgets import QFormLayout
+            uf = QFormLayout(udlg)
+            # Fetch units
+            from .models import Unit
+            from .db import SessionLocal as _SL
+            dbu = _SL()
+            try:
+                units = dbu.query(Unit).order_by(Unit.name).all()
+            finally:
+                dbu.close()
+            # Parse existing mapping
+            import json
+            raw = get_setting('UNIT_EMAILS','') or ''
+            mapping: dict[str, list[str]] = {}
+            if raw.strip():
+                try:
+                    obj = json.loads(raw)
+                    if isinstance(obj, dict):
+                        for k, v in obj.items():
+                            if isinstance(v, list):
+                                mapping[str(k).strip()] = [str(x).strip() for x in v if str(x).strip()]
+                            elif isinstance(v, str):
+                                mapping[str(k).strip()] = [e.strip() for e in v.split(',') if e.strip()]
+                except Exception:
+                    # fallback parse "Unit=mail1,mail2; Unit2=mail3"
+                    parts = [p for p in raw.split(';') if p.strip()]
+                    for p in parts:
+                        if '=' in p:
+                            name, emails = p.split('=', 1)
+                            mapping[name.strip()] = [e.strip() for e in emails.split(',') if e.strip()]
+            # Build form
+            inputs = {}
+            for u in units:
+                emails = ", ".join(mapping.get(u.name, []))
+                line = QLineEdit(emails)
+                uf.addRow(u.name, line)
+                inputs[u.name] = line
+            # Buttons
+            from PySide6.QtWidgets import QPushButton, QHBoxLayout
+            ub_ok = QPushButton("Lưu"); ub_cancel = QPushButton("Đóng")
+            urow = QHBoxLayout(); urow.addWidget(ub_ok); urow.addWidget(ub_cancel)
+            uf.addRow(urow)
+
+            def do_save_unit_emails():
+                data = {}
+                for name, line in inputs.items():
+                    vals = [e.strip() for e in (line.text() or '').split(',') if e.strip()]
+                    if vals:
+                        data[name] = vals
+                try:
+                    set_setting('UNIT_EMAILS', json.dumps(data, ensure_ascii=False))
+                    QMessageBox.information(udlg, "Đã lưu", "Đã lưu email theo đơn vị")
+                except Exception as ex:
+                    QMessageBox.critical(udlg, "Lỗi", str(ex))
+
+            ub_ok.clicked.connect(do_save_unit_emails)
+            ub_cancel.clicked.connect(udlg.reject)
+            udlg.exec()
+
         btn_ok.clicked.connect(save)
         btn_cancel.clicked.connect(dlg.reject)
+        btn_unit_emails.clicked.connect(edit_unit_emails)
         dlg.exec()
 
     def manage_users(self):
