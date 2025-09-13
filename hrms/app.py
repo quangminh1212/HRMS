@@ -101,6 +101,8 @@ class MainWindow(QWidget):
         self.btn_detail.clicked.connect(self.open_detail)
         self.btn_due = QPushButton("Nâng lương quý này")
         self.btn_due.clicked.connect(self.show_due)
+        self.btn_email_salary_due = QPushButton("Gửi email nâng lương (quý)")
+        self.btn_email_salary_due.clicked.connect(self.send_quarter_salary_email)
         self.btn_appointment = QPushButton("Kiểm tra bổ nhiệm")
         self.btn_appointment.clicked.connect(self.check_appointment)
         self.btn_work = QPushButton("Thêm quá trình công tác")
@@ -136,6 +138,7 @@ class MainWindow(QWidget):
         btn_layout.addWidget(self.btn_export)
         btn_layout.addWidget(self.btn_detail)
         btn_layout.addWidget(self.btn_due)
+        btn_layout.addWidget(self.btn_email_salary_due)
         btn_layout.addWidget(self.btn_appointment)
         btn_layout.addWidget(self.btn_work)
         btn_layout.addWidget(self.btn_export_work)
@@ -357,6 +360,8 @@ class MainWindow(QWidget):
         self.btn_ins_export.setEnabled(is_admin)
         self.btn_manage_users.setEnabled(is_admin)
         self.btn_settings.setEnabled(is_admin)
+        # Gửi email nâng lương (quý) chỉ cho admin/hr
+        self.btn_email_salary_due.setEnabled(is_admin)
         is_mgr = role in ('admin','hr','unit_manager')
         self.btn_work.setEnabled(is_mgr)
         self.btn_contract_add.setEnabled(is_mgr)
@@ -733,6 +738,44 @@ class MainWindow(QWidget):
         finally:
             if db:
                 db.close()
+
+    def send_quarter_salary_email(self):
+        # Gửi email danh sách nâng lương quý hiện tại kèm file Excel
+        role = (self.current_user.get('role') or '').lower()
+        if role not in ('admin','hr'):
+            QMessageBox.warning(self, "Không có quyền", "Chỉ admin/HR mới gửi email")
+            return
+        from datetime import date
+        from pathlib import Path
+        from .salary import list_due_in_window, export_due_to_excel
+        from .mailer import send_email_with_attachment
+        start, end = quarter_window(date.today())
+        db = SessionLocal()
+        try:
+            items = list_due_in_window(db, start, end)
+            if not items:
+                QMessageBox.information(self, "Kết quả", "Không có nhân sự đến hạn trong quý này")
+                return
+            Path("exports").mkdir(exist_ok=True)
+            q = ((end.month - 1)//3) + 1
+            out = Path("exports") / f"nang_luong_quy_{end.year}_Q{q}.xlsx"
+            export_due_to_excel(items, str(out), template_name=self.get_template_for('salary_due'), username=self.current_user.get('username'))
+            subject = f"[HRMS] Danh sách đến hạn nâng lương - Q{q}/{end.year}"
+            body = f"Có {len(items)} nhân sự đến hạn trong quý này. Tệp đính kèm: {out.name}"
+            ok = send_email_with_attachment(subject, body, [str(out)])
+            # Audit
+            try:
+                log_action(SessionLocal(), self.current_user.get('id'), 'email_salary_due', 'Salary', None, f"file={out};sent={ok};count={len(items)}")
+            except Exception:
+                pass
+            if ok:
+                QMessageBox.information(self, "Thành công", f"Đã gửi email kèm tệp: {out}")
+            else:
+                QMessageBox.warning(self, "Chưa gửi", "Không gửi được email. Kiểm tra cấu hình SMTP/ALERT_EMAILS")
+        except Exception as e:
+            QMessageBox.critical(self, "Lỗi", str(e))
+        finally:
+            db.close()
 
     def quick_report(self):
         from datetime import date
