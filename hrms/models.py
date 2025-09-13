@@ -1,0 +1,150 @@
+from datetime import date, datetime
+from typing import Optional
+
+from sqlalchemy import Column, Integer, String, Date, DateTime, Boolean, ForeignKey, Float, UniqueConstraint, Enum
+from sqlalchemy.orm import relationship
+
+from .db import Base
+
+
+class Unit(Base):
+    __tablename__ = "units"
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False, unique=True)
+    parent_id = Column(Integer, ForeignKey("units.id"), nullable=True)
+
+    parent = relationship("Unit", remote_side=[id], backref="children")
+
+
+class Position(Base):
+    __tablename__ = "positions"
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False, unique=True)
+
+
+class Person(Base):
+    __tablename__ = "persons"
+    id = Column(Integer, primary_key=True)
+    code = Column(String(50), nullable=False, unique=True)
+    full_name = Column(String(255), nullable=False)
+    dob = Column(Date, nullable=True)
+    gender = Column(String(10), nullable=True)  # Nam/Nu/Khac
+    ethnicity = Column(String(100), nullable=True)
+    religion = Column(String(100), nullable=True)
+    hometown = Column(String(255), nullable=True)
+
+    unit_id = Column(Integer, ForeignKey("units.id"), nullable=True)
+    position_id = Column(Integer, ForeignKey("positions.id"), nullable=True)
+
+    party_joined_date = Column(Date, nullable=True)
+    llct_level = Column(String(100), nullable=True)  # Trinh do ly luan chinh tri
+    professional_level = Column(String(255), nullable=True)  # hien thi ngan gon
+
+    status = Column(String(100), nullable=True)  # Dang cong tac, nghi thai san, di hoc, ...
+
+    phone = Column(String(50), nullable=True)
+    email = Column(String(255), nullable=True)
+
+    unit = relationship("Unit")
+    position = relationship("Position")
+
+
+class Education(Base):
+    __tablename__ = "educations"
+    id = Column(Integer, primary_key=True)
+    person_id = Column(Integer, ForeignKey("persons.id"), nullable=False)
+    level = Column(String(100), nullable=False)  # DH/Sau DH/LLCT/QPAN/QLNN/Khac
+    major = Column(String(255), nullable=True)
+    school = Column(String(255), nullable=True)
+    country = Column(String(100), nullable=True)
+    method = Column(String(100), nullable=True)
+    start_date = Column(Date, nullable=True)
+    end_date = Column(Date, nullable=True)
+
+
+class WorkProcess(Base):
+    __tablename__ = "work_processes"
+    id = Column(Integer, primary_key=True)
+    person_id = Column(Integer, ForeignKey("persons.id"), nullable=False)
+    unit = Column(String(255), nullable=True)
+    position = Column(String(255), nullable=True)
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=True)
+
+
+class Planning(Base):
+    __tablename__ = "plannings"
+    id = Column(Integer, primary_key=True)
+    person_id = Column(Integer, ForeignKey("persons.id"), nullable=False)
+    job_position = Column(String(255), nullable=False)
+    start_year = Column(Integer, nullable=False)
+    end_year = Column(Integer, nullable=False)
+
+
+class SalaryRank(Base):
+    __tablename__ = "salary_ranks"
+    id = Column(Integer, primary_key=True)
+    code = Column(String(50), nullable=False, unique=True)
+    name = Column(String(255), nullable=False)
+    level = Column(String(100), nullable=True)  # Chuyen vien/nhan vien/thu quy...
+
+
+class SalaryStep(Base):
+    __tablename__ = "salary_steps"
+    id = Column(Integer, primary_key=True)
+    rank_id = Column(Integer, ForeignKey("salary_ranks.id"), nullable=False)
+    step = Column(Integer, nullable=False)
+    coefficient = Column(Float, nullable=False)
+    min_months = Column(Integer, nullable=False)  # 36 or 24
+    __table_args__ = (UniqueConstraint('rank_id', 'step', name='uq_rank_step'),)
+
+
+class SalaryHistory(Base):
+    __tablename__ = "salary_histories"
+    id = Column(Integer, primary_key=True)
+    person_id = Column(Integer, ForeignKey("persons.id"), nullable=False)
+    rank_id = Column(Integer, ForeignKey("salary_ranks.id"), nullable=False)
+    step = Column(Integer, nullable=False)
+    coefficient = Column(Float, nullable=False)
+    effective_date = Column(Date, nullable=False)
+    note = Column(String(255), nullable=True)  # ky luat/ly do keo dai
+
+
+class Allowance(Base):
+    __tablename__ = "allowances"
+    id = Column(Integer, primary_key=True)
+    person_id = Column(Integer, ForeignKey("persons.id"), nullable=False)
+    type = Column(String(100), nullable=False)  # chuc vu, vuot khung, khac
+    percent = Column(Float, nullable=True)
+    amount = Column(Float, nullable=True)
+    start_date = Column(Date, nullable=True)
+    end_date = Column(Date, nullable=True)
+
+
+class AnnualEvaluation(Base):
+    __tablename__ = "annual_evaluations"
+    id = Column(Integer, primary_key=True)
+    person_id = Column(Integer, ForeignKey("persons.id"), nullable=False)
+    year = Column(Integer, nullable=False)
+    level = Column(String(100), nullable=False)  # XS/ Tot / Hoan thanh / Khong hoan thanh
+    __table_args__ = (UniqueConstraint('person_id', 'year', name='uq_eval_year'),)
+
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True)
+    username = Column(String(100), unique=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    role = Column(String(50), nullable=False, default="user")  # admin, hr, unit_manager, user
+    unit_id = Column(Integer, ForeignKey("units.id"), nullable=True)
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    action = Column(String(100), nullable=False)
+    entity = Column(String(100), nullable=False)
+    entity_id = Column(Integer, nullable=True)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    details = Column(String(500), nullable=True)
