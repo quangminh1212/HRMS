@@ -1471,12 +1471,32 @@ class MainWindow(QWidget):
                     s2.close()
             def do_add():
                 uid = unit_box.currentData();
-                em = (email_edit.text() or '').strip()
-                if not uid or not em:
+                em_raw = (email_edit.text() or '').strip()
+                if not uid or not em_raw:
+                    return
+                # Cho phép nhập nhiều email, phân tách bởi dấu phẩy
+                emails = [e.strip() for e in em_raw.split(',') if e.strip()]
+                # Validate định dạng đơn giản
+                import re
+                pat = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+                valid = [e for e in emails if pat.match(e)]
+                invalid = [e for e in emails if e not in valid]
+                if invalid:
+                    QMessageBox.warning(md, "Cảnh báo", f"Bỏ qua email không hợp lệ: {', '.join(invalid)}")
+                if not valid:
                     return
                 s2 = _SL();
                 try:
-                    s2.add(UnitEmailRecipient(unit_id=uid, email=em, active=True)); s2.commit()
+                    # tránh trùng: kiểm tra trước khi thêm
+                    from sqlalchemy import exists
+                    added = 0
+                    for em in valid:
+                        exists_q = s2.query(UnitEmailRecipient).filter(UnitEmailRecipient.unit_id==uid, UnitEmailRecipient.email==em).first()
+                        if exists_q:
+                            continue
+                        s2.add(UnitEmailRecipient(unit_id=uid, email=em, active=True)); s2.commit(); added += 1
+                    if added:
+                        QMessageBox.information(md, "Đã thêm", f"Đã thêm {added} email")
                 except Exception as ex:
                     s2.rollback(); QMessageBox.critical(md, "Lỗi", str(ex))
                 finally:
@@ -1544,12 +1564,20 @@ class MainWindow(QWidget):
                         # duyệt theo tên đơn vị, map sang id
                         units_by_name = {u.name.strip().lower(): u.id for u in s2.query(Unit).all()}
                         added = 0
+                        import re
+                        pat = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
                         for name, emails in mapping.items():
                             uid = units_by_name.get((name or '').strip().lower())
                             if not uid:
                                 continue
                             for em in emails:
+                                em = (em or '').strip()
+                                if not em or not pat.match(em):
+                                    continue
                                 try:
+                                    # tránh trùng
+                                    if s2.query(UnitEmailRecipient).filter(UnitEmailRecipient.unit_id==uid, UnitEmailRecipient.email==em).first():
+                                        continue
                                     s2.add(UnitEmailRecipient(unit_id=uid, email=em, active=True)); s2.commit(); added += 1
                                     # Audit
                                     try:

@@ -62,8 +62,20 @@ def _shorten_recipients(recipients: List[str]) -> str:
 
 def get_recipients_for_unit(unit_name: str) -> List[str]:
     """Trả về danh sách email cho đơn vị.
-    Ưu tiên đọc từ DB (bảng unit_email_recipients, active=True), nếu không có thì fallback UNIT_EMAILS trong settings.
+    Ưu tiên DB (unit_email_recipients.active=True), fallback settings. Lọc trùng và định dạng cơ bản.
     """
+    def _normalize(emails: List[str]) -> List[str]:
+        seen = set(); out = []
+        import re
+        pat = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+        for e in emails or []:
+            e = (e or '').strip()
+            if not e or not pat.match(e):
+                continue
+            if e.lower() in seen:
+                continue
+            seen.add(e.lower()); out.append(e)
+        return out
     try:
         # Ưu tiên DB
         from .db import SessionLocal
@@ -73,6 +85,7 @@ def get_recipients_for_unit(unit_name: str) -> List[str]:
             u = s.query(Unit).filter(Unit.name.ilike(unit_name)).first()
             if u:
                 emails = [r.email.strip() for r in s.query(UnitEmailRecipient).filter(UnitEmailRecipient.unit_id == u.id, UnitEmailRecipient.active == True).all() if (r.email or '').strip()]
+                emails = _normalize(emails)
                 if emails:
                     return emails
         finally:
@@ -114,12 +127,12 @@ def get_recipients_for_unit(unit_name: str) -> List[str]:
             return (x or '').strip().lower()
         # Ưu tiên khớp chính xác
         if unit_name in mapping:
-            return mapping[unit_name]
+            return _normalize(mapping[unit_name])
         # Khớp không phân biệt hoa thường
         target = _norm(unit_name)
         for k, v in mapping.items():
             if _norm(k) == target:
-                return v
+                return _normalize(v)
         return []
     except Exception:
         return []

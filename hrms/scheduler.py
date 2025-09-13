@@ -8,7 +8,7 @@ from .db import SessionLocal
 from .models import Person
 from .salary import list_due_in_window
 from .retirement import calculate_retirement_date
-from .mailer import send_alert, send_email_with_attachment_retry
+from .mailer import send_alert, send_email_with_attachment_retry as send_email_with_attachment, get_recipients_for_unit, create_zip
 
 # Hàng đợi thông báo để UI lấy và hiển thị popup
 NOTIFY_QUEUE: Queue[tuple[str, str]] = Queue()
@@ -30,7 +30,6 @@ def schedule_jobs():
     def run_salary_alert_by_unit(start, end):
         from pathlib import Path
         from .salary import export_due_to_excel
-        from .mailer import get_recipients_for_unit, create_zip
         from .settings_service import get_setting
         from .models import Unit
         try:
@@ -54,8 +53,7 @@ def schedule_jobs():
                     continue
                 out = Path('exports')/f"nang_luong_quy_{end.year}_Q{q}_{u.name.replace(' ', '_')}.xlsx"
                 export_due_to_excel(arr, str(out), template_name=None, username='Scheduler')
-                from .mailer import send_email_with_attachment_retry
-                ok = send_email_with_attachment_retry(f"[HRMS] Nâng lương Q{q}/{end.year} - {u.name}", f"Đính kèm danh sách cho {u.name}", [str(out)], to=recips, retries=rc, delay=rd)
+                ok = send_email_with_attachment(f"[HRMS] Nâng lương Q{q}/{end.year} - {u.name}", f"Đính kèm danh sách cho {u.name}", [str(out)], to=recips, retries=rc, delay=rd)
                 files.append(str(out))
                 try:
                     # mask recipients
@@ -77,8 +75,7 @@ def schedule_jobs():
                 if flag and files:
                     zip_path = Path('exports')/f"nang_luong_quy_{end.year}_Q{q}_by_unit.zip"
                     if create_zip(files, str(zip_path)):
-                        from .mailer import send_email_with_attachment_retry
-                        send_email_with_attachment_retry(f"[HRMS] Nâng lương Q{q}/{end.year} (ZIP tổng hợp)", f"ZIP tổng hợp danh sách nâng lương theo đơn vị Q{q}/{end.year}", [str(zip_path)], retries=rc, delay=rd)
+                        send_email_with_attachment(f"[HRMS] Nâng lương Q{q}/{end.year} (ZIP tổng hợp)", f"ZIP tổng hợp danh sách nâng lương theo đơn vị Q{q}/{end.year}", [str(zip_path)], retries=rc, delay=rd)
             except Exception:
                 pass
         finally:
@@ -115,7 +112,6 @@ def schedule_jobs():
                 try:
                     from pathlib import Path
                     from .salary import export_due_to_excel
-from .mailer import send_email_with_attachment_retry as send_email_with_attachment
                     Path("exports").mkdir(exist_ok=True)
                     q = ((end.month - 1)//3) + 1
                     out = Path("exports") / f"nang_luong_quy_{end.year}_Q{q}.xlsx"
@@ -188,7 +184,6 @@ from .mailer import send_email_with_attachment_retry as send_email_with_attachme
         from calendar import monthrange
         from pathlib import Path
         from .insurance import export_insurance_to_excel
-from .mailer import send_email_with_attachment_retry as send_email_with_attachment, get_recipients_for_unit
         today = date.today()
         # Retry params
         try:
@@ -225,37 +220,6 @@ from .mailer import send_email_with_attachment_retry as send_email_with_attachme
         finally:
             db.close()
 
-    # Hợp đồng hết hạn trong N ngày tới
-    def run_contracts_expiring():
-        from datetime import timedelta, date
-        from pathlib import Path
-        from .contracts import export_contracts_expiring_to_excel
-        from .mailer import send_email_with_attachment, get_recipients_for_unit
-        from .settings_service import get_setting
-        today = date.today()
-        days = int(get_setting('CONTRACT_ALERT_DAYS', '30') or '30')
-        # Retry params
-        try:
-            rc = int(get_setting('RETRY_COUNT','2') or '2')
-            rd = int(get_setting('RETRY_DELAY','10') or '10')
-        except Exception:
-            rc, rd = 2, 10
-        end = today + timedelta(days=days)
-        db = SessionLocal()
-        try:
-            Path('exports').mkdir(exist_ok=True)
-            # tổng hợp chung
-            out = Path('exports')/f"contracts_expiring_{today.isoformat()}_{days}d.xlsx"
-            export_contracts_expiring_to_excel(db, today, end, str(out))
-            send_email_with_attachment('[HRMS] Hợp đồng sắp hết hạn', f'Đính kèm danh sách HĐ sắp hết hạn trong {days} ngày tới', [str(out)], retries=rc, delay=rd)
-            # theo đơn vị
-            from .models import Unit
-            units = db.query(Unit).all()
-            for u in units:
-                recips = get_recipients_for_unit(u.name)
-                if not recips:
-                    continue
-                outu = Path('exports')/f"contracts_expiring_{today.isoformat()}_{days}d_{u.name.replace(' ', '_')}.xlsx"
                 export_contracts_expiring_to_excel(db, today, end, str(outu), unit_id=u.id)
                 send_email_with_attachment('[HRMS] HĐ sắp hết hạn theo đơn vị', f'Đính kèm HĐ sắp hết hạn trong {days} ngày tới - {u.name}', [str(outu)], to=recips)
         except Exception:
@@ -263,73 +227,6 @@ from .mailer import send_email_with_attachment_retry as send_email_with_attachme
         finally:
             db.close()
 
-    # BHXH hàng tháng: ngày 1 hàng tháng lúc 09:15
-    def run_insurance_monthly():
-        from datetime import date
-        from calendar import monthrange
-        from pathlib import Path
-        from .insurance import export_insurance_to_excel
-from .mailer import send_email_with_attachment_retry as send_email_with_attachment, get_recipients_for_unit, create_zip
-        today = date.today()
-        prev_month = (today.month - 2) % 12 + 1
-        prev_year = today.year - 1 if today.month == 1 else today.year
-        start = date(prev_year, prev_month, 1)
-        last_day = monthrange(prev_year, prev_month)[1]
-        end = date(prev_year, prev_month, last_day)
-        db = SessionLocal()
-        try:
-            Path('exports').mkdir(exist_ok=True)
-            out = Path('exports')/f"bhxh_{prev_year}_{prev_month:02d}.xlsx"
-            export_insurance_to_excel(db, start, end, str(out), username='Scheduler')
-# Gửi tổng hợp
-            ok = send_email_with_attachment('[HRMS] Báo cáo BHXH tháng', f'Đính kèm BHXH {prev_month:02d}/{prev_year}', [str(out)])
-            try:
-                # Log email tổng hợp
-                from .db import SessionLocal
-                from .models import EmailLog
-                s = SessionLocal();
-                s.add(EmailLog(type='bhxh_monthly', unit_name=None, recipients='', subject='[HRMS] Báo cáo BHXH tháng', body=f'BHXH {prev_month:02d}/{prev_year}', attachments=str(out), status='sent' if ok else 'failed'))
-                s.commit(); s.close()
-            except Exception: pass
-            # Theo đơn vị + ZIP tổng hợp nếu bật
-            from .models import Unit
-            units = db.query(Unit).all()
-            files = []
-            for u in units:
-                recips = get_recipients_for_unit(u.name)
-                if not recips:
-                    continue
-                outu = Path('exports')/f"bhxh_{prev_year}_{prev_month:02d}_{u.name.replace(' ', '_')}.xlsx"
-                export_insurance_to_excel(db, start, end, str(outu), username='Scheduler', unit_id=u.id)
-                files.append(str(outu))
-                ok_u = send_email_with_attachment('[HRMS] BHXH tháng theo đơn vị', f'Đính kèm BHXH {prev_month:02d}/{prev_year} - {u.name}', [str(outu)], to=recips)
-                try:
-                    # Ghi EmailLog chi tiết
-                    masked = []
-                    for r in recips:
-                        r = str(r or '').strip()
-                        if '@' in r:
-                            masked.append('***@' + r.split('@',1)[1])
-                        elif r:
-                            masked.append('***')
-                    from .db import SessionLocal
-                    from .models import EmailLog
-                    s2 = SessionLocal(); s2.add(EmailLog(type='bhxh_monthly', unit_name=u.name, recipients=", ".join(masked)[:1000], subject='BHXH tháng theo đơn vị', body=f"BHXH {prev_month:02d}/{prev_year} - {u.name}", attachments=str(outu), status='sent' if ok_u else 'failed')); s2.commit(); s2.close()
-                except Exception:
-                    pass
-            try:
-                from .settings_service import get_setting
-                flag = (get_setting('SEND_SUMMARY_ZIP','0') or '0').strip().lower() in ('1','true','yes')
-                if flag and files:
-                    zip_path = Path('exports')/f"bhxh_{prev_year}_{prev_month:02d}_by_unit.zip"
-                    if create_zip(files, str(zip_path)):
-                        send_email_with_attachment('[HRMS] BHXH tháng (ZIP tổng hợp)', f'ZIP tổng hợp BHXH {prev_month:02d}/{prev_year}', [str(zip_path)])
-            except Exception:
-                pass
-        except Exception:
-            pass
-        finally:
-            db.close()
 
     # Hợp đồng hết hạn trong N ngày tới
     def run_contracts_expiring():
@@ -423,6 +320,26 @@ from .mailer import send_email_with_attachment_retry as send_email_with_attachme
             print(f"[CLEANUP] error: {ex}")
 
     sched.add_job(cleanup_exports, 'cron', hour=3, minute=0)
+
+    # Dọn dẹp email_logs theo TTL
+    def cleanup_email_logs():
+        try:
+            from .db import SessionLocal as _SL
+            from .models import EmailLog
+            from .settings_service import get_setting
+            from datetime import datetime, timedelta
+            ttl = int(get_setting('EMAIL_LOG_TTL_DAYS','365') or '365')
+            cutoff = datetime.utcnow() - timedelta(days=ttl)
+            s = _SL();
+            try:
+                s.query(EmailLog).filter(EmailLog.created_at < cutoff).delete()
+                s.commit()
+            finally:
+                s.close()
+        except Exception as ex:
+            print(f"[CLEANUP] email_logs error: {ex}")
+
+    sched.add_job(cleanup_email_logs, 'cron', hour=4, minute=0)
 
     sched.start()
     return sched
