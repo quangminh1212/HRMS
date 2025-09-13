@@ -178,6 +178,7 @@ class UnitEmailRecipient(Base):
     unit_id = Column(Integer, ForeignKey("units.id"), nullable=False)
     email = Column(String(255), nullable=False)
     active = Column(Boolean, default=True, nullable=False)
+    note = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     __table_args__ = (UniqueConstraint('unit_id', 'email', name='uq_unit_email'),)
 

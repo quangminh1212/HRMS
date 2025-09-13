@@ -1448,9 +1448,11 @@ class MainWindow(QWidget):
             btn_load = QPushButton("Tải"); btn_add = QPushButton("Thêm"); btn_del = QPushButton("Xoá"); btn_toggle = QPushButton("Bật/Tắt")
             top.addWidget(unit_box); top.addWidget(btn_load); top.addWidget(btn_add); top.addWidget(btn_del); top.addWidget(btn_toggle)
             lay.addLayout(top)
-            table = QTableWidget(0, 3); table.setHorizontalHeaderLabels(["Email", "Active", "Created"])
+            table = QTableWidget(0, 4); table.setHorizontalHeaderLabels(["Email", "Active", "Note", "Created"])
             lay.addWidget(table)
-            email_edit = QLineEdit(); lay.addWidget(email_edit)
+            email_edit = QLineEdit(); email_note = QLineEdit();
+            from PySide6.QtWidgets import QFormLayout as _QF
+            sf = _QF(); sf.addRow("Email(s)", email_edit); sf.addRow("Note", email_note); lay.addLayout(sf)
             # Import từ settings
             btn_import_settings = QPushButton("Nhập từ settings")
             lay.addWidget(btn_import_settings)
@@ -1466,7 +1468,8 @@ class MainWindow(QWidget):
                         i = table.rowCount(); table.insertRow(i)
                         table.setItem(i, 0, QTableWidgetItem(r.email or ''))
                         table.setItem(i, 1, QTableWidgetItem('1' if r.active else '0'))
-                        table.setItem(i, 2, QTableWidgetItem(str(r.created_at)))
+                        table.setItem(i, 2, QTableWidgetItem(r.note or ''))
+                        table.setItem(i, 3, QTableWidgetItem(str(r.created_at)))
                 finally:
                     s2.close()
             def do_add():
@@ -1490,11 +1493,12 @@ class MainWindow(QWidget):
                     # tránh trùng: kiểm tra trước khi thêm
                     from sqlalchemy import exists
                     added = 0
+                    note_text = (email_note.text() or '').strip()
                     for em in valid:
                         exists_q = s2.query(UnitEmailRecipient).filter(UnitEmailRecipient.unit_id==uid, UnitEmailRecipient.email==em).first()
                         if exists_q:
                             continue
-                        s2.add(UnitEmailRecipient(unit_id=uid, email=em, active=True)); s2.commit(); added += 1
+                        s2.add(UnitEmailRecipient(unit_id=uid, email=em, active=True, note=note_text)); s2.commit(); added += 1
                     if added:
                         QMessageBox.information(md, "Đã thêm", f"Đã thêm {added} email")
                 except Exception as ex:
