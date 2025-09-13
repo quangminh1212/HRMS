@@ -33,7 +33,7 @@ if !errorlevel!==0 (
 ) else (
     echo 🔄 Starting server...
     taskkill /F /IM python.exe /FI "WINDOWTITLE eq HRMS*" >nul 2>&1
-    start /MIN "HRMS Server" python run.py
+    start /MIN "HRMS Server" python -m streamlit run app_minimal.py --server.port 3000 --server.address 0.0.0.0
     timeout /t 15 >nul
 )
 
