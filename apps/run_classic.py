@@ -35,9 +35,12 @@ def main():
     
     # Chạy ứng dụng Streamlit
     try:
+        # Đường dẫn đến file app_classic.py
+        app_path = Path(__file__).parent / "app_classic.py"
+
         # Sử dụng subprocess để chạy streamlit run
         cmd = [
-            sys.executable, "-m", "streamlit", "run", "app_classic.py",
+            sys.executable, "-m", "streamlit", "run", str(app_path),
             "--server.port", "3000",
             "--server.address", "0.0.0.0",
             "--browser.gatherUsageStats", "false"
