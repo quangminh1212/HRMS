@@ -43,6 +43,19 @@ def schedule_jobs():
                     send_alert("[HRMS] Nâng lương định kỳ", msg)
                 except Exception:
                     pass
+                # Xuất Excel và gửi email đính kèm
+                try:
+                    from pathlib import Path
+                    from .salary import export_due_to_excel
+                    from .mailer import send_email_with_attachment
+                    Path("exports").mkdir(exist_ok=True)
+                    q = ((end.month - 1)//3) + 1
+                    out = Path("exports") / f"nang_luong_quy_{end.year}_Q{q}.xlsx"
+                    export_due_to_excel(items, str(out), template_name=None, username="Scheduler")
+                    body = msg + f"\nĐính kèm file: {out.name}"
+                    send_email_with_attachment("[HRMS] Danh sách đến hạn nâng lương", body, [str(out)])
+                except Exception:
+                    pass
         finally:
             db.close()
 
