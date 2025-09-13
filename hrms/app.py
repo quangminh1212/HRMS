@@ -77,6 +77,10 @@ class MainWindow(QWidget):
         self.btn_report.clicked.connect(self.quick_report)
         self.btn_import = QPushButton("Import Excel nhân sự")
         self.btn_import.clicked.connect(self.import_excel)
+        self.btn_ins_add = QPushButton("Thêm sự kiện BHXH")
+        self.btn_ins_add.clicked.connect(self.add_insurance)
+        self.btn_ins_export = QPushButton("Xuất Excel BHXH")
+        self.btn_ins_export.clicked.connect(self.export_insurance)
         btn_layout.addWidget(self.btn_export)
         btn_layout.addWidget(self.btn_due)
         btn_layout.addWidget(self.btn_appointment)
@@ -84,6 +88,8 @@ class MainWindow(QWidget):
         btn_layout.addWidget(self.btn_export_work)
         btn_layout.addWidget(self.btn_report)
         btn_layout.addWidget(self.btn_import)
+        btn_layout.addWidget(self.btn_ins_add)
+        btn_layout.addWidget(self.btn_ins_export)
         layout.addWidget(QLabel("Tra cứu nhân sự"))
         layout.addWidget(self.search)
         layout.addWidget(self.list)
@@ -296,6 +302,42 @@ class MainWindow(QWidget):
         finally:
             if db:
                 db.close()
+
+    def add_insurance(self):
+        from PySide6.QtWidgets import QInputDialog
+        from datetime import date
+        from .insurance import add_insurance_event
+        db, person = self.current_person()
+        try:
+            if not person:
+                QMessageBox.information(self, "Chưa chọn", "Chọn một nhân sự trước")
+                return
+            etype, ok = QInputDialog.getText(self, "Loại sự kiện BHXH", "Nhập loại sự kiện:")
+            if not ok or not etype:
+                return
+            add_insurance_event(db, person, etype, date.today())
+            QMessageBox.information(self, "Thành công", "Đã thêm sự kiện BHXH")
+        except Exception as e:
+            QMessageBox.critical(self, "Lỗi", str(e))
+        finally:
+            if db:
+                db.close()
+
+    def export_insurance(self):
+        from datetime import date
+        from .insurance import export_insurance_to_excel
+        start = date(date.today().year, 1, 1)
+        end = date(date.today().year, 12, 31)
+        db = SessionLocal()
+        try:
+            Path("exports").mkdir(exist_ok=True)
+            file_path = Path("exports") / f"bhxh_{start.year}.xlsx"
+            export_insurance_to_excel(db, start, end, str(file_path))
+            QMessageBox.information(self, "Thành công", f"Đã xuất: {file_path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Lỗi", str(e))
+        finally:
+            db.close()
 
 
 def quarter_window(d):
