@@ -150,6 +150,13 @@ class AuditLog(Base):
     details = Column(String(500), nullable=True)
 
 
+class Setting(Base):
+    __tablename__ = "settings"
+    id = Column(Integer, primary_key=True)
+    key = Column(String(100), unique=True, nullable=False)
+    value = Column(String(1000), nullable=True)
+
+
 class Contract(Base):
     __tablename__ = "contracts"
     id = Column(Integer, primary_key=True)

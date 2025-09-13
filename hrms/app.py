@@ -76,11 +76,14 @@ class MainWindow(QWidget):
         self.btn_filter_refresh.clicked.connect(lambda: self.on_search(self.search.text()))
         self.btn_manage_users = QPushButton("Quản lý người dùng")
         self.btn_manage_users.clicked.connect(self.manage_users)
+        self.btn_settings = QPushButton("Cấu hình")
+        self.btn_settings.clicked.connect(self.open_settings)
         filter_bar.addWidget(self.filter_unit)
         filter_bar.addWidget(self.filter_position)
         filter_bar.addWidget(self.filter_status)
         filter_bar.addWidget(self.btn_filter_refresh)
         filter_bar.addWidget(self.btn_manage_users)
+        filter_bar.addWidget(self.btn_settings)
 
         self.search = QLineEdit()
         self.search.setPlaceholderText("Nhập tên cần tìm...")
@@ -218,6 +221,7 @@ class MainWindow(QWidget):
         self.btn_ins_add.setEnabled(is_admin)
         self.btn_ins_export.setEnabled(is_admin)
         self.btn_manage_users.setEnabled(is_admin)
+        self.btn_settings.setEnabled(is_admin)
         is_mgr = role in ('admin','hr','unit_manager')
         self.btn_work.setEnabled(is_mgr)
         self.btn_contract_add.setEnabled(is_mgr)
@@ -580,6 +584,40 @@ class MainWindow(QWidget):
         finally:
             if db:
                 db.close()
+
+    def open_settings(self):
+        # Trang cấu hình tối giản: SMTP và alert emails
+        role = (self.current_user.get('role') or '').lower()
+        if role not in ('admin','hr'):
+            QMessageBox.warning(self, "Không có quyền", "Chỉ admin/HR mới truy cập cấu hình")
+            return
+        from PySide6.QtWidgets import QDialog, QFormLayout
+        from .settings_service import get_setting, set_setting
+        dlg = QDialog(self); dlg.setWindowTitle("Cấu hình hệ thống")
+        f = QFormLayout(dlg)
+        smtp_host = QLineEdit(get_setting('SMTP_HOST','') or '')
+        smtp_port = QLineEdit(get_setting('SMTP_PORT','587') or '587')
+        smtp_user = QLineEdit(get_setting('SMTP_USER','') or '')
+        smtp_pass = QLineEdit(get_setting('SMTP_PASSWORD','') or ''); smtp_pass.setEchoMode(QLineEdit.Password)
+        alert_emails = QLineEdit(get_setting('ALERT_EMAILS','') or '')
+        f.addRow("SMTP_HOST", smtp_host)
+        f.addRow("SMTP_PORT", smtp_port)
+        f.addRow("SMTP_USER", smtp_user)
+        f.addRow("SMTP_PASSWORD", smtp_pass)
+        f.addRow("ALERT_EMAILS", alert_emails)
+        btn_ok = QPushButton("Lưu"); btn_cancel = QPushButton("Đóng")
+        row = QHBoxLayout(); row.addWidget(btn_ok); row.addWidget(btn_cancel)
+        f.addRow(row)
+        def save():
+            set_setting('SMTP_HOST', smtp_host.text())
+            set_setting('SMTP_PORT', smtp_port.text())
+            set_setting('SMTP_USER', smtp_user.text())
+            set_setting('SMTP_PASSWORD', smtp_pass.text())
+            set_setting('ALERT_EMAILS', alert_emails.text())
+            QMessageBox.information(dlg, "Đã lưu", "Lưu cấu hình thành công")
+        btn_ok.clicked.connect(save)
+        btn_cancel.clicked.connect(dlg.reject)
+        dlg.exec()
 
     def manage_users(self):
         # Chỉ admin/hr mới được
