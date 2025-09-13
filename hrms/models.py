@@ -172,6 +172,16 @@ class Setting(Base):
     value = Column(String(1000), nullable=True)
 
 
+class UnitEmailRecipient(Base):
+    __tablename__ = "unit_email_recipients"
+    id = Column(Integer, primary_key=True)
+    unit_id = Column(Integer, ForeignKey("units.id"), nullable=False)
+    email = Column(String(255), nullable=False)
+    active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    __table_args__ = (UniqueConstraint('unit_id', 'email', name='uq_unit_email'),)
+
+
 class Contract(Base):
     __tablename__ = "contracts"
     id = Column(Integer, primary_key=True)

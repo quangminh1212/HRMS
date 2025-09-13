@@ -61,12 +61,25 @@ def _shorten_recipients(recipients: List[str]) -> str:
 
 
 def get_recipients_for_unit(unit_name: str) -> List[str]:
-    """Đọc cấu hình UNIT_EMAILS và trả về danh sách email cho tên đơn vị.
-    Hỗ trợ 2 định dạng:
-    - JSON: {"Unit A": ["a@x", "b@y"], "Unit B": "c@z"}
-    - Dạng chuỗi: "Unit A=a@x,b@y; Unit B=c@z"
-    Khớp tên đơn vị không phân biệt hoa thường.
+    """Trả về danh sách email cho đơn vị.
+    Ưu tiên đọc từ DB (bảng unit_email_recipients, active=True), nếu không có thì fallback UNIT_EMAILS trong settings.
     """
+    try:
+        # Ưu tiên DB
+        from .db import SessionLocal
+        from .models import Unit, UnitEmailRecipient
+        s = SessionLocal()
+        try:
+            u = s.query(Unit).filter(Unit.name.ilike(unit_name)).first()
+            if u:
+                emails = [r.email.strip() for r in s.query(UnitEmailRecipient).filter(UnitEmailRecipient.unit_id == u.id, UnitEmailRecipient.active == True).all() if (r.email or '').strip()]
+                if emails:
+                    return emails
+        finally:
+            s.close()
+    except Exception:
+        pass
+    # Fallback settings
     try:
         if not _get_setting:
             return []

@@ -1323,8 +1323,8 @@ class MainWindow(QWidget):
         f.addRow("XLSX_FREEZE_COL:salary_due", freeze_salary_due)
         f.addRow("XLSX_FREEZE_COL:salary_history", freeze_salary_history)
         f.addRow("XLSX_FREEZE_COL:salary_histories", freeze_salary_histories)
-        btn_ok = QPushButton("Lưu"); btn_cancel = QPushButton("Đóng"); btn_unit_emails = QPushButton("Email theo đơn vị…")
-        row = QHBoxLayout(); row.addWidget(btn_ok); row.addWidget(btn_cancel); row.addWidget(btn_unit_emails)
+        btn_ok = QPushButton("Lưu"); btn_cancel = QPushButton("Đóng"); btn_unit_emails = QPushButton("Email theo đơn vị…"); btn_unit_emails_db = QPushButton("QL email theo đơn vị (DB)…")
+        row = QHBoxLayout(); row.addWidget(btn_ok); row.addWidget(btn_cancel); row.addWidget(btn_unit_emails); row.addWidget(btn_unit_emails_db)
         f.addRow(row)
 
         def save():
@@ -1411,9 +1411,90 @@ class MainWindow(QWidget):
             ub_cancel.clicked.connect(udlg.reject)
             udlg.exec()
 
+        def manage_unit_emails_db():
+            # CRUD đơn giản cho bảng unit_email_recipients
+            from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem, QPushButton, QLineEdit, QComboBox
+            md = QDialog(dlg); md.setWindowTitle("Quản lý email theo đơn vị (DB)")
+            lay = QVBoxLayout(md)
+            top = QHBoxLayout();
+            unit_box = QComboBox();
+            from .db import SessionLocal as _SL
+            from .models import Unit, UnitEmailRecipient
+            s = _SL(); units = s.query(Unit).order_by(Unit.name).all(); s.close()
+            unit_map = {}
+            unit_box.addItem("-- Chọn đơn vị --", None)
+            for u in units:
+                unit_box.addItem(u.name, u.id); unit_map[u.id] = u.name
+            btn_load = QPushButton("Tải"); btn_add = QPushButton("Thêm"); btn_del = QPushButton("Xoá"); btn_toggle = QPushButton("Bật/Tắt")
+            top.addWidget(unit_box); top.addWidget(btn_load); top.addWidget(btn_add); top.addWidget(btn_del); top.addWidget(btn_toggle)
+            lay.addLayout(top)
+            table = QTableWidget(0, 3); table.setHorizontalHeaderLabels(["Email", "Active", "Created"])
+            lay.addWidget(table)
+            email_edit = QLineEdit(); lay.addWidget(email_edit)
+            def load_rows():
+                table.setRowCount(0)
+                uid = unit_box.currentData();
+                if not uid:
+                    return
+                s2 = _SL()
+                try:
+                    rows = s2.query(UnitEmailRecipient).filter(UnitEmailRecipient.unit_id==uid).order_by(UnitEmailRecipient.created_at.desc()).all()
+                    for r in rows:
+                        i = table.rowCount(); table.insertRow(i)
+                        table.setItem(i, 0, QTableWidgetItem(r.email or ''))
+                        table.setItem(i, 1, QTableWidgetItem('1' if r.active else '0'))
+                        table.setItem(i, 2, QTableWidgetItem(str(r.created_at)))
+                finally:
+                    s2.close()
+            def do_add():
+                uid = unit_box.currentData();
+                em = (email_edit.text() or '').strip()
+                if not uid or not em:
+                    return
+                s2 = _SL();
+                try:
+                    s2.add(UnitEmailRecipient(unit_id=uid, email=em, active=True)); s2.commit()
+                except Exception as ex:
+                    s2.rollback(); QMessageBox.critical(md, "Lỗi", str(ex))
+                finally:
+                    s2.close(); load_rows()
+            def do_del():
+                uid = unit_box.currentData();
+                row = table.currentRow()
+                if not uid or row < 0:
+                    return
+                em = table.item(row,0).text() if table.item(row,0) else ''
+                s2 = _SL();
+                try:
+                    s2.query(UnitEmailRecipient).filter(UnitEmailRecipient.unit_id==uid, UnitEmailRecipient.email==em).delete(); s2.commit()
+                except Exception as ex:
+                    s2.rollback(); QMessageBox.critical(md, "Lỗi", str(ex))
+                finally:
+                    s2.close(); load_rows()
+            def do_toggle():
+                uid = unit_box.currentData();
+                row = table.currentRow()
+                if not uid or row < 0:
+                    return
+                em = table.item(row,0).text() if table.item(row,0) else ''
+                s2 = _SL();
+                try:
+                    rec = s2.query(UnitEmailRecipient).filter(UnitEmailRecipient.unit_id==uid, UnitEmailRecipient.email==em).first()
+                    if rec:
+                        rec.active = not bool(rec.active); s2.commit()
+                except Exception as ex:
+                    s2.rollback(); QMessageBox.critical(md, "Lỗi", str(ex))
+                finally:
+                    s2.close(); load_rows()
+            btn_load.clicked.connect(load_rows); btn_add.clicked.connect(do_add); btn_del.clicked.connect(do_del); btn_toggle.clicked.connect(do_toggle)
+            md.resize(700, 500); md.exec()
         btn_ok.clicked.connect(save)
         btn_cancel.clicked.connect(dlg.reject)
         btn_unit_emails.clicked.connect(edit_unit_emails)
+        try:
+            btn_unit_emails_db.clicked.connect(manage_unit_emails_db)
+        except Exception:
+            pass
         dlg.exec()
 
     def open_email_history(self):
