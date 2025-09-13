@@ -178,3 +178,41 @@ def export_due_to_excel(items: List[Dict[str, Any]], file_path: str) -> None:
             it.get("due_date", ""),
         ])
     wb.save(file_path)
+
+
+def export_salary_history_for_person(db: Session, person: Person, file_path: str) -> None:
+    """Xuất toàn bộ lịch sử lương của một nhân sự ra Excel."""
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Salary history"
+    headers = ["Mã NV", "Họ tên", "Ngày hiệu lực", "Ngạch", "Bậc", "Hệ số", "Ghi chú"]
+    ws.append(headers)
+
+    hists = (
+        db.query(SalaryHistory)
+        .filter(SalaryHistory.person_id == person.id)
+        .order_by(SalaryHistory.effective_date.asc())
+        .all()
+    )
+
+    # Tránh N+1: cache rank code theo id nếu cần
+    rank_code_cache: Dict[int, str] = {}
+
+    for h in hists:
+        rid = h.rank_id
+        if rid not in rank_code_cache:
+            r = db.get(SalaryRank, rid)
+            rank_code_cache[rid] = (r.code if r else "")
+        ws.append([
+            person.code or "",
+            person.full_name or "",
+            h.effective_date,
+            rank_code_cache.get(rid, ""),
+            h.step,
+            h.coefficient,
+            h.note or "",
+        ])
+
+    wb.save(file_path)

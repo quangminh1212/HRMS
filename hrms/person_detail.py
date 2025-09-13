@@ -1,5 +1,6 @@
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QTabWidget, QListWidget, QPushButton
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QTabWidget, QListWidget, QPushButton, QMessageBox
 from PySide6.QtCore import Qt
+from pathlib import Path
 
 from .db import SessionLocal
 from .models import Person, SalaryHistory, WorkProcess, Planning, Contract, InsuranceEvent, SalaryRank
@@ -13,6 +14,10 @@ class PersonDetailDialog(QDialog):
         layout = QVBoxLayout(self)
         self.tabs = QTabWidget()
         layout.addWidget(self.tabs)
+        self.btn_export_salary = QPushButton("Xuất lương (Excel)")
+        self.btn_export_salary.clicked.connect(self.export_salary_history)
+        layout.addWidget(self.btn_export_salary, alignment=Qt.AlignRight)
+
         self.btn_close = QPushButton("Đóng")
         self.btn_close.clicked.connect(self.accept)
         layout.addWidget(self.btn_close, alignment=Qt.AlignRight)
@@ -70,5 +75,30 @@ class PersonDetailDialog(QDialog):
             for i in ins:
                 ins_list.addItem(f"{i.event_date}: {i.event_type} ({i.details or ''})")
             self.tabs.addTab(ins_list, "BHXH")
+        finally:
+            db.close()
+
+    def export_salary_history(self):
+        from .salary import export_salary_history_for_person
+        from .audit import log_action
+        db = SessionLocal()
+        try:
+            p = db.get(Person, self.person_id)
+            if not p:
+                QMessageBox.critical(self, "Lỗi", "Không tìm thấy nhân sự")
+                return
+            Path("exports").mkdir(exist_ok=True)
+            out = Path("exports") / f"salary_history_{p.code}.xlsx"
+            export_salary_history_for_person(db, p, str(out))
+            # Audit
+            try:
+                current_user = getattr(self.parent(), 'current_user', {}) if self.parent() else {}
+                uid = current_user.get('id') if isinstance(current_user, dict) else None
+                log_action(db, uid, 'export_salary_history', 'Person', p.id, f"file={out}")
+            except Exception:
+                pass
+            QMessageBox.information(self, "Thành công", f"Đã xuất: {out}")
+        except Exception as e:
+            QMessageBox.critical(self, "Lỗi", str(e))
         finally:
             db.close()

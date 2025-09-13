@@ -3,7 +3,7 @@ from datetime import date
 
 from hrms.db import SessionLocal
 from hrms.models import Person, SalaryRank, SalaryStep, SalaryHistory
-from hrms.salary import compute_next_for_person
+from hrms.salary import compute_next_for_person, export_salary_history_for_person
 from hrms.init_db import init_db
 from hrms.seed import seed_basic_data
 
@@ -35,5 +35,17 @@ def test_compute_next_for_person_over_limit():
         assert info is not None
         assert info["type"] == "over_limit"
         assert info["allowance_percent"] >= 5
+    finally:
+        db.close()
+
+
+def test_export_salary_history(tmp_path):
+    db = SessionLocal()
+    try:
+        p = db.query(Person).filter_by(code="NV001").first()
+        out = tmp_path / f"salary_history_{p.code}.xlsx"
+        export_salary_history_for_person(db, p, str(out))
+        assert out.exists()
+        assert out.stat().st_size > 0
     finally:
         db.close()
