@@ -1,6 +1,8 @@
 from email.message import EmailMessage
 import smtplib
 from typing import List
+import zipfile
+import os
 
 from .config import load_settings
 try:
@@ -74,6 +76,21 @@ def send_email_with_attachment(subject: str, body: str, attachments: List[str], 
             if settings.smtp_user and settings.smtp_password:
                 server.login(settings.smtp_user, settings.smtp_password)
             server.send_message(msg)
+        return True
+    except Exception:
+        return False
+
+
+def create_zip(files: list[str], out_zip: str) -> bool:
+    try:
+        with zipfile.ZipFile(out_zip, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
+            for f in files:
+                try:
+                    if not f or not os.path.exists(f):
+                        continue
+                    zf.write(f, arcname=os.path.basename(f))
+                except Exception:
+                    continue
         return True
     except Exception:
         return False
