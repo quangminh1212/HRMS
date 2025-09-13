@@ -117,7 +117,8 @@ class MainWindow(QWidget):
         self.btn_letter_salary_person.clicked.connect(self.export_salary_letters)
         self.btn_pdf_toggle = QComboBox(); self.btn_pdf_toggle.addItems(["DOCX","PDF"])  # chế độ xuất
         # Template Excel chooser
-        self.excel_template_box = QComboBox(); self.load_excel_templates()
+        self.excel_template_box = QComboBox(); self.load_excel_templates(); self.load_default_excel_template()
+        self.btn_save_tpl = QPushButton("Lưu mặc định"); self.btn_save_tpl.clicked.connect(self.save_default_excel_template)
         self.btn_import = QPushButton("Import Excel nhân sự")
         self.btn_import.clicked.connect(self.import_excel)
         self.btn_ins_add = QPushButton("Thêm sự kiện BHXH")
@@ -144,6 +145,7 @@ class MainWindow(QWidget):
         btn_layout.addWidget(self.btn_letter_salary_person)
         btn_layout.addWidget(self.btn_pdf_toggle)
         btn_layout.addWidget(self.excel_template_box)
+        btn_layout.addWidget(self.btn_save_tpl)
         btn_layout.addWidget(self.btn_import)
         btn_layout.addWidget(self.btn_ins_add)
         btn_layout.addWidget(self.btn_ins_export)
@@ -240,6 +242,40 @@ class MainWindow(QWidget):
             # Bỏ qua lỗi nạp template
             self.excel_template_box.clear()
             self.excel_template_box.addItem("(Mặc định)", None)
+
+    def load_default_excel_template(self) -> None:
+        # Nạp template mặc định đã lưu theo user hiện tại
+        try:
+            from .settings_service import get_setting
+            username = (self.current_user.get('username') or '').strip()
+            if not username:
+                return
+            key = f"DEFAULT_XLSX_TEMPLATE:{username}"
+            val = get_setting(key, None)
+            if not val:
+                return
+            # Tìm item có data == val
+            for i in range(self.excel_template_box.count()):
+                if self.excel_template_box.itemData(i) == val:
+                    self.excel_template_box.setCurrentIndex(i)
+                    break
+        except Exception:
+            pass
+
+    def save_default_excel_template(self) -> None:
+        # Lưu template hiện chọn làm mặc định cho user
+        try:
+            from .settings_service import set_setting
+            tpl = self.get_selected_excel_template()
+            username = (self.current_user.get('username') or '').strip()
+            if not username:
+                QMessageBox.warning(self, "Lỗi", "Không xác định được người dùng")
+                return
+            key = f"DEFAULT_XLSX_TEMPLATE:{username}"
+            set_setting(key, tpl or '')
+            QMessageBox.information(self, "Đã lưu", "Đã lưu template Excel mặc định")
+        except Exception as e:
+            QMessageBox.critical(self, "Lỗi", str(e))
 
     def load_filters(self):
         db = SessionLocal()
