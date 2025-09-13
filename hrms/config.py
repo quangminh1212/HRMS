@@ -10,6 +10,7 @@ class Settings(BaseModel):
     smtp_port: int | None = None
     smtp_user: str | None = None
     smtp_password: str | None = None
+    alert_emails: list[str] | None = None
 
 
 def load_settings() -> Settings:
@@ -20,6 +21,9 @@ def load_settings() -> Settings:
         load_dotenv(dotenv_path=env_path)
     # Allow DATABASE_URL override for PostgreSQL in prod
     db_url = os.getenv("DATABASE_URL") or os.getenv("DB_URL") or Settings().db_url
+    # parse alert emails
+    emails_raw = os.getenv("ALERT_EMAILS", "").strip()
+    emails = [e.strip() for e in emails_raw.split(",") if e.strip()] or None
     return Settings(
         app_name=os.getenv("APP_NAME", "HRMS"),
         db_url=db_url,
@@ -28,4 +32,5 @@ def load_settings() -> Settings:
         smtp_port=int(os.getenv("SMTP_PORT", "0")) or None,
         smtp_user=os.getenv("SMTP_USER"),
         smtp_password=os.getenv("SMTP_PASSWORD"),
+        alert_emails=emails,
     )

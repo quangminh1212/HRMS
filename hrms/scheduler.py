@@ -8,6 +8,7 @@ from .db import SessionLocal
 from .models import Person
 from .salary import list_due_in_window
 from .retirement import calculate_retirement_date
+from .mailer import send_alert
 
 # Hàng đợi thông báo để UI lấy và hiển thị popup
 NOTIFY_QUEUE: Queue[tuple[str, str]] = Queue()
@@ -36,7 +37,12 @@ def schedule_jobs():
         try:
             items = list_due_in_window(db, start, end)
             if items:
-                notify("Nâng lương định kỳ", f"Có {len(items)} nhân sự đến hạn trong quý này")
+                msg = f"Có {len(items)} nhân sự đến hạn trong quý này"
+                notify("Nâng lương định kỳ", msg)
+                try:
+                    send_alert("[HRMS] Nâng lương định kỳ", msg)
+                except Exception:
+                    pass
         finally:
             db.close()
 
@@ -58,9 +64,19 @@ def schedule_jobs():
                 if rd == three:
                     due3 += 1
             if due6:
-                notify("Nghỉ hưu (6 tháng)", f"Có {due6} nhân sự sắp nghỉ hưu sau 6 tháng")
+                msg = f"Có {due6} nhân sự sắp nghỉ hưu sau 6 tháng"
+                notify("Nghỉ hưu (6 tháng)", msg)
+                try:
+                    send_alert("[HRMS] Nghỉ hưu (6 tháng)", msg)
+                except Exception:
+                    pass
             if due3:
-                notify("Nghỉ hưu (3 tháng)", f"Có {due3} nhân sự sắp nghỉ hưu sau 3 tháng")
+                msg = f"Có {due3} nhân sự sắp nghỉ hưu sau 3 tháng"
+                notify("Nghỉ hưu (3 tháng)", msg)
+                try:
+                    send_alert("[HRMS] Nghỉ hưu (3 tháng)", msg)
+                except Exception:
+                    pass
         finally:
             db.close()
 
