@@ -17,6 +17,7 @@ from .salary import list_due_in_window, export_due_to_excel
 from .audit import log_action
 from .scheduler import NOTIFY_QUEUE
 from .templates import render_docx_template
+from .ui_forms import prompt_context
 
 
 class LoginWindow(QWidget):
@@ -433,16 +434,31 @@ class MainWindow(QWidget):
         from datetime import date
         from .docx_exports import export_salary_review_cover
         q = (date.today().month - 1)//3 + 1
-        ctx = {
+        defaults = {
             'org_name': 'Cơ quan ABC',
             'quarter': str(q),
             'year': str(date.today().year),
             'date': date.today().isoformat(),
         }
+        # Hỏi người dùng thông tin văn bản
+        form_fields = [
+            {'name': 'org_name', 'label': 'Đơn vị/Cơ quan', 'type': 'text', 'default': defaults['org_name']},
+            {'name': 'quarter', 'label': 'Quý', 'type': 'select', 'default': defaults['quarter'], 'options': ['1','2','3','4']},
+            {'name': 'year', 'label': 'Năm', 'type': 'text', 'default': defaults['year']},
+            {'name': 'date', 'label': 'Ngày văn bản', 'type': 'date', 'default': defaults['date']},
+        ]
+        ctx = prompt_context(self, 'Thông tin công văn rà soát', form_fields)
+        if not ctx:
+            QMessageBox.information(self, "Đã hủy", "Đã hủy xuất công văn")
+            return
         Path('exports').mkdir(exist_ok=True)
         out = Path('exports')/f"cong_van_ra_soat_quy_{ctx['year']}_Q{ctx['quarter']}.docx"
         try:
             export_salary_review_cover(ctx, str(out))
+            try:
+                log_action(SessionLocal(), self.current_user.get('id'), 'export_salary_cover', 'Letter', None, f"file={out}")
+            except Exception:
+                pass
             QMessageBox.information(self, "Thành công", f"Đã xuất: {out}")
         except Exception as e:
             QMessageBox.critical(self, "Lỗi", str(e))
@@ -456,17 +472,32 @@ class MainWindow(QWidget):
             if not person:
                 QMessageBox.information(self, "Chưa chọn", "Chọn một nhân sự trước")
                 return
-            ctx = {
+            default_retire = (person.dob.replace(year=person.dob.year + (60 if (person.gender or 'Nam').lower().startswith('n') else 55)).isoformat() if person.dob else '')
+            defaults = {
                 'full_name': person.full_name or '',
                 'code': person.code or '',
-                'retirement_date': (person.dob.replace(year=person.dob.year + (60 if (person.gender or 'Nam').lower().startswith('n') else 55)).isoformat() if person.dob else ''),
+                'retirement_date': default_retire,
                 'date': date.today().isoformat(),
             }
+            fields = [
+                {'name': 'full_name', 'label': 'Họ và tên', 'type': 'text', 'default': defaults['full_name']},
+                {'name': 'code', 'label': 'Mã nhân sự', 'type': 'text', 'default': defaults['code']},
+                {'name': 'retirement_date', 'label': 'Ngày nghỉ hưu', 'type': 'date', 'default': defaults['retirement_date']},
+                {'name': 'date', 'label': 'Ngày văn bản', 'type': 'date', 'default': defaults['date']},
+            ]
+            ctx = prompt_context(self, 'Thông tin văn bản nghỉ hưu', fields)
+            if not ctx:
+                QMessageBox.information(self, "Đã hủy", "Đã hủy xuất văn bản")
+                return
             Path('exports').mkdir(exist_ok=True)
             out1 = Path('exports')/f"thong_bao_nghi_huu_{person.code}.docx"
             out2 = Path('exports')/f"quyet_dinh_nghi_huu_{person.code}.docx"
             export_retirement_notification(ctx, str(out1))
             export_retirement_decision(ctx, str(out2))
+            try:
+                log_action(SessionLocal(), self.current_user.get('id'), 'export_retirement_letters', 'Letter', person.id, f"files={out1},{out2}")
+            except Exception:
+                pass
             QMessageBox.information(self, "Thành công", f"Đã xuất: {out1}\n{out2}")
         except Exception as e:
             QMessageBox.critical(self, "Lỗi", str(e))
@@ -491,7 +522,7 @@ class MainWindow(QWidget):
             effective = info.get('due_date')
             step = info.get('next_step') if info.get('type') == 'step' else ''
             coef = info.get('next_coef') if info.get('type') == 'step' else f"{info.get('allowance_percent','')}%"
-            ctx = {
+            defaults = {
                 'full_name': person.full_name or '',
                 'code': person.code or '',
                 'unit': person.unit.name if person.unit else '',
@@ -499,11 +530,27 @@ class MainWindow(QWidget):
                 'step': str(step) if step != '' else '',
                 'coefficient': str(coef) if coef is not None else '',
             }
+            fields = [
+                {'name': 'full_name', 'label': 'Họ và tên', 'type': 'text', 'default': defaults['full_name']},
+                {'name': 'code', 'label': 'Mã nhân sự', 'type': 'text', 'default': defaults['code']},
+                {'name': 'unit', 'label': 'Đơn vị', 'type': 'text', 'default': defaults['unit']},
+                {'name': 'effective_date', 'label': 'Ngày hiệu lực', 'type': 'date', 'default': defaults['effective_date']},
+                {'name': 'step', 'label': 'Bậc', 'type': 'text', 'default': defaults['step']},
+                {'name': 'coefficient', 'label': 'Hệ số/% vượt khung', 'type': 'text', 'default': defaults['coefficient']},
+            ]
+            ctx = prompt_context(self, 'Thông tin văn bản nâng lương', fields)
+            if not ctx:
+                QMessageBox.information(self, "Đã hủy", "Đã hủy xuất văn bản")
+                return
             Path('exports').mkdir(exist_ok=True)
             out1 = Path('exports')/f"thong_bao_nang_luong_{person.code}.docx"
             out2 = Path('exports')/f"quyet_dinh_nang_luong_{person.code}.docx"
             export_salary_notification(ctx, str(out1))
             export_salary_decision(ctx, str(out2))
+            try:
+                log_action(SessionLocal(), self.current_user.get('id'), 'export_salary_letters', 'Letter', person.id, f"files={out1},{out2}")
+            except Exception:
+                pass
             QMessageBox.information(self, "Thành công", f"Đã xuất: {out1}\n{out2}")
         except Exception as e:
             QMessageBox.critical(self, "Lỗi", str(e))
