@@ -73,11 +73,17 @@ class MainWindow(QWidget):
         self.btn_work.clicked.connect(self.add_work_process)
         self.btn_export_work = QPushButton("Xuất quá trình công tác")
         self.btn_export_work.clicked.connect(self.export_work_process)
+        self.btn_report = QPushButton("Báo cáo nhanh")
+        self.btn_report.clicked.connect(self.quick_report)
+        self.btn_import = QPushButton("Import Excel nhân sự")
+        self.btn_import.clicked.connect(self.import_excel)
         btn_layout.addWidget(self.btn_export)
         btn_layout.addWidget(self.btn_due)
         btn_layout.addWidget(self.btn_appointment)
         btn_layout.addWidget(self.btn_work)
         btn_layout.addWidget(self.btn_export_work)
+        btn_layout.addWidget(self.btn_report)
+        btn_layout.addWidget(self.btn_import)
         layout.addWidget(QLabel("Tra cứu nhân sự"))
         layout.addWidget(self.search)
         layout.addWidget(self.list)
@@ -247,6 +253,44 @@ class MainWindow(QWidget):
                 row[2].text = w.position or ""
             doc.save(str(file_path))
             QMessageBox.information(self, "Thành công", f"Đã xuất: {file_path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Lỗi", str(e))
+        finally:
+            if db:
+                db.close()
+
+    def quick_report(self):
+        from datetime import date
+        from .reporting import compute_annual_summary, compute_demographics, export_report_to_excel
+        year = date.today().year
+        db = SessionLocal()
+        try:
+            summary = compute_annual_summary(db, year)
+            demo = compute_demographics(db, date.today())
+            Path("exports").mkdir(exist_ok=True)
+            file_path = Path("exports") / f"bao_cao_nhanh_{year}.xlsx"
+            export_report_to_excel(summary, demo, str(file_path))
+            QMessageBox.information(self, "Thành công", f"Đã xuất: {file_path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Lỗi", str(e))
+        finally:
+            if db:
+                db.close()
+
+    def import_excel(self):
+        from PySide6.QtWidgets import QFileDialog
+        from .importer import import_persons_from_excel
+        db = SessionLocal()
+        try:
+            xlsx_path, _ = QFileDialog.getOpenFileName(self, "Chọn file Excel", "", "Excel Files (*.xlsx)")
+            if not xlsx_path:
+                return
+            result = import_persons_from_excel(db, xlsx_path)
+            if not result.get("ok"):
+                QMessageBox.critical(self, "Import lỗi", result.get("error", "Lỗi không rõ"))
+                return
+            QMessageBox.information(self, "Import thành công", f"Tạo mới: {result['created']}, Cập nhật: {result['updated']}")
+            self.refresh()
         except Exception as e:
             QMessageBox.critical(self, "Lỗi", str(e))
         finally:
