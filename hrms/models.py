@@ -188,3 +188,14 @@ class JobPositionRequirement(Base):
     required_qlnn = Column(String(100), nullable=True)
     min_years_experience = Column(Integer, nullable=True)
     __table_args__ = (UniqueConstraint('position_name', name='uq_position_req'),)
+
+
+class Appointment(Base):
+    __tablename__ = "appointments"
+    id = Column(Integer, primary_key=True)
+    person_id = Column(Integer, ForeignKey("persons.id"), nullable=False)
+    position_name = Column(String(255), nullable=False)
+    start_date = Column(Date, nullable=False)
+    term_months = Column(Integer, nullable=True)  # thời hạn bổ nhiệm (nếu có)
+    reappointment_due_date = Column(Date, nullable=True)
+    note = Column(String(255), nullable=True)
