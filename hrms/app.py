@@ -94,6 +94,22 @@ class MainWindow(QWidget):
         self.search.setPlaceholderText("Nhập tên cần tìm...")
         self.search.textChanged.connect(self.on_search)
         self.list = QListWidget()
+        # Phân trang
+        pager_layout = QHBoxLayout()
+        self.page_size_box = QComboBox(); self.page_size_box.addItems(["50","100","200"]); self.page_size_box.setCurrentText("50")
+        self.btn_prev = QPushButton("◀ Trước")
+        self.btn_next = QPushButton("Sau ▶")
+        self.page_label = QLabel("Trang 1/1")
+        pager_layout.addWidget(QLabel("Kích thước trang"))
+        pager_layout.addWidget(self.page_size_box)
+        pager_layout.addWidget(self.btn_prev)
+        pager_layout.addWidget(self.btn_next)
+        pager_layout.addWidget(self.page_label)
+        self.current_page = 0
+        self.total_count = 0
+        self.btn_prev.clicked.connect(self.go_prev_page)
+        self.btn_next.clicked.connect(self.go_next_page)
+        self.page_size_box.currentTextChanged.connect(lambda _: self.reset_to_first_page())
         btn_layout = QHBoxLayout()
         self.btn_export = QPushButton("Xuất trích ngang")
         self.btn_export.clicked.connect(self.export_selected)
@@ -162,6 +178,7 @@ class MainWindow(QWidget):
         layout.addWidget(QLabel("Tra cứu nhân sự"))
         layout.addWidget(self.search)
         layout.addWidget(self.list)
+        layout.addLayout(pager_layout)
         layout.addLayout(btn_layout)
         self.setLayout(layout)
         self.setLayout(layout)
@@ -182,6 +199,22 @@ class MainWindow(QWidget):
 
     def refresh(self):
         self.on_search("")
+
+    def reset_to_first_page(self):
+        self.current_page = 0
+        self.on_search(self.search.text())
+
+    def go_prev_page(self):
+        if self.current_page > 0:
+            self.current_page -= 1
+            self.on_search(self.search.text())
+
+    def go_next_page(self):
+        page_size = int(self.page_size_box.currentText()) if self.page_size_box.currentText().isdigit() else 50
+        max_page = max(0, (self.total_count - 1) // page_size)
+        if self.current_page < max_page:
+            self.current_page += 1
+            self.on_search(self.search.text())
 
     def on_search(self, text: str):
         db = SessionLocal()
@@ -224,10 +257,24 @@ class MainWindow(QWidget):
             st = self.filter_status.currentText()
             if st and not st.startswith("--"):
                 q = q.filter(Person.status.ilike(f"%{st}%"))
-            people = q.order_by(Person.full_name).all()
+            # Đếm tổng số kết quả trước khi phân trang
+            self.total_count = q.count()
+            page_size = int(self.page_size_box.currentText()) if self.page_size_box.currentText().isdigit() else 50
+            offset = self.current_page * page_size
+            # Nếu offset vượt quá tổng, đưa về trang cuối
+            if offset >= max(0, self.total_count):
+                self.current_page = max(0, (self.total_count - 1) // page_size) if self.total_count > 0 else 0
+                offset = self.current_page * page_size
+            people = q.order_by(Person.full_name).limit(page_size).offset(offset).all()
+            # Cập nhật danh sách
             self.list.clear()
             for p in people:
                 self.list.addItem(f"{p.full_name} - {p.code}")
+            # Cập nhật pager label và nút
+            total_pages = max(1, (self.total_count - 1) // page_size + 1) if self.total_count > 0 else 1
+            self.page_label.setText(f"Trang {self.current_page+1}/{total_pages} ({self.total_count} kết quả)")
+            self.btn_prev.setEnabled(self.current_page > 0)
+            self.btn_next.setEnabled(self.current_page < total_pages - 1)
         except Exception as e:
             QMessageBox.critical(self, "Lỗi", str(e))
         finally:
