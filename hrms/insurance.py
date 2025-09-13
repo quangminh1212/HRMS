@@ -15,16 +15,22 @@ def add_insurance_event(db: Session, person: Person, event_type: str, event_date
 
 
 def export_insurance_to_excel(db: Session, start_date: date, end_date: date, path: str) -> None:
-    from openpyxl import Workbook
+    from .excel_utils import prepare_workbook_with_template, style_header, auto_filter_and_width, set_date_format
 
     q = db.query(InsuranceEvent).filter(InsuranceEvent.event_date >= start_date, InsuranceEvent.event_date <= end_date)
     rows = q.all()
 
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "BHXH"
-    ws.append(["Mã NV", "Họ tên", "Loại sự kiện", "Ngày", "Ghi chú"])
+    headers = ["Mã NV", "Họ tên", "Loại sự kiện", "Ngày", "Ghi chú"]
+    wb, ws = prepare_workbook_with_template(template_name='bhxh.xlsx', title='BHXH', headers=headers)
+
+    # Ghi dữ liệu
     for r in rows:
         p = db.get(Person, r.person_id)
         ws.append([p.code if p else "", p.full_name if p else "", r.event_type, r.event_date, r.details or ""])
+
+    # Định dạng chung
+    style_header(ws, header_row=1)
+    set_date_format(ws, date_columns=[4], start_row=2)
+    auto_filter_and_width(ws, header_row=1)
+
     wb.save(path)

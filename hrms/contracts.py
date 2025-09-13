@@ -15,12 +15,17 @@ def add_contract(db: Session, person: Person, contract_type: str, start_date: da
 
 
 def export_contracts_for_person(db: Session, person: Person, path: str) -> None:
-    from openpyxl import Workbook
+    from .excel_utils import prepare_workbook_with_template, style_header, auto_filter_and_width, set_date_format
     rows = db.query(Contract).filter(Contract.person_id == person.id).order_by(Contract.start_date).all()
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Hop dong"
-    ws.append(["Loại HĐ", "Từ ngày", "Đến ngày", "Ghi chú"])
+
+    headers = ["Loại HĐ", "Từ ngày", "Đến ngày", "Ghi chú"]
+    wb, ws = prepare_workbook_with_template(template_name='contracts.xlsx', title='Hop dong', headers=headers)
+
     for r in rows:
         ws.append([r.contract_type, r.start_date, r.end_date, r.note or ""])
+
+    style_header(ws, header_row=1)
+    set_date_format(ws, date_columns=[2,3], start_row=2)
+    auto_filter_and_width(ws, header_row=1)
+
     wb.save(path)

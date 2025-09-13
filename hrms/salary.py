@@ -153,16 +153,14 @@ def list_due_in_window(
 
 
 def export_due_to_excel(items: List[Dict[str, Any]], file_path: str) -> None:
-    from openpyxl import Workbook
+    from .excel_utils import prepare_workbook_with_template, style_header, auto_filter_and_width, set_date_format
 
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Nang luong"
     headers = [
         "Họ tên", "Đơn vị", "Chức vụ", "Loại", "Bậc hiện tại", "Hệ số hiện tại",
         "Bậc dự kiến", "Hệ số dự kiến", "% vượt khung", "Ngày hiệu lực gần nhất", "Ngày dự kiến",
     ]
-    ws.append(headers)
+    wb, ws = prepare_workbook_with_template(template_name='salary_due.xlsx', title='Nang luong', headers=headers)
+
     for it in items:
         ws.append([
             it.get("full_name", ""),
@@ -177,6 +175,12 @@ def export_due_to_excel(items: List[Dict[str, Any]], file_path: str) -> None:
             it.get("last_effective", ""),
             it.get("due_date", ""),
         ])
+
+    style_header(ws, header_row=1)
+    # Cột 10-11 là ngày
+    set_date_format(ws, date_columns=[10,11], start_row=2)
+    auto_filter_and_width(ws, header_row=1)
+
     wb.save(file_path)
 
 
