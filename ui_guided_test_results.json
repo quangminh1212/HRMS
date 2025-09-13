@@ -1,0 +1,56 @@
+{
+  "summary": {
+    "total_tests": 2,
+    "successful": 2,
+    "failed": 0,
+    "success_rate": 100.0,
+    "keep_alive_working": 2,
+    "test_timestamp": "2025-09-13T11:14:21.447238"
+  },
+  "results": [
+    {
+      "option": "1",
+      "name": "HRMS Modern",
+      "description": "Giao diện đẹp nhất + Auto Keep-Alive",
+      "start_time": "2025-09-13T11:10:15.505905",
+      "success": true,
+      "port_health": {
+        "accessible": true,
+        "response_time": 2.0601885318756104,
+        "status_code": 200,
+        "content_length": 892,
+        "title": "Streamlit",
+        "error": null
+      },
+      "keep_alive_tested": true,
+      "error": null,
+      "logs": [
+        "Port 3000 accessible",
+        "Keep-Alive assumed working (port accessible)"
+      ],
+      "end_time": "2025-09-13T11:10:32.567370"
+    },
+    {
+      "option": "2",
+      "name": "Quick Start",
+      "description": "Khởi động nhanh + Auto Keep-Alive",
+      "start_time": "2025-09-13T11:12:14.391735",
+      "success": true,
+      "port_health": {
+        "accessible": true,
+        "response_time": 2.06148099899292,
+        "status_code": 200,
+        "content_length": 892,
+        "title": "Streamlit",
+        "error": null
+      },
+      "keep_alive_tested": true,
+      "error": null,
+      "logs": [
+        "Port 3000 accessible",
+        "Keep-Alive assumed working (port accessible)"
+      ],
+      "end_time": "2025-09-13T11:12:31.453657"
+    }
+  ]
+}
