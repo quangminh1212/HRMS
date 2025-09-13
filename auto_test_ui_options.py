@@ -13,12 +13,8 @@ from pathlib import Path
 from typing import Dict, List, Any
 from datetime import datetime
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+# Simple logging
+logging.basicConfig(level=logging.WARNING)
 
 
 class AutoUITester:

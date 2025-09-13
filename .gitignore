@@ -71,4 +71,9 @@ htmlcov/
 # Distribution / packaging
 build/
 dist/
-*.egg-info/
+*.egg-info/# Log files
+*.log
+logs/
+test_screenshots/
+exports/
+temp_*.bat

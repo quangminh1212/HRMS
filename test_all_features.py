@@ -28,11 +28,8 @@ from pathlib import Path
 from datetime import datetime, date
 from typing import Dict, Any, List
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# Simple logging
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
@@ -56,10 +53,9 @@ class HRMSFeatureTester:
             
             # Initialize database
             init_enhanced_database()
-            logger.info("✅ Test environment setup completed")
             return True
         except Exception as e:
-            logger.error(f"❌ Test environment setup failed: {e}")
+            print(f"Setup failed: {e}")
             return False
     
     def test_database_connection(self) -> bool:
@@ -80,13 +76,10 @@ class HRMSFeatureTester:
                     missing_tables.append(table)
 
             if missing_tables:
-                logger.error(f"❌ Missing tables: {missing_tables}")
                 return False
 
-            logger.info("✅ Database connection and tables verified")
             return True
         except Exception as e:
-            logger.error(f"❌ Database test failed: {e}")
             return False
     
     def test_user_authentication(self) -> bool:
@@ -313,29 +306,20 @@ class HRMSFeatureTester:
         total = len(tests)
         
         for test_name, test_func in tests:
-            logger.info(f"Running {test_name} test...")
             try:
                 result = test_func()
                 results[test_name] = result
                 if result:
                     passed += 1
-                    logger.info(f"✅ {test_name} test PASSED")
+                    print(f"✅ {test_name}")
                 else:
-                    logger.error(f"❌ {test_name} test FAILED")
+                    print(f"❌ {test_name}")
             except Exception as e:
-                logger.error(f"❌ {test_name} test ERROR: {e}")
+                print(f"❌ {test_name}: {e}")
                 results[test_name] = False
-        
+
         # Generate report
-        logger.info("\n" + "="*60)
-        logger.info("🧪 HRMS FEATURE TESTING REPORT")
-        logger.info("="*60)
-        logger.info(f"📊 Tests Passed: {passed}/{total}")
-        logger.info(f"🎯 Success Rate: {(passed/total)*100:.1f}%")
-        
-        for test_name, result in results.items():
-            status = "✅ PASS" if result else "❌ FAIL"
-            logger.info(f"  {test_name}: {status}")
+        print(f"\n📊 Results: {passed}/{total} passed ({(passed/total)*100:.1f}%)")
         
         return results
 
