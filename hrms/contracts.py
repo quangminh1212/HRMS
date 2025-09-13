@@ -28,7 +28,17 @@ def export_contracts_for_person(db: Session, person: Person, path: str, template
     style_header(ws, header_row=1)
     set_date_format(ws, date_columns=[2,3], start_row=2)
     auto_filter_and_width(ws, header_row=1)
-    from .excel_utils import set_header_footer
-    set_header_footer(ws, title=f"Hợp đồng - {person.full_name}")
+    from .excel_utils import set_header_footer, set_freeze
+    from .settings_service import get_setting
+    org = get_setting('ORG_NAME', None)
+    set_header_footer(ws, title=f"Hợp đồng - {person.full_name}", org=org)
+    # Freeze theo cấu hình
+    try:
+        from openpyxl.utils import column_index_from_string
+        letter = get_setting('XLSX_FREEZE_COL:contracts', None) or get_setting('XLSX_FREEZE_COL:GLOBAL', None) or 'A'
+        col = column_index_from_string(letter.strip().upper())
+        set_freeze(ws, row=2, col=col)
+    except Exception:
+        pass
 
     wb.save(path)

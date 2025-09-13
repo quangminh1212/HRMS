@@ -33,7 +33,17 @@ def export_insurance_to_excel(db: Session, start_date: date, end_date: date, pat
     style_header(ws, header_row=1)
     set_date_format(ws, date_columns=[4], start_row=2)
     auto_filter_and_width(ws, header_row=1)
-    from .excel_utils import set_header_footer
-    set_header_footer(ws, title='Danh sách sự kiện BHXH')
+    from .excel_utils import set_header_footer, set_freeze
+    from .settings_service import get_setting
+    org = get_setting('ORG_NAME', None)
+    set_header_footer(ws, title='Danh sách sự kiện BHXH', org=org)
+    # Freeze theo cấu hình
+    try:
+        from openpyxl.utils import column_index_from_string
+        letter = get_setting('XLSX_FREEZE_COL:bhxh', None) or get_setting('XLSX_FREEZE_COL:GLOBAL', None) or 'A'
+        col = column_index_from_string(letter.strip().upper())
+        set_freeze(ws, row=2, col=col)
+    except Exception:
+        pass
 
     wb.save(path)

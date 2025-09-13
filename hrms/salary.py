@@ -181,8 +181,18 @@ def export_due_to_excel(items: List[Dict[str, Any]], file_path: str, template_na
     set_date_format(ws, date_columns=[10,11], start_row=2)
     set_number_format(ws, number_columns=[6,8], start_row=2, fmt='0.00')
     auto_filter_and_width(ws, header_row=1)
-    from .excel_utils import set_header_footer
-    set_header_footer(ws, title='Danh sách đến hạn nâng lương')
+    from .excel_utils import set_header_footer, set_freeze
+    from .settings_service import get_setting
+    org = get_setting('ORG_NAME', None)
+    set_header_footer(ws, title='Danh sách đến hạn nâng lương', org=org)
+    # Freeze theo cấu hình
+    try:
+        from openpyxl.utils import column_index_from_string
+        letter = get_setting('XLSX_FREEZE_COL:salary_due', None) or get_setting('XLSX_FREEZE_COL:GLOBAL', None) or 'A'
+        col = column_index_from_string(letter.strip().upper())
+        set_freeze(ws, row=2, col=col)
+    except Exception:
+        pass
 
     wb.save(file_path)
 
@@ -239,8 +249,18 @@ def export_salary_history_for_person(db: Session, person: Person, file_path: str
     set_number_format(ws, number_columns=[6], start_row=2, fmt='0.00')
 
     # Header/Footer
-    from .excel_utils import set_header_footer
-    set_header_footer(ws, title=f"Lịch sử lương - {person.full_name or ''}")
+    from .excel_utils import set_header_footer, set_freeze
+    from .settings_service import get_setting
+    org = get_setting('ORG_NAME', None)
+    set_header_footer(ws, title=f"Lịch sử lương - {person.full_name or ''}", org=org)
+    # Freeze theo cấu hình
+    try:
+        from openpyxl.utils import column_index_from_string
+        letter = get_setting('XLSX_FREEZE_COL:salary_history', None) or get_setting('XLSX_FREEZE_COL:GLOBAL', None) or 'A'
+        col = column_index_from_string(letter.strip().upper())
+        set_freeze(ws, row=2, col=col)
+    except Exception:
+        pass
 
     # Biểu đồ hệ số theo thời gian nếu có dữ liệu
     if ws.max_row > 1:
@@ -317,7 +337,17 @@ def export_salary_histories_for_people(db: Session, people: List[Person], file_p
     auto_filter_and_width(ws, header_row=1)
     set_date_format(ws, date_columns=[3], start_row=2)
     set_number_format(ws, number_columns=[6], start_row=2, fmt='0.00')
-    from .excel_utils import set_header_footer
-    set_header_footer(ws, title='Lịch sử lương (lọc)')
+    from .excel_utils import set_header_footer, set_freeze
+    from .settings_service import get_setting
+    org = get_setting('ORG_NAME', None)
+    set_header_footer(ws, title='Lịch sử lương (lọc)', org=org)
+    # Freeze theo cấu hình
+    try:
+        from openpyxl.utils import column_index_from_string
+        letter = get_setting('XLSX_FREEZE_COL:salary_histories', None) or get_setting('XLSX_FREEZE_COL:GLOBAL', None) or 'A'
+        col = column_index_from_string(letter.strip().upper())
+        set_freeze(ws, row=2, col=col)
+    except Exception:
+        pass
 
     wb.save(file_path)
