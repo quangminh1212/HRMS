@@ -16,6 +16,7 @@ from .security import verify_password
 from .salary import list_due_in_window, export_due_to_excel
 from .audit import log_action
 from .scheduler import NOTIFY_QUEUE
+from .templates import render_docx_template
 
 
 class LoginWindow(QWidget):
@@ -242,34 +243,56 @@ class MainWindow(QWidget):
                 return
             Path("exports").mkdir(exist_ok=True)
             file_path = Path("exports") / f"trich_ngang_{person.code}.docx"
-            doc = Document()
-            doc.add_heading("Trích ngang nhân sự", level=1)
-            rows = [
-                ("Họ và tên", person.full_name or ""),
-                ("Mã", person.code or ""),
-                ("Ngày sinh", person.dob.isoformat() if person.dob else ""),
-                ("Giới tính", person.gender or ""),
-                ("Dân tộc", person.ethnicity or ""),
-                ("Tôn giáo", person.religion or ""),
-                ("Quê quán", person.hometown or ""),
-                ("Chức danh", person.position.name if person.position else ""),
-                ("Đơn vị", person.unit.name if person.unit else ""),
-                ("Ngày vào Đảng", person.party_joined_date.isoformat() if person.party_joined_date else ""),
-                ("LLCT", person.llct_level or ""),
-                ("Trình độ chuyên môn", person.professional_level or ""),
-                ("Tình trạng công tác", person.status or ""),
-                ("Điện thoại", person.phone or ""),
-                ("Email", person.email or ""),
-            ]
-            table = doc.add_table(rows=1, cols=2)
-            hdr_cells = table.rows[0].cells
-            hdr_cells[0].text = "Trường"
-            hdr_cells[1].text = "Giá trị"
-            for k, v in rows:
-                row_cells = table.add_row().cells
-                row_cells[0].text = k
-                row_cells[1].text = v
-            doc.save(str(file_path))
+            # Nếu có template, render template; nếu không, fallback bảng mặc định
+            tpl = Path("templates") / "trich_ngang_template.docx"
+            context = {
+                "full_name": person.full_name or "",
+                "code": person.code or "",
+                "dob": person.dob.isoformat() if person.dob else "",
+                "gender": person.gender or "",
+                "ethnicity": person.ethnicity or "",
+                "religion": person.religion or "",
+                "hometown": person.hometown or "",
+                "position": person.position.name if person.position else "",
+                "unit": person.unit.name if person.unit else "",
+                "party_joined_date": person.party_joined_date.isoformat() if person.party_joined_date else "",
+                "llct_level": person.llct_level or "",
+                "professional_level": person.professional_level or "",
+                "status": person.status or "",
+                "phone": person.phone or "",
+                "email": person.email or "",
+            }
+            if tpl.exists():
+                render_docx_template(str(tpl), context, str(file_path))
+            else:
+                doc = Document()
+                doc.add_heading("Trích ngang nhân sự", level=1)
+                rows = [
+                    ("Họ và tên", context["full_name"]),
+                    ("Mã", context["code"]),
+                    ("Ngày sinh", context["dob"]),
+                    ("Giới tính", context["gender"]),
+                    ("Dân tộc", context["ethnicity"]),
+                    ("Tôn giáo", context["religion"]),
+                    ("Quê quán", context["hometown"]),
+                    ("Chức danh", context["position"]),
+                    ("Đơn vị", context["unit"]),
+                    ("Ngày vào Đảng", context["party_joined_date"]),
+                    ("LLCT", context["llct_level"]),
+                    ("Trình độ chuyên môn", context["professional_level"]),
+                    ("Tình trạng công tác", context["status"]),
+                    ("Điện thoại", context["phone"]),
+                    ("Email", context["email"]),
+                ]
+                table = doc.add_table(rows=1, cols=2)
+                hdr_cells = table.rows[0].cells
+                hdr_cells[0].text = "Trường"
+                hdr_cells[1].text = "Giá trị"
+                for k, v in rows:
+                    row_cells = table.add_row().cells
+                    row_cells[0].text = k
+                    row_cells[1].text = v
+                doc.save(str(file_path))
             # Audit
             try:
                 log_action(db, self.current_user.get('id'), 'export_profile', 'Person', person.id, f"file={file_path}")
