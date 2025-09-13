@@ -98,6 +98,10 @@ class MainWindow(QWidget):
         self.btn_export_work.clicked.connect(self.export_work_process)
         self.btn_report = QPushButton("Báo cáo nhanh")
         self.btn_report.clicked.connect(self.quick_report)
+        self.btn_letter_salary_cover = QPushButton("CV rà soát nâng lương")
+        self.btn_letter_salary_cover.clicked.connect(self.export_salary_cover)
+        self.btn_letter_retirement = QPushButton("Văn bản nghỉ hưu")
+        self.btn_letter_retirement.clicked.connect(self.export_retirement_letters)
         self.btn_import = QPushButton("Import Excel nhân sự")
         self.btn_import.clicked.connect(self.import_excel)
         self.btn_ins_add = QPushButton("Thêm sự kiện BHXH")
@@ -116,6 +120,8 @@ class MainWindow(QWidget):
         btn_layout.addWidget(self.btn_contract_add)
         btn_layout.addWidget(self.btn_contract_export)
         btn_layout.addWidget(self.btn_report)
+        btn_layout.addWidget(self.btn_letter_salary_cover)
+        btn_layout.addWidget(self.btn_letter_retirement)
         btn_layout.addWidget(self.btn_import)
         btn_layout.addWidget(self.btn_ins_add)
         btn_layout.addWidget(self.btn_ins_export)
@@ -413,6 +419,52 @@ class MainWindow(QWidget):
             except Exception:
                 pass
             QMessageBox.information(self, "Thành công", f"Đã xuất: {file_path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Lỗi", str(e))
+        finally:
+            if db:
+                db.close()
+
+    def export_salary_cover(self):
+        # Xuất công văn rà soát nâng lương theo quý hiện tại
+        from datetime import date
+        from .docx_exports import export_salary_review_cover
+        q = (date.today().month - 1)//3 + 1
+        ctx = {
+            'org_name': 'Cơ quan ABC',
+            'quarter': str(q),
+            'year': str(date.today().year),
+            'date': date.today().isoformat(),
+        }
+        Path('exports').mkdir(exist_ok=True)
+        out = Path('exports')/f"cong_van_ra_soat_quy_{ctx['year']}_Q{ctx['quarter']}.docx"
+        try:
+            export_salary_review_cover(ctx, str(out))
+            QMessageBox.information(self, "Thành công", f"Đã xuất: {out}")
+        except Exception as e:
+            QMessageBox.critical(self, "Lỗi", str(e))
+
+    def export_retirement_letters(self):
+        # Xuất văn bản nghỉ hưu cho nhân sự đã chọn (TB và QĐ)
+        from datetime import date
+        from .docx_exports import export_retirement_notification, export_retirement_decision
+        db, person = self.current_person()
+        try:
+            if not person:
+                QMessageBox.information(self, "Chưa chọn", "Chọn một nhân sự trước")
+                return
+            ctx = {
+                'full_name': person.full_name or '',
+                'code': person.code or '',
+                'retirement_date': (person.dob.replace(year=person.dob.year + (60 if (person.gender or 'Nam').lower().startswith('n') else 55)).isoformat() if person.dob else ''),
+                'date': date.today().isoformat(),
+            }
+            Path('exports').mkdir(exist_ok=True)
+            out1 = Path('exports')/f"thong_bao_nghi_huu_{person.code}.docx"
+            out2 = Path('exports')/f"quyet_dinh_nghi_huu_{person.code}.docx"
+            export_retirement_notification(ctx, str(out1))
+            export_retirement_decision(ctx, str(out2))
+            QMessageBox.information(self, "Thành công", f"Đã xuất: {out1}\n{out2}")
         except Exception as e:
             QMessageBox.critical(self, "Lỗi", str(e))
         finally:
