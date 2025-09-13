@@ -830,6 +830,12 @@ class MainWindow(QWidget):
             # Audit
             try:
                 log_action(SessionLocal(), self.current_user.get('id'), 'email_salary_due', 'Salary', None, f"file={out};sent={ok};count={len(items)}")
+                # EmailLog chi tiết
+                from .db import SessionLocal as _SL
+                from .models import EmailLog
+                s = _SL()
+                s.add(EmailLog(type='salary_due', unit_name=None, recipients='', subject=subject, body=body[:1000], attachments=str(out), status='sent' if ok else 'failed', user_id=self.current_user.get('id')))
+                s.commit(); s.close()
             except Exception:
                 pass
             if ok:
@@ -871,6 +877,10 @@ class MainWindow(QWidget):
             ok = send_email_with_attachment(subject, body, [str(out)])
             try:
                 log_action(SessionLocal(), self.current_user.get('id'), 'email_retirement_alerts', 'Retirement', None, f"file={out};sent={ok};six={len(list6)};three={len(list3)}")
+                # EmailLog chi tiết
+                from .db import SessionLocal as _SL
+                from .models import EmailLog
+                s = _SL(); s.add(EmailLog(type='retirement', unit_name=None, recipients='', subject=subject, body=body[:1000], attachments=str(out), status='sent' if ok else 'failed', user_id=self.current_user.get('id'))); s.commit(); s.close()
             except Exception:
                 pass
             if ok:
@@ -927,6 +937,10 @@ class MainWindow(QWidget):
             ok = send_email_with_attachment(subject, body, [str(file_path)])
             try:
                 log_action(SessionLocal(), self.current_user.get('id'), 'email_quick_report', 'Report', None, f"file={file_path};sent={ok}")
+                # EmailLog chi tiết
+                from .db import SessionLocal as _SL
+                from .models import EmailLog
+                s = _SL(); s.add(EmailLog(type='quick_report', unit_name=None, recipients='', subject=subject, body=body[:1000], attachments=str(file_path), status='sent' if ok else 'failed', user_id=self.current_user.get('id'))); s.commit(); s.close()
             except Exception:
                 pass
             if ok:
@@ -1128,17 +1142,22 @@ class MainWindow(QWidget):
         lay = QVBoxLayout(dlg)
         # Bộ lọc
         f = QFormLayout();
-        from PySide6.QtWidgets import QLineEdit, QComboBox, QPushButton
+        from PySide6.QtWidgets import QLineEdit, QComboBox, QPushButton, QDateEdit, QCheckBox
         type_box = QComboBox(); type_box.addItems(["(Tất cả)", "salary_due", "bhxh_monthly", "contracts_expiring", "quick_report", "retirement", "generic"])
         unit_edit = QLineEdit(); unit_edit.setPlaceholderText("Đơn vị chứa…")
         status_box = QComboBox(); status_box.addItems(["(Tất cả)", "sent", "failed"])
         subject_search = QLineEdit(); subject_search.setPlaceholderText("Tìm tiêu đề…")
-        btn_refresh = QPushButton("Làm mới")
+        from_date = QDateEdit(); from_date.setCalendarPopup(True)
+        to_date = QDateEdit(); to_date.setCalendarPopup(True)
+        e_from = QCheckBox("Áp dụng"); e_to = QCheckBox("Áp dụng")
+        btn_refresh = QPushButton("Làm mới"); btn_export = QPushButton("Export CSV")
         f.addRow("Loại", type_box)
         f.addRow("Đơn vị", unit_edit)
         f.addRow("Trạng thái", status_box)
         f.addRow("Tiêu đề", subject_search)
-        f.addRow(btn_refresh)
+        h = QHBoxLayout(); h.addWidget(QLabel("Từ")); h.addWidget(from_date); h.addWidget(e_from); h.addSpacing(12); h.addWidget(QLabel("Đến")); h.addWidget(to_date); h.addWidget(e_to)
+        f.addRow("Thời gian", h)
+        hb = QHBoxLayout(); hb.addWidget(btn_refresh); hb.addWidget(btn_export); f.addRow(hb)
         lay.addLayout(f)
         # Bảng kết quả
         table = QTableWidget(0, 7)
@@ -1163,7 +1182,16 @@ class MainWindow(QWidget):
                 subj = subject_search.text().strip();
                 if subj:
                     q = q.filter(EmailLog.subject.ilike(f"%{subj}%"))
-                rows = q.limit(500).all()
+                # Lọc theo thời gian nếu bật
+                if e_from.isChecked():
+                    fd = from_date.date()
+                    from datetime import datetime as _dt
+                    q = q.filter(EmailLog.created_at >= _dt(fd.year(), fd.month(), fd.day(), 0, 0, 0))
+                if e_to.isChecked():
+                    td = to_date.date()
+                    from datetime import datetime as _dt
+                    q = q.filter(EmailLog.created_at <= _dt(td.year(), td.month(), td.day(), 23, 59, 59))
+                rows = q.limit(1000).all()
                 table.setRowCount(0)
                 for r in rows:
                     i = table.rowCount(); table.insertRow(i)
@@ -1178,9 +1206,26 @@ class MainWindow(QWidget):
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
             finally:
                 db.close()
+        def export_csv():
+            try:
+                import csv
+                from datetime import datetime as _dt
+                from pathlib import Path
+                Path('exports').mkdir(exist_ok=True)
+                outp = Path('exports')/f"email_logs_{_dt.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                with open(outp, 'w', encoding='utf-8', newline='') as fcsv:
+                    w = csv.writer(fcsv)
+                    w.writerow(["created_at","type","unit_name","subject","recipients","attachments","status"])
+                    for i in range(table.rowCount()):
+                        it = lambda r,c: (table.item(r,c).text() if table.item(r,c) else '')
+                        w.writerow([it(i,0), it(i,1), it(i,2), it(i,3), it(i,4), it(i,5), it(i,6)])
+                QMessageBox.information(dlg, "Đã xuất", f"{outp}")
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_refresh.clicked.connect(load)
+        btn_export.clicked.connect(export_csv)
         load()
-        dlg.resize(900, 500)
+        dlg.resize(1000, 540)
         dlg.exec()
 
     def manage_users(self):
