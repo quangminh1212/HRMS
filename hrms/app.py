@@ -151,10 +151,16 @@ class MainWindow(QWidget):
         self.btn_ins_add.clicked.connect(self.add_insurance)
         self.btn_ins_export = QPushButton("Xuất Excel BHXH")
         self.btn_ins_export.clicked.connect(self.export_insurance)
+        # Gửi BHXH theo đơn vị (UI)
+        self.btn_email_insurance_units = QPushButton("Gửi BHXH theo đơn vị")
+        self.btn_email_insurance_units.clicked.connect(self.send_insurance_email_by_unit)
         self.btn_contract_add = QPushButton("Thêm HĐ")
         self.btn_contract_add.clicked.connect(self.add_contract)
         self.btn_contract_export = QPushButton("Xuất HĐ")
         self.btn_contract_export.clicked.connect(self.export_contract)
+        # Gửi HĐ sắp hết hạn theo đơn vị (UI)
+        self.btn_email_contracts_units = QPushButton("Gửi HĐ sắp hết hạn theo đơn vị")
+        self.btn_email_contracts_units.clicked.connect(self.send_contracts_expiring_email_by_unit)
         self.btn_salary_export_filtered = QPushButton("Xuất lương (lọc)")
         self.btn_salary_export_filtered.clicked.connect(self.export_salary_histories_filtered)
         btn_layout.addWidget(self.btn_export)
@@ -167,6 +173,7 @@ class MainWindow(QWidget):
         btn_layout.addWidget(self.btn_export_work)
         btn_layout.addWidget(self.btn_contract_add)
         btn_layout.addWidget(self.btn_contract_export)
+        btn_layout.addWidget(self.btn_email_contracts_units)
         btn_layout.addWidget(self.btn_report)
         btn_layout.addWidget(self.btn_email_report)
         btn_layout.addWidget(self.btn_letter_salary_cover)
@@ -180,6 +187,7 @@ class MainWindow(QWidget):
         btn_layout.addWidget(self.btn_email_history)
         btn_layout.addWidget(self.btn_ins_add)
         btn_layout.addWidget(self.btn_ins_export)
+        btn_layout.addWidget(self.btn_email_insurance_units)
         btn_layout.addWidget(self.btn_salary_export_filtered)
         layout.addWidget(QLabel("Tra cứu nhân sự"))
         layout.addWidget(self.search)
@@ -420,6 +428,9 @@ class MainWindow(QWidget):
         # Gửi email nâng lương (quý) chỉ cho admin/hr
         self.btn_email_salary_due.setEnabled(is_admin)
         self.btn_email_salary_due_units.setEnabled(is_admin)
+        # Gửi BHXH/HĐ theo đơn vị chỉ cho admin/hr
+        self.btn_email_insurance_units.setEnabled(is_admin)
+        self.btn_email_contracts_units.setEnabled(is_admin)
         # Nút email nghỉ hưu: chỉ admin/hr
         if not hasattr(self, 'btn_email_retirement'):
             self.btn_email_retirement = QPushButton("Gửi email nghỉ hưu (6/3 tháng)")
@@ -941,6 +952,165 @@ class MainWindow(QWidget):
         finally:
             db.close()
 
+    def send_insurance_email_by_unit(self):
+        # Gửi BHXH tháng trước theo từng đơn vị + ZIP tổng hợp
+        role = (self.current_user.get('role') or '').lower()
+        if role not in ('admin','hr'):
+            QMessageBox.warning(self, "Không có quyền", "Chỉ admin/HR mới gửi")
+            return
+        from datetime import date
+        from calendar import monthrange
+        from pathlib import Path
+        from .insurance import export_insurance_to_excel
+        from .mailer import send_email_with_attachment, get_recipients_for_unit, create_zip
+        from .settings_service import get_setting
+        today = date.today()
+        prev_month = (today.month - 2) % 12 + 1
+        prev_year = today.year - 1 if today.month == 1 else today.year
+        start = date(prev_year, prev_month, 1)
+        end = date(prev_year, prev_month, monthrange(prev_year, prev_month)[1])
+        db = SessionLocal()
+        try:
+            from .models import Unit
+            units = db.query(Unit).order_by(Unit.name).all()
+            from PySide6.QtWidgets import QDialog, QVBoxLayout, QCheckBox, QPushButton, QLabel, QHBoxLayout
+            dlg = QDialog(self); dlg.setWindowTitle("Gửi BHXH theo đơn vị")
+            v = QVBoxLayout(dlg)
+            v.addWidget(QLabel(f"Tháng: {prev_month:02d}/{prev_year}"))
+            data = []
+            for u in units:
+                recips = get_recipients_for_unit(u.name)
+                text = f"{u.name} - {len(recips)} email"
+                cb = QCheckBox(text); cb.setChecked(bool(recips))
+                v.addWidget(cb)
+                data.append((cb, u.name, u.id, recips))
+            row = QHBoxLayout(); btn_ok = QPushButton("Gửi"); btn_cancel = QPushButton("Hủy"); row.addWidget(btn_ok); row.addWidget(btn_cancel)
+            v.addLayout(row)
+            def do_send():
+                try:
+                    Path('exports').mkdir(exist_ok=True)
+                    sent_files = []
+                    sent = 0; failed = 0
+                    for cb, unit_name, unit_id, recips in data:
+                        if not cb.isChecked() or not recips:
+                            continue
+                        out = Path('exports')/f"bhxh_{prev_year}_{prev_month:02d}_{unit_name.replace(' ', '_')}.xlsx"
+                        export_insurance_to_excel(db, start, end, str(out), template_name=self.get_template_for('bhxh'), username=self.current_user.get('username'), unit_id=unit_id)
+                        ok = send_email_with_attachment(f"[HRMS] BHXH {prev_month:02d}/{prev_year} - {unit_name}", f"Đính kèm BHXH {prev_month:02d}/{prev_year} - {unit_name}", [str(out)], to=recips)
+                        sent_files.append(str(out))
+                        try:
+                            # Audit + EmailLog
+                            log_action(SessionLocal(), self.current_user.get('id'), 'email_insurance_unit', 'InsuranceEvent', None, f"unit={unit_name};file={out};sent={ok}")
+                            masked = []
+                            for r in recips:
+                                r = str(r or '').strip()
+                                if '@' in r:
+                                    masked.append('***@' + r.split('@',1)[1])
+                                elif r:
+                                    masked.append('***')
+                            from .models import EmailLog
+                            s = SessionLocal(); s.add(EmailLog(type='bhxh_monthly', unit_name=unit_name, recipients=", ".join(masked)[:1000], subject=f"BHXH {prev_month:02d}/{prev_year} - {unit_name}", body=f"BHXH {prev_month:02d}/{prev_year}", attachments=str(out), status='sent' if ok else 'failed', user_id=self.current_user.get('id'))); s.commit(); s.close()
+                        except Exception: pass
+                        if ok: sent += 1
+                        else: failed += 1
+                    # ZIP tổng hợp nếu bật
+                    try:
+                        flag = (get_setting('SEND_SUMMARY_ZIP','0') or '0').strip().lower() in ('1','true','yes')
+                        if flag and sent_files:
+                            zip_path = Path('exports')/f"bhxh_{prev_year}_{prev_month:02d}_by_unit.zip"
+                            if create_zip(sent_files, str(zip_path)):
+                                send_email_with_attachment(f"[HRMS] BHXH {prev_month:02d}/{prev_year} (ZIP tổng hợp)", f"ZIP tổng hợp BHXH {prev_month:02d}/{prev_year}", [str(zip_path)])
+                    except Exception:
+                        pass
+                    QMessageBox.information(dlg, "Kết quả", f"Gửi thành công: {sent}\nThất bại: {failed}")
+                    dlg.accept()
+                except Exception as ex:
+                    QMessageBox.critical(dlg, "Lỗi", str(ex))
+            btn_ok.clicked.connect(do_send)
+            btn_cancel.clicked.connect(dlg.reject)
+            dlg.resize(520, 600)
+            dlg.exec()
+        finally:
+            db.close()
+
+    def send_contracts_expiring_email_by_unit(self):
+        # Gửi HĐ sắp hết hạn theo đơn vị + ZIP tổng hợp
+        role = (self.current_user.get('role') or '').lower()
+        if role not in ('admin','hr'):
+            QMessageBox.warning(self, "Không có quyền", "Chỉ admin/HR mới gửi")
+            return
+        from datetime import date, timedelta
+        from pathlib import Path
+        from .contracts import export_contracts_expiring_to_excel
+        from .mailer import send_email_with_attachment, get_recipients_for_unit, create_zip
+        from .settings_service import get_setting
+        today = date.today()
+        days = int(get_setting('CONTRACT_ALERT_DAYS','30') or '30')
+        end = today + timedelta(days=days)
+        db = SessionLocal()
+        try:
+            from .models import Unit
+            units = db.query(Unit).order_by(Unit.name).all()
+            from PySide6.QtWidgets import QDialog, QVBoxLayout, QCheckBox, QPushButton, QLabel, QHBoxLayout, QLineEdit
+            dlg = QDialog(self); dlg.setWindowTitle("Gửi HĐ sắp hết hạn theo đơn vị")
+            v = QVBoxLayout(dlg)
+            v.addWidget(QLabel(f"Trong {days} ngày tới"))
+            data = []
+            for u in units:
+                recips = get_recipients_for_unit(u.name)
+                text = f"{u.name} - {len(recips)} email"
+                cb = QCheckBox(text); cb.setChecked(bool(recips))
+                v.addWidget(cb)
+                data.append((cb, u.name, u.id, recips))
+            row = QHBoxLayout(); btn_ok = QPushButton("Gửi"); btn_cancel = QPushButton("Hủy"); row.addWidget(btn_ok); row.addWidget(btn_cancel)
+            v.addLayout(row)
+            def do_send():
+                try:
+                    Path('exports').mkdir(exist_ok=True)
+                    sent_files = []
+                    sent = 0; failed = 0
+                    for cb, unit_name, unit_id, recips in data:
+                        if not cb.isChecked() or not recips:
+                            continue
+                        out = Path('exports')/f"contracts_expiring_{today.isoformat()}_{days}d_{unit_name.replace(' ', '_')}.xlsx"
+                        export_contracts_expiring_to_excel(db, today, end, str(out), template_name=self.get_template_for('contracts'), username=self.current_user.get('username'), unit_id=unit_id)
+                        ok = send_email_with_attachment(f"[HRMS] HĐ sắp hết hạn ({days} ngày) - {unit_name}", f"Đính kèm HĐ sắp hết hạn - {unit_name}", [str(out)], to=recips)
+                        sent_files.append(str(out))
+                        try:
+                            # Audit + EmailLog
+                            log_action(SessionLocal(), self.current_user.get('id'), 'email_contracts_expiring_unit', 'Contract', None, f"unit={unit_name};file={out};sent={ok}")
+                            masked = []
+                            for r in recips:
+                                r = str(r or '').strip()
+                                if '@' in r:
+                                    masked.append('***@' + r.split('@',1)[1])
+                                elif r:
+                                    masked.append('***')
+                            from .models import EmailLog
+                            s = SessionLocal(); s.add(EmailLog(type='contracts_expiring', unit_name=unit_name, recipients=", ".join(masked)[:1000], subject=f"HĐ sắp hết hạn ({days}d) - {unit_name}", body=f"HĐ sắp hết hạn - {unit_name}", attachments=str(out), status='sent' if ok else 'failed', user_id=self.current_user.get('id'))); s.commit(); s.close()
+                        except Exception: pass
+                        if ok: sent += 1
+                        else: failed += 1
+                    # ZIP tổng hợp nếu bật
+                    try:
+                        flag = (get_setting('SEND_SUMMARY_ZIP','0') or '0').strip().lower() in ('1','true','yes')
+                        if flag and sent_files:
+                            zip_path = Path('exports')/f"contracts_expiring_{today.isoformat()}_{days}d_by_unit.zip"
+                            if create_zip(sent_files, str(zip_path)):
+                                send_email_with_attachment(f"[HRMS] HĐ sắp hết hạn (ZIP tổng hợp)", 'ZIP tổng hợp HĐ sắp hết hạn các đơn vị', [str(zip_path)])
+                    except Exception:
+                        pass
+                    QMessageBox.information(dlg, "Kết quả", f"Gửi thành công: {sent}\nThất bại: {failed}")
+                    dlg.accept()
+                except Exception as ex:
+                    QMessageBox.critical(dlg, "Lỗi", str(ex))
+            btn_ok.clicked.connect(do_send)
+            btn_cancel.clicked.connect(dlg.reject)
+            dlg.resize(520, 600)
+            dlg.exec()
+        finally:
+            db.close()
+
     def send_retirement_email(self):
         # Gửi email danh sách nghỉ hưu (6/3 tháng) kèm Excel 2 sheet
         role = (self.current_user.get('role') or '').lower()
@@ -1234,7 +1404,7 @@ class MainWindow(QWidget):
         if role not in ('admin','hr'):
             QMessageBox.warning(self, "Không có quyền", "Chỉ admin/HR mới truy cập")
             return
-        from PySide6.QtWidgets import QDialog, QFormLayout, QTableWidget, QTableWidgetItem
+        from PySide6.QtWidgets import QDialog, QFormLayout, QTableWidget, QTableWidgetItem, QPushButton
         dlg = QDialog(self); dlg.setWindowTitle("Lịch sử Email")
         lay = QVBoxLayout(dlg)
         # Bộ lọc
@@ -1247,14 +1417,16 @@ class MainWindow(QWidget):
         from_date = QDateEdit(); from_date.setCalendarPopup(True)
         to_date = QDateEdit(); to_date.setCalendarPopup(True)
         e_from = QCheckBox("Áp dụng"); e_to = QCheckBox("Áp dụng")
-        btn_refresh = QPushButton("Làm mới"); btn_export = QPushButton("Export CSV")
+        btn_refresh = QPushButton("Làm mới"); btn_export = QPushButton("Export CSV"); btn_view = QPushButton("Xem chi tiết")
         f.addRow("Loại", type_box)
         f.addRow("Đơn vị", unit_edit)
         f.addRow("Trạng thái", status_box)
         f.addRow("Tiêu đề", subject_search)
         h = QHBoxLayout(); h.addWidget(QLabel("Từ")); h.addWidget(from_date); h.addWidget(e_from); h.addSpacing(12); h.addWidget(QLabel("Đến")); h.addWidget(to_date); h.addWidget(e_to)
         f.addRow("Thời gian", h)
-        hb = QHBoxLayout(); hb.addWidget(btn_refresh); hb.addWidget(btn_export); f.addRow(hb)
+        user_id_edit = QLineEdit(); user_id_edit.setPlaceholderText("User ID")
+        f.addRow("User ID", user_id_edit)
+        hb = QHBoxLayout(); hb.addWidget(btn_refresh); hb.addWidget(btn_export); hb.addWidget(btn_view); f.addRow(hb)
         lay.addLayout(f)
         # Bảng kết quả
         table = QTableWidget(0, 8)
@@ -1279,6 +1451,9 @@ class MainWindow(QWidget):
                 subj = subject_search.text().strip();
                 if subj:
                     q = q.filter(EmailLog.subject.ilike(f"%{subj}%"))
+                uidtxt = user_id_edit.text().strip();
+                if uidtxt.isdigit():
+                    q = q.filter(EmailLog.user_id == int(uidtxt))
                 # Lọc theo thời gian nếu bật
                 if e_from.isChecked():
                     fd = from_date.date()
@@ -1292,17 +1467,31 @@ class MainWindow(QWidget):
                 table.setRowCount(0)
                 for r in rows:
                     i = table.rowCount(); table.insertRow(i)
-                    table.setItem(i, 0, QTableWidgetItem(str(getattr(r, 'created_at', ''))))
-                    table.setItem(i, 1, QTableWidgetItem(getattr(r, 'type', '') or ''))
-                    table.setItem(i, 2, QTableWidgetItem(getattr(r, 'unit_name', '') or ''))
-                    table.setItem(i, 3, QTableWidgetItem(getattr(r, 'subject', '') or ''))
-                    table.setItem(i, 4, QTableWidgetItem((getattr(r, 'recipients', '') or '')[:100]))
-                    table.setItem(i, 5, QTableWidgetItem((getattr(r, 'attachments', '') or '')[:100]))
-                    table.setItem(i, 6, QTableWidgetItem(getattr(r, 'status', '') or ''))
-                    table.setItem(i, 7, QTableWidgetItem(getattr(r, 'error', '') or ''))
+                    it0 = QTableWidgetItem(str(getattr(r, 'created_at', '')))
+                    it1 = QTableWidgetItem(getattr(r, 'type', '') or '')
+                    it2 = QTableWidgetItem(getattr(r, 'unit_name', '') or '')
+                    it3 = QTableWidgetItem(getattr(r, 'subject', '') or '')
+                    it4 = QTableWidgetItem((getattr(r, 'recipients', '') or '')[:100])
+                    it5 = QTableWidgetItem((getattr(r, 'attachments', '') or '')[:100])
+                    it6 = QTableWidgetItem(getattr(r, 'status', '') or '')
+                    it7 = QTableWidgetItem(getattr(r, 'error', '') or '')
+                    # Lưu full text ở UserRole để xem chi tiết
+                    it3.setData(Qt.UserRole, getattr(r, 'body', '') or '')
+                    it4.setData(Qt.UserRole, getattr(r, 'recipients', '') or '')
+                    it5.setData(Qt.UserRole, getattr(r, 'attachments', '') or '')
+                    it7.setData(Qt.UserRole, getattr(r, 'error', '') or '')
+                    table.setItem(i, 0, it0)
+                    table.setItem(i, 1, it1)
+                    table.setItem(i, 2, it2)
+                    table.setItem(i, 3, it3)
+                    table.setItem(i, 4, it4)
+                    table.setItem(i, 5, it5)
+                    table.setItem(i, 6, it6)
+                    table.setItem(i, 7, it7)
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
             finally:
+                db.close()
                 db.close()
         def export_csv():
             try:
@@ -1322,8 +1511,30 @@ class MainWindow(QWidget):
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_refresh.clicked.connect(load)
         btn_export.clicked.connect(export_csv)
+        def view_detail():
+            i = table.currentRow()
+            if i < 0:
+                QMessageBox.information(dlg, "Chưa chọn", "Chọn một dòng trong bảng")
+                return
+            from PySide6.QtWidgets import QDialog, QFormLayout, QTextEdit
+            dd = QDialog(dlg); dd.setWindowTitle("Chi tiết Email")
+            ff = QFormLayout(dd)
+            get = lambda c: (table.item(i,c).data(Qt.UserRole) if table.item(i,c) else '') or (table.item(i,c).text() if table.item(i,c) else '')
+            ff.addRow("Thời gian", QLabel(table.item(i,0).text() if table.item(i,0) else ''))
+            ff.addRow("Loại", QLabel(table.item(i,1).text() if table.item(i,1) else ''))
+            ff.addRow("Đơn vị", QLabel(table.item(i,2).text() if table.item(i,2) else ''))
+            ff.addRow("Subject", QLabel(table.item(i,3).text() if table.item(i,3) else ''))
+            body = QTextEdit(); body.setReadOnly(True); body.setText(get(3))
+            ff.addRow("Body", body)
+            ff.addRow("Recipients", QLabel(get(4)))
+            ff.addRow("Attachments", QLabel(get(5)))
+            ff.addRow("Trạng thái", QLabel(table.item(i,6).text() if table.item(i,6) else ''))
+            ff.addRow("Lỗi", QLabel(get(7)))
+            dd.resize(700, 500)
+            dd.exec()
+        btn_view.clicked.connect(view_detail)
         load()
-        dlg.resize(1000, 540)
+        dlg.resize(1100, 600)
         dlg.exec()
 
     def manage_users(self):
