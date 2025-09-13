@@ -118,6 +118,8 @@ class MainWindow(QWidget):
         self.btn_pdf_toggle = QComboBox(); self.btn_pdf_toggle.addItems(["DOCX","PDF"])  # chế độ xuất
         # Template Excel chooser
         self.excel_template_box = QComboBox(); self.load_excel_templates(); self.load_default_excel_template()
+        # Combobox loại export để lưu mặc định theo loại
+        self.excel_template_type_box = QComboBox(); self._init_excel_template_types()
         self.btn_save_tpl = QPushButton("Lưu mặc định"); self.btn_save_tpl.clicked.connect(self.save_default_excel_template)
         self.btn_import = QPushButton("Import Excel nhân sự")
         self.btn_import.clicked.connect(self.import_excel)
@@ -145,6 +147,7 @@ class MainWindow(QWidget):
         btn_layout.addWidget(self.btn_letter_salary_person)
         btn_layout.addWidget(self.btn_pdf_toggle)
         btn_layout.addWidget(self.excel_template_box)
+        btn_layout.addWidget(self.excel_template_type_box)
         btn_layout.addWidget(self.btn_save_tpl)
         btn_layout.addWidget(self.btn_import)
         btn_layout.addWidget(self.btn_ins_add)
@@ -229,6 +232,34 @@ class MainWindow(QWidget):
         data = self.excel_template_box.currentData()
         return data if isinstance(data, str) or data is None else None
 
+    def _init_excel_template_types(self):
+        # Khởi tạo danh sách loại export
+        self.excel_template_type_box.clear()
+        self.excel_template_type_box.addItem("(Chung)", "GLOBAL")
+        self.excel_template_type_box.addItem("Nâng lương đến hạn", "salary_due")
+        self.excel_template_type_box.addItem("Lịch sử lương (cá nhân)", "salary_history")
+        self.excel_template_type_box.addItem("Lịch sử lương (lọc)", "salary_histories")
+        self.excel_template_type_box.addItem("Hợp đồng", "contracts")
+        self.excel_template_type_box.addItem("BHXH", "bhxh")
+
+    def get_template_for(self, export_type: str) -> str | None:
+        # Ưu tiên mặc định theo loại -> mặc định chung -> lựa chọn hiện tại
+        try:
+            from .settings_service import get_setting
+            username = (self.current_user.get('username') or '').strip()
+            if username:
+                key_type = f"DEFAULT_XLSX_TEMPLATE:{username}:{export_type}"
+                val = get_setting(key_type, None)
+                if val:
+                    return val
+                key_global = f"DEFAULT_XLSX_TEMPLATE:{username}:GLOBAL"
+                val2 = get_setting(key_global, None)
+                if val2:
+                    return val2
+        except Exception:
+            pass
+        return self.get_selected_excel_template()
+
     def load_excel_templates(self):
         # Nạp danh sách template Excel từ templates/xlsx
         try:
@@ -244,13 +275,13 @@ class MainWindow(QWidget):
             self.excel_template_box.addItem("(Mặc định)", None)
 
     def load_default_excel_template(self) -> None:
-        # Nạp template mặc định đã lưu theo user hiện tại
+        # Nạp template mặc định (chung) đã lưu theo user hiện tại
         try:
             from .settings_service import get_setting
             username = (self.current_user.get('username') or '').strip()
             if not username:
                 return
-            key = f"DEFAULT_XLSX_TEMPLATE:{username}"
+            key = f"DEFAULT_XLSX_TEMPLATE:{username}:GLOBAL"
             val = get_setting(key, None)
             if not val:
                 return
@@ -263,7 +294,7 @@ class MainWindow(QWidget):
             pass
 
     def save_default_excel_template(self) -> None:
-        # Lưu template hiện chọn làm mặc định cho user
+        # Lưu template hiện chọn làm mặc định cho user (theo loại export hoặc GLOBAL)
         try:
             from .settings_service import set_setting
             tpl = self.get_selected_excel_template()
@@ -271,9 +302,10 @@ class MainWindow(QWidget):
             if not username:
                 QMessageBox.warning(self, "Lỗi", "Không xác định được người dùng")
                 return
-            key = f"DEFAULT_XLSX_TEMPLATE:{username}"
+            etype = self.excel_template_type_box.currentData() or 'GLOBAL'
+            key = f"DEFAULT_XLSX_TEMPLATE:{username}:{etype}"
             set_setting(key, tpl or '')
-            QMessageBox.information(self, "Đã lưu", "Đã lưu template Excel mặc định")
+            QMessageBox.information(self, "Đã lưu", "Đã lưu template Excel mặc định cho loại export")
         except Exception as e:
             QMessageBox.critical(self, "Lỗi", str(e))
 
@@ -435,7 +467,7 @@ class MainWindow(QWidget):
                 return
             Path("exports").mkdir(exist_ok=True)
             xlsx = Path("exports") / f"nang_luong_quy_{end.year}_Q{((end.month-1)//3)+1}.xlsx"
-            export_due_to_excel(items, str(xlsx), template_name=self.get_selected_excel_template())
+            export_due_to_excel(items, str(xlsx), template_name=self.get_template_for('salary_due'))
             # Audit
             try:
                 log_action(db, self.current_user.get('id'), 'export_salary_due', 'Salary', None, f"file={xlsx}")
@@ -757,7 +789,7 @@ class MainWindow(QWidget):
             Path("exports").mkdir(exist_ok=True)
             ts = datetime.now().strftime('%Y%m%d_%H%M%S')
             out = Path("exports")/f"salary_histories_{ts}.xlsx"
-            export_salary_histories_for_people(db, people, str(out), template_name=self.get_selected_excel_template())
+            export_salary_histories_for_people(db, people, str(out), template_name=self.get_template_for('salary_histories'))
             try:
                 log_action(db, self.current_user.get('id'), 'export_salary_histories', 'Person', None, f"count={len(people)};file={out}")
             except Exception:
@@ -931,7 +963,7 @@ class MainWindow(QWidget):
         try:
             Path("exports").mkdir(exist_ok=True)
             file_path = Path("exports") / f"bhxh_{start.year}.xlsx"
-            export_insurance_to_excel(db, start, end, str(file_path), template_name=self.get_selected_excel_template())
+            export_insurance_to_excel(db, start, end, str(file_path), template_name=self.get_template_for('bhxh'))
             # Audit
             try:
                 log_action(db, self.current_user.get('id'), 'export_insurance', 'InsuranceEvent', None, f"file={file_path}")
@@ -979,7 +1011,7 @@ class MainWindow(QWidget):
                 return
             Path("exports").mkdir(exist_ok=True)
             file_path = Path("exports") / f"contracts_{person.code}.xlsx"
-            export_contracts_for_person(db, person, str(file_path), template_name=self.get_selected_excel_template())
+            export_contracts_for_person(db, person, str(file_path), template_name=self.get_template_for('contracts'))
             try:
                 log_action(db, self.current_user.get('id'), 'export_contracts', 'Person', person.id, f"file={file_path}")
             except Exception:

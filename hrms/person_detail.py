@@ -108,6 +108,13 @@ class PersonDetailDialog(QDialog):
 
             Path("exports").mkdir(exist_ok=True)
             out = Path("exports") / f"salary_history_{p.code}.xlsx"
+            # Dùng template theo loại (fallback template_name nếu đã lấy trực tiếp)
+            try:
+                parent = self.parent()
+                if parent and hasattr(parent, 'get_template_for'):
+                    template_name = parent.get_template_for('salary_history')
+            except Exception:
+                pass
             export_salary_history_for_person(db, p, str(out), template_name=template_name)
             # Audit
             try:

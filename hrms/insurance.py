@@ -33,5 +33,7 @@ def export_insurance_to_excel(db: Session, start_date: date, end_date: date, pat
     style_header(ws, header_row=1)
     set_date_format(ws, date_columns=[4], start_row=2)
     auto_filter_and_width(ws, header_row=1)
+    from .excel_utils import set_header_footer
+    set_header_footer(ws, title='Danh sách sự kiện BHXH')
 
     wb.save(path)
