@@ -896,6 +896,12 @@ class MainWindow(QWidget):
                 data.append((cb, u.name, u.id, len(arr), recips))
             row = QHBoxLayout(); btn_ok = QPushButton("Gửi"); btn_cancel = QPushButton("Hủy"); row.addWidget(btn_ok); row.addWidget(btn_cancel)
             v.addLayout(row)
+            zip_cb = QCheckBox("Gửi kèm ZIP tổng hợp");
+            try:
+                zip_cb.setChecked(((get_setting('SEND_SUMMARY_ZIP','0') or '0').strip().lower() in ('1','true','yes')))
+            except Exception:
+                zip_cb.setChecked(False)
+            v.addWidget(zip_cb)
 
             def do_send():
                 try:
@@ -932,10 +938,9 @@ class MainWindow(QWidget):
                             pass
                         if ok: sent += 1
                         else: failed += 1
-                    # ZIP tổng hợp nếu bật
+                    # ZIP tổng hợp nếu checkbox bật
                     try:
-                        flag = (get_setting('SEND_SUMMARY_ZIP','0') or '0').strip().lower() in ('1','true','yes')
-                        if flag and sent_files:
+                        if zip_cb.isChecked() and sent_files:
                             zip_path = Path('exports')/f"nang_luong_quy_{end.year}_Q{q}_by_unit.zip"
                             if create_zip(sent_files, str(zip_path)):
                                 send_email_with_attachment(f"[HRMS] Nâng lương Q{q}/{end.year} (ZIP tổng hợp)", f"ZIP tổng hợp danh sách nâng lương theo đơn vị Q{q}/{end.year}", [str(zip_path)])
@@ -986,6 +991,12 @@ class MainWindow(QWidget):
                 data.append((cb, u.name, u.id, recips))
             row = QHBoxLayout(); btn_ok = QPushButton("Gửi"); btn_cancel = QPushButton("Hủy"); row.addWidget(btn_ok); row.addWidget(btn_cancel)
             v.addLayout(row)
+            zip_cb = QCheckBox("Gửi kèm ZIP tổng hợp");
+            try:
+                zip_cb.setChecked(((get_setting('SEND_SUMMARY_ZIP','0') or '0').strip().lower() in ('1','true','yes')))
+            except Exception:
+                zip_cb.setChecked(False)
+            v.addWidget(zip_cb)
             def do_send():
                 try:
                     Path('exports').mkdir(exist_ok=True)
@@ -1013,10 +1024,9 @@ class MainWindow(QWidget):
                         except Exception: pass
                         if ok: sent += 1
                         else: failed += 1
-                    # ZIP tổng hợp nếu bật
+                    # ZIP tổng hợp nếu checkbox bật
                     try:
-                        flag = (get_setting('SEND_SUMMARY_ZIP','0') or '0').strip().lower() in ('1','true','yes')
-                        if flag and sent_files:
+                        if zip_cb.isChecked() and sent_files:
                             zip_path = Path('exports')/f"bhxh_{prev_year}_{prev_month:02d}_by_unit.zip"
                             if create_zip(sent_files, str(zip_path)):
                                 send_email_with_attachment(f"[HRMS] BHXH {prev_month:02d}/{prev_year} (ZIP tổng hợp)", f"ZIP tổng hợp BHXH {prev_month:02d}/{prev_year}", [str(zip_path)])
@@ -1064,6 +1074,12 @@ class MainWindow(QWidget):
                 data.append((cb, u.name, u.id, recips))
             row = QHBoxLayout(); btn_ok = QPushButton("Gửi"); btn_cancel = QPushButton("Hủy"); row.addWidget(btn_ok); row.addWidget(btn_cancel)
             v.addLayout(row)
+            zip_cb = QCheckBox("Gửi kèm ZIP tổng hợp");
+            try:
+                zip_cb.setChecked(((get_setting('SEND_SUMMARY_ZIP','0') or '0').strip().lower() in ('1','true','yes')))
+            except Exception:
+                zip_cb.setChecked(False)
+            v.addWidget(zip_cb)
             def do_send():
                 try:
                     Path('exports').mkdir(exist_ok=True)
@@ -1091,10 +1107,9 @@ class MainWindow(QWidget):
                         except Exception: pass
                         if ok: sent += 1
                         else: failed += 1
-                    # ZIP tổng hợp nếu bật
+                    # ZIP tổng hợp nếu checkbox bật
                     try:
-                        flag = (get_setting('SEND_SUMMARY_ZIP','0') or '0').strip().lower() in ('1','true','yes')
-                        if flag and sent_files:
+                        if zip_cb.isChecked() and sent_files:
                             zip_path = Path('exports')/f"contracts_expiring_{today.isoformat()}_{days}d_by_unit.zip"
                             if create_zip(sent_files, str(zip_path)):
                                 send_email_with_attachment(f"[HRMS] HĐ sắp hết hạn (ZIP tổng hợp)", 'ZIP tổng hợp HĐ sắp hết hạn các đơn vị', [str(zip_path)])
@@ -1426,7 +1441,8 @@ class MainWindow(QWidget):
         f.addRow("Thời gian", h)
         user_id_edit = QLineEdit(); user_id_edit.setPlaceholderText("User ID")
         f.addRow("User ID", user_id_edit)
-        hb = QHBoxLayout(); hb.addWidget(btn_refresh); hb.addWidget(btn_export); hb.addWidget(btn_view); f.addRow(hb)
+        btn_resend = QPushButton("Gửi lại")
+        hb = QHBoxLayout(); hb.addWidget(btn_refresh); hb.addWidget(btn_export); hb.addWidget(btn_view); hb.addWidget(btn_resend); f.addRow(hb)
         lay.addLayout(f)
         # Bảng kết quả
         table = QTableWidget(0, 8)
@@ -1533,6 +1549,48 @@ class MainWindow(QWidget):
             dd.resize(700, 500)
             dd.exec()
         btn_view.clicked.connect(view_detail)
+        def resend_selected():
+            i = table.currentRow()
+            if i < 0:
+                QMessageBox.information(dlg, "Chưa chọn", "Chọn một dòng để gửi lại")
+                return
+            try:
+                t = table.item(i,1).text() if table.item(i,1) else ''
+                unit_name = table.item(i,2).text() if table.item(i,2) else ''
+                subject = table.item(i,3).text() if table.item(i,3) else ''
+                body = table.item(i,3).data(Qt.UserRole) if table.item(i,3) else ''
+                attach_disp = table.item(i,5).data(Qt.UserRole) if table.item(i,5) else (table.item(i,5).text() if table.item(i,5) else '')
+                paths = []
+                from pathlib import Path
+                for part in (attach_disp or '').split(','):
+                    p = part.strip()
+                    if p:
+                        pp = Path(p)
+                        if pp.exists():
+                            paths.append(str(pp))
+                recips = None
+                if t in ('salary_due','bhxh_monthly','contracts_expiring') and unit_name:
+                    try:
+                        from .mailer import get_recipients_for_unit
+                        recips = get_recipients_for_unit(unit_name)
+                    except Exception:
+                        recips = None
+                from .mailer import send_email_with_attachment
+                ok = send_email_with_attachment(subject or '[HRMS] Resend', body or '', paths, to=recips)
+                # Log lại với type ban đầu
+                try:
+                    from .db import SessionLocal
+                    from .models import EmailLog
+                    s = SessionLocal(); s.add(EmailLog(type=t or 'generic', unit_name=(unit_name or None), recipients='', subject=subject or '[HRMS] Resend', body=(body or '')[:1000], attachments=', '.join(paths), status='sent' if ok else 'failed', user_id=self.current_user.get('id'))); s.commit(); s.close()
+                except Exception:
+                    pass
+                if ok:
+                    QMessageBox.information(dlg, "Đã gửi lại", "Gửi lại thành công")
+                else:
+                    QMessageBox.warning(dlg, "Chưa gửi", "Gửi lại thất bại")
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_resend.clicked.connect(resend_selected)
         load()
         dlg.resize(1100, 600)
         dlg.exec()
