@@ -21,3 +21,21 @@ def render_docx_template(template_path: str, context: dict[str, str], output_pat
                             for r in p.runs:
                                 r.text = r.text.replace(f"{{{{{k}}}}}", v)
     doc.save(output_path)
+
+
+def try_export_docx_to_pdf(input_docx: str, output_pdf: str) -> bool:
+    """Attempts to export a DOCX to PDF using MS Word automation if available.
+    Returns True on success, False otherwise.
+    """
+    try:
+        import win32com.client  # type: ignore
+        word = win32com.client.Dispatch("Word.Application")
+        word.Visible = False
+        doc = word.Documents.Open(input_docx)
+        wdFormatPDF = 17
+        doc.SaveAs(output_pdf, FileFormat=wdFormatPDF)
+        doc.Close(False)
+        word.Quit()
+        return True
+    except Exception:
+        return False

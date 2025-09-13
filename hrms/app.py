@@ -108,6 +108,7 @@ class MainWindow(QWidget):
         self.btn_letter_retirement.clicked.connect(self.export_retirement_letters)
         self.btn_letter_salary_person = QPushButton("Văn bản nâng lương")
         self.btn_letter_salary_person.clicked.connect(self.export_salary_letters)
+        self.btn_pdf_toggle = QComboBox(); self.btn_pdf_toggle.addItems(["DOCX","PDF"])  # chế độ xuất
         self.btn_import = QPushButton("Import Excel nhân sự")
         self.btn_import.clicked.connect(self.import_excel)
         self.btn_ins_add = QPushButton("Thêm sự kiện BHXH")
@@ -129,6 +130,7 @@ class MainWindow(QWidget):
         btn_layout.addWidget(self.btn_letter_salary_cover)
         btn_layout.addWidget(self.btn_letter_retirement)
         btn_layout.addWidget(self.btn_letter_salary_person)
+        btn_layout.addWidget(self.btn_pdf_toggle)
         btn_layout.addWidget(self.btn_import)
         btn_layout.addWidget(self.btn_ins_add)
         btn_layout.addWidget(self.btn_ins_export)
@@ -459,6 +461,12 @@ class MainWindow(QWidget):
         out = Path('exports')/f"cong_van_ra_soat_quy_{ctx['year']}_Q{ctx['quarter']}.docx"
         try:
             export_salary_review_cover(ctx, str(out))
+            # Optional PDF
+            if self.btn_pdf_toggle.currentText() == 'PDF':
+                from .templates import try_export_docx_to_pdf
+                pdf_path = str(out).replace('.docx','.pdf')
+                if try_export_docx_to_pdf(str(out), pdf_path):
+                    out = Path(pdf_path)
             try:
                 log_action(SessionLocal(), self.current_user.get('id'), 'export_salary_cover', 'Letter', None, f"file={out}")
             except Exception:
@@ -498,6 +506,14 @@ class MainWindow(QWidget):
             out2 = Path('exports')/f"quyet_dinh_nghi_huu_{person.code}.docx"
             export_retirement_notification(ctx, str(out1))
             export_retirement_decision(ctx, str(out2))
+            if self.btn_pdf_toggle.currentText() == 'PDF':
+                from .templates import try_export_docx_to_pdf
+                p1 = str(out1).replace('.docx','.pdf')
+                p2 = str(out2).replace('.docx','.pdf')
+                if try_export_docx_to_pdf(str(out1), p1):
+                    out1 = Path(p1)
+                if try_export_docx_to_pdf(str(out2), p2):
+                    out2 = Path(p2)
             try:
                 log_action(SessionLocal(), self.current_user.get('id'), 'export_retirement_letters', 'Letter', person.id, f"files={out1},{out2}")
             except Exception:
@@ -551,6 +567,14 @@ class MainWindow(QWidget):
             out2 = Path('exports')/f"quyet_dinh_nang_luong_{person.code}.docx"
             export_salary_notification(ctx, str(out1))
             export_salary_decision(ctx, str(out2))
+            if self.btn_pdf_toggle.currentText() == 'PDF':
+                from .templates import try_export_docx_to_pdf
+                p1 = str(out1).replace('.docx','.pdf')
+                p2 = str(out2).replace('.docx','.pdf')
+                if try_export_docx_to_pdf(str(out1), p1):
+                    out1 = Path(p1)
+                if try_export_docx_to_pdf(str(out2), p2):
+                    out2 = Path(p2)
             try:
                 log_action(SessionLocal(), self.current_user.get('id'), 'export_salary_letters', 'Letter', person.id, f"files={out1},{out2}")
             except Exception:
