@@ -43,16 +43,16 @@
   },
   "ui_frameworks": {
     "Streamlit Modern": true,
-    "Streamlit Classic": true,
-    "Flet (Flutter)": true,
-    "NiceGUI": true,
-    "Launcher Menu": true,
-    "Auto Keep-Alive": true
+    "Streamlit Classic": false,
+    "Flet (Flutter)": false,
+    "NiceGUI": false,
+    "Launcher Menu": false,
+    "Auto Keep-Alive": false
   },
   "summary": {
     "total_features": 38,
-    "completed_features": 38,
-    "completion_rate": 100.0,
-    "status": "Excellent"
+    "completed_features": 33,
+    "completion_rate": 86.8421052631579,
+    "status": "Good"
   }
 }

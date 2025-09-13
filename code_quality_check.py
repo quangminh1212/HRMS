@@ -25,8 +25,12 @@ from pathlib import Path
 from typing import List, Dict, Any, Tuple
 from dataclasses import dataclass
 
-# Simple logging
-logging.basicConfig(level=logging.WARNING)
+# Configure logging according to international standards
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 @dataclass

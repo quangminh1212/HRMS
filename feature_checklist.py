@@ -25,8 +25,12 @@ from pathlib import Path
 from typing import Dict, List, Any
 import json
 
-# Simple logging
-logging.basicConfig(level=logging.WARNING)
+# Configure logging according to international standards
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 class HRMSFeatureChecker:
