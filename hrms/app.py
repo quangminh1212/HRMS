@@ -18,6 +18,7 @@ from .audit import log_action
 from .scheduler import NOTIFY_QUEUE
 from .templates import render_docx_template
 from .ui_forms import prompt_context
+from .person_detail import PersonDetailDialog
 
 
 class LoginWindow(QWidget):
@@ -70,6 +71,8 @@ class MainWindow(QWidget):
         self.filter_unit.addItem("-- Đơn vị --", None)
         self.filter_position = QComboBox()
         self.filter_position.addItem("-- Chức vụ --", None)
+        self.filter_rank = QComboBox(); self.filter_rank.addItem("-- Ngạch --", None)
+        self.filter_step = QComboBox(); self.filter_step.addItem("-- Bậc --", None)
         self.filter_status = QComboBox()
         self.filter_status.addItems(["-- Trạng thái --", "Đang công tác", "Nghỉ thai sản", "Đi học", "Thôi việc"])  # có thể mở rộng
         self.btn_filter_refresh = QPushButton("Lọc")
@@ -80,6 +83,8 @@ class MainWindow(QWidget):
         self.btn_settings.clicked.connect(self.open_settings)
         filter_bar.addWidget(self.filter_unit)
         filter_bar.addWidget(self.filter_position)
+        filter_bar.addWidget(self.filter_rank)
+        filter_bar.addWidget(self.filter_step)
         filter_bar.addWidget(self.filter_status)
         filter_bar.addWidget(self.btn_filter_refresh)
         filter_bar.addWidget(self.btn_manage_users)
@@ -92,6 +97,8 @@ class MainWindow(QWidget):
         btn_layout = QHBoxLayout()
         self.btn_export = QPushButton("Xuất trích ngang")
         self.btn_export.clicked.connect(self.export_selected)
+        self.btn_detail = QPushButton("Chi tiết")
+        self.btn_detail.clicked.connect(self.open_detail)
         self.btn_due = QPushButton("Nâng lương quý này")
         self.btn_due.clicked.connect(self.show_due)
         self.btn_appointment = QPushButton("Kiểm tra bổ nhiệm")
@@ -120,6 +127,7 @@ class MainWindow(QWidget):
         self.btn_contract_export = QPushButton("Xuất HĐ")
         self.btn_contract_export.clicked.connect(self.export_contract)
         btn_layout.addWidget(self.btn_export)
+        btn_layout.addWidget(self.btn_detail)
         btn_layout.addWidget(self.btn_due)
         btn_layout.addWidget(self.btn_appointment)
         btn_layout.addWidget(self.btn_work)
@@ -173,6 +181,25 @@ class MainWindow(QWidget):
             pos_id = self.filter_position.currentData()
             if pos_id:
                 q = q.filter(Person.position_id == pos_id)
+            # Lọc theo ngạch/bậc dựa trên lịch sử lương mới nhất
+            rank_id = self.filter_rank.currentData()
+            step_val = self.filter_step.currentData()
+            if rank_id or step_val:
+                from .models import SalaryHistory
+                from sqlalchemy import func
+                sub = db.query(
+                    SalaryHistory.person_id,
+                    func.max(SalaryHistory.effective_date).label('max_date')
+                ).group_by(SalaryHistory.person_id).subquery()
+                latest = db.query(SalaryHistory.person_id, SalaryHistory.rank_id, SalaryHistory.step).join(
+                    sub,
+                    (SalaryHistory.person_id == sub.c.person_id) & (SalaryHistory.effective_date == sub.c.max_date)
+                )
+                ids = [pid for pid, r, s in latest if ((not rank_id or r == rank_id) and (not step_val or s == step_val))]
+                if ids:
+                    q = q.filter(Person.id.in_(ids))
+                else:
+                    q = q.filter(Person.id == -1)
             st = self.filter_status.currentText()
             if st and not st.startswith("--"):
                 q = q.filter(Person.status.ilike(f"%{st}%"))
@@ -206,6 +233,14 @@ class MainWindow(QWidget):
             self.filter_position.addItem("-- Chức vụ --", None)
             for p in db.query(Position).order_by(Position.name).all():
                 self.filter_position.addItem(p.name, p.id)
+            # Ranks
+            from .models import SalaryRank, SalaryStep
+            self.filter_rank.clear(); self.filter_rank.addItem("-- Ngạch --", None)
+            for r in db.query(SalaryRank).order_by(SalaryRank.code).all():
+                self.filter_rank.addItem(f"{r.code}-{r.name}", r.id)
+            self.filter_step.clear(); self.filter_step.addItem("-- Bậc --", None)
+            for s in range(1, 15):
+                self.filter_step.addItem(str(s), s)
         except Exception as e:
             QMessageBox.critical(self, "Lỗi", str(e))
         finally:
@@ -219,6 +254,7 @@ class MainWindow(QWidget):
         # Người dùng thường: chỉ xem và xuất trích ngang, xem nâng lương/báo cáo
         self.btn_import.setEnabled(is_admin)
         self.btn_work.setEnabled(is_admin)
+        self.btn_detail.setEnabled(True)
         self.btn_export_work.setEnabled(is_admin)
         self.btn_ins_add.setEnabled(is_admin)
         self.btn_ins_export.setEnabled(is_admin)
@@ -397,6 +433,19 @@ class MainWindow(QWidget):
             QMessageBox.information(self, "Thành công", "Đã thêm quá trình công tác")
         except Exception as e:
             QMessageBox.critical(self, "Lỗi", str(e))
+        finally:
+            if db:
+                db.close()
+
+    def open_detail(self):
+        # Mở dialog chi tiết cho nhân sự đang chọn
+        db, person = self.current_person()
+        try:
+            if not person:
+                QMessageBox.information(self, "Chưa chọn", "Chọn một nhân sự trước")
+                return
+            dlg = PersonDetailDialog(person.id, self)
+            dlg.exec()
         finally:
             if db:
                 db.close()
