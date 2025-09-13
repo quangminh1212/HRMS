@@ -81,6 +81,8 @@ class MainWindow(QWidget):
         self.btn_manage_users.clicked.connect(self.manage_users)
         self.btn_settings = QPushButton("Cấu hình")
         self.btn_settings.clicked.connect(self.open_settings)
+        self.btn_email_history = QPushButton("Lịch sử Email")
+        self.btn_email_history.clicked.connect(self.open_email_history)
         filter_bar.addWidget(self.filter_unit)
         filter_bar.addWidget(self.filter_position)
         filter_bar.addWidget(self.filter_rank)
@@ -172,6 +174,7 @@ class MainWindow(QWidget):
         btn_layout.addWidget(self.excel_template_type_box)
         btn_layout.addWidget(self.btn_save_tpl)
         btn_layout.addWidget(self.btn_import)
+        btn_layout.addWidget(self.btn_email_history)
         btn_layout.addWidget(self.btn_ins_add)
         btn_layout.addWidget(self.btn_ins_export)
         btn_layout.addWidget(self.btn_salary_export_filtered)
@@ -410,6 +413,7 @@ class MainWindow(QWidget):
         self.btn_ins_export.setEnabled(is_admin)
         self.btn_manage_users.setEnabled(is_admin)
         self.btn_settings.setEnabled(is_admin)
+        self.btn_email_history.setEnabled(role in ('admin','hr'))
         # Gửi email nâng lương (quý) chỉ cho admin/hr
         self.btn_email_salary_due.setEnabled(is_admin)
         # Nút email nghỉ hưu: chỉ admin/hr
@@ -1111,6 +1115,72 @@ class MainWindow(QWidget):
         btn_ok.clicked.connect(save)
         btn_cancel.clicked.connect(dlg.reject)
         btn_unit_emails.clicked.connect(edit_unit_emails)
+        dlg.exec()
+
+    def open_email_history(self):
+        # Hiển thị lịch sử email với bộ lọc cơ bản
+        role = (self.current_user.get('role') or '').lower()
+        if role not in ('admin','hr'):
+            QMessageBox.warning(self, "Không có quyền", "Chỉ admin/HR mới truy cập")
+            return
+        from PySide6.QtWidgets import QDialog, QFormLayout, QTableWidget, QTableWidgetItem
+        dlg = QDialog(self); dlg.setWindowTitle("Lịch sử Email")
+        lay = QVBoxLayout(dlg)
+        # Bộ lọc
+        f = QFormLayout();
+        from PySide6.QtWidgets import QLineEdit, QComboBox, QPushButton
+        type_box = QComboBox(); type_box.addItems(["(Tất cả)", "salary_due", "bhxh_monthly", "contracts_expiring", "quick_report", "retirement", "generic"])
+        unit_edit = QLineEdit(); unit_edit.setPlaceholderText("Đơn vị chứa…")
+        status_box = QComboBox(); status_box.addItems(["(Tất cả)", "sent", "failed"])
+        subject_search = QLineEdit(); subject_search.setPlaceholderText("Tìm tiêu đề…")
+        btn_refresh = QPushButton("Làm mới")
+        f.addRow("Loại", type_box)
+        f.addRow("Đơn vị", unit_edit)
+        f.addRow("Trạng thái", status_box)
+        f.addRow("Tiêu đề", subject_search)
+        f.addRow(btn_refresh)
+        lay.addLayout(f)
+        # Bảng kết quả
+        table = QTableWidget(0, 7)
+        table.setHorizontalHeaderLabels(["Thời gian", "Loại", "Đơn vị", "Subject", "Recipients", "Tệp đính kèm", "Trạng thái"])
+        lay.addWidget(table)
+        # Tải dữ liệu
+        def load():
+            from .db import SessionLocal
+            from .models import EmailLog
+            db = SessionLocal()
+            try:
+                q = db.query(EmailLog).order_by(EmailLog.created_at.desc())
+                t = type_box.currentText();
+                if not t.startswith("("):
+                    q = q.filter(EmailLog.type == t)
+                u = unit_edit.text().strip();
+                if u:
+                    q = q.filter(EmailLog.unit_name.ilike(f"%{u}%"))
+                st = status_box.currentText();
+                if not st.startswith("("):
+                    q = q.filter(EmailLog.status == st)
+                subj = subject_search.text().strip();
+                if subj:
+                    q = q.filter(EmailLog.subject.ilike(f"%{subj}%"))
+                rows = q.limit(500).all()
+                table.setRowCount(0)
+                for r in rows:
+                    i = table.rowCount(); table.insertRow(i)
+                    table.setItem(i, 0, QTableWidgetItem(str(getattr(r, 'created_at', ''))))
+                    table.setItem(i, 1, QTableWidgetItem(getattr(r, 'type', '') or ''))
+                    table.setItem(i, 2, QTableWidgetItem(getattr(r, 'unit_name', '') or ''))
+                    table.setItem(i, 3, QTableWidgetItem(getattr(r, 'subject', '') or ''))
+                    table.setItem(i, 4, QTableWidgetItem((getattr(r, 'recipients', '') or '')[:100]))
+                    table.setItem(i, 5, QTableWidgetItem((getattr(r, 'attachments', '') or '')[:100]))
+                    table.setItem(i, 6, QTableWidgetItem(getattr(r, 'status', '') or ''))
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+            finally:
+                db.close()
+        btn_refresh.clicked.connect(load)
+        load()
+        dlg.resize(900, 500)
         dlg.exec()
 
     def manage_users(self):
