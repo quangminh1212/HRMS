@@ -49,3 +49,17 @@ def test_export_salary_history(tmp_path):
         assert out.stat().st_size > 0
     finally:
         db.close()
+
+
+def test_export_salary_histories(tmp_path):
+    db = SessionLocal()
+    try:
+        # Lấy 2 nhân sự bất kỳ
+        people = db.query(Person).order_by(Person.id).limit(2).all()
+        out = tmp_path / "salary_histories.xlsx"
+        from hrms.salary import export_salary_histories_for_people
+        export_salary_histories_for_people(db, people, str(out))
+        assert out.exists()
+        assert out.stat().st_size > 0
+    finally:
+        db.close()

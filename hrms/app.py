@@ -126,6 +126,8 @@ class MainWindow(QWidget):
         self.btn_contract_add.clicked.connect(self.add_contract)
         self.btn_contract_export = QPushButton("Xuất HĐ")
         self.btn_contract_export.clicked.connect(self.export_contract)
+        self.btn_salary_export_filtered = QPushButton("Xuất lương (lọc)")
+        self.btn_salary_export_filtered.clicked.connect(self.export_salary_histories_filtered)
         btn_layout.addWidget(self.btn_export)
         btn_layout.addWidget(self.btn_detail)
         btn_layout.addWidget(self.btn_due)
@@ -142,6 +144,7 @@ class MainWindow(QWidget):
         btn_layout.addWidget(self.btn_import)
         btn_layout.addWidget(self.btn_ins_add)
         btn_layout.addWidget(self.btn_ins_export)
+        btn_layout.addWidget(self.btn_salary_export_filtered)
         layout.addWidget(QLabel("Tra cứu nhân sự"))
         layout.addWidget(self.search)
         layout.addWidget(self.list)
@@ -264,6 +267,8 @@ class MainWindow(QWidget):
         self.btn_work.setEnabled(is_mgr)
         self.btn_contract_add.setEnabled(is_mgr)
         self.btn_contract_export.setEnabled(is_mgr)
+        # Xuất lịch sử lương theo danh sách lọc: chỉ admin/hr và quản lý đơn vị (sẽ lọc theo đơn vị)
+        self.btn_salary_export_filtered.setEnabled(is_mgr)
 
     def drain_notifications(self):
         # Lấy thông báo từ scheduler và hiển thị popup
@@ -657,6 +662,49 @@ class MainWindow(QWidget):
         finally:
             if db:
                 db.close()
+
+    def export_salary_histories_filtered(self):
+        # Xuất lịch sử lương cho danh sách đang hiển thị (lọc)
+        from datetime import datetime
+        from .salary import export_salary_histories_for_people
+        db = SessionLocal()
+        try:
+            role = (self.current_user.get('role') or '').lower()
+            # Lấy danh sách code từ list widget (đang hiển thị theo bộ lọc)
+            codes = []
+            for i in range(self.list.count()):
+                item = self.list.item(i)
+                if not item:
+                    continue
+                code = item.text().split(" - ")[-1]
+                codes.append(code)
+            if not codes:
+                QMessageBox.information(self, "Không có dữ liệu", "Không có nhân sự trong danh sách để xuất")
+                return
+            from .models import Person
+            q = db.query(Person).filter(Person.code.in_(codes))
+            # RBAC: nếu quản lý đơn vị, chỉ cho phép xuất người cùng đơn vị
+            if role == 'unit_manager':
+                only_unit_id = self.current_user.get('unit_id')
+                if only_unit_id:
+                    q = q.filter(Person.unit_id == only_unit_id)
+            people = q.order_by(Person.full_name).all()
+            if not people:
+                QMessageBox.information(self, "Không có dữ liệu", "Không có nhân sự phù hợp quyền để xuất")
+                return
+            Path("exports").mkdir(exist_ok=True)
+            ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+            out = Path("exports")/f"salary_histories_{ts}.xlsx"
+            export_salary_histories_for_people(db, people, str(out))
+            try:
+                log_action(db, self.current_user.get('id'), 'export_salary_histories', 'Person', None, f"count={len(people)};file={out}")
+            except Exception:
+                pass
+            QMessageBox.information(self, "Thành công", f"Đã xuất: {out}")
+        except Exception as e:
+            QMessageBox.critical(self, "Lỗi", str(e))
+        finally:
+            db.close()
 
     def open_settings(self):
         # Trang cấu hình tối giản: SMTP và alert emails

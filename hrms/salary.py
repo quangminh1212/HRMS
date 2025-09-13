@@ -216,3 +216,52 @@ def export_salary_history_for_person(db: Session, person: Person, file_path: str
         ])
 
     wb.save(file_path)
+
+
+def export_salary_histories_for_people(db: Session, people: List[Person], file_path: str) -> None:
+    """Xuất lịch sử lương cho danh sách nhân sự (một sheet tổng hợp)."""
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Salary histories"
+    headers = ["Mã NV", "Họ tên", "Ngày hiệu lực", "Ngạch", "Bậc", "Hệ số", "Ghi chú"]
+    ws.append(headers)
+
+    if not people:
+        wb.save(file_path)
+        return
+
+    ids = [p.id for p in people]
+    person_map = {p.id: p for p in people}
+
+    # Lấy toàn bộ lịch sử cho các nhân sự đã chọn
+    hists = (
+        db.query(SalaryHistory)
+        .filter(SalaryHistory.person_id.in_(ids))
+        .order_by(SalaryHistory.person_id.asc(), SalaryHistory.effective_date.asc())
+        .all()
+    )
+
+    # Cache mã ngạch để tránh N+1
+    rank_ids = sorted({h.rank_id for h in hists})
+    code_map: Dict[int, str] = {}
+    if rank_ids:
+        for r in db.query(SalaryRank).filter(SalaryRank.id.in_(rank_ids)).all():
+            code_map[r.id] = r.code or ""
+
+    for h in hists:
+        p = person_map.get(h.person_id)
+        if not p:
+            continue
+        ws.append([
+            p.code or "",
+            p.full_name or "",
+            h.effective_date,
+            code_map.get(h.rank_id, ""),
+            h.step,
+            h.coefficient,
+            h.note or "",
+        ])
+
+    wb.save(file_path)
