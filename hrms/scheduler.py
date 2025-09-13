@@ -26,6 +26,59 @@ def notify(title: str, message: str):
 def schedule_jobs():
     sched = BackgroundScheduler()
 
+    # Gửi nâng lương theo đơn vị + ZIP tổng hợp nếu bật
+    def run_salary_alert_by_unit(start, end):
+        from pathlib import Path
+        from .salary import export_due_to_excel
+        from .mailer import send_email_with_attachment, get_recipients_for_unit, create_zip
+        from .settings_service import get_setting
+        from .models import Unit
+        try:
+            dbu = SessionLocal()
+            Path('exports').mkdir(exist_ok=True)
+            q = ((end.month - 1)//3) + 1
+            files = []
+            units = dbu.query(Unit).order_by(Unit.name).all()
+            for u in units:
+                recips = get_recipients_for_unit(u.name)
+                if not recips:
+                    continue
+                arr = list_due_in_window(dbu, start, end, unit_id=u.id)
+                if not arr:
+                    continue
+                out = Path('exports')/f"nang_luong_quy_{end.year}_Q{q}_{u.name.replace(' ', '_')}.xlsx"
+                export_due_to_excel(arr, str(out), template_name=None, username='Scheduler')
+                ok = send_email_with_attachment(f"[HRMS] Nâng lương Q{q}/{end.year} - {u.name}", f"Đính kèm danh sách cho {u.name}", [str(out)], to=recips)
+                files.append(str(out))
+                try:
+                    # mask recipients
+                    masked = []
+                    for r in recips:
+                        r = str(r or '').strip()
+                        if '@' in r:
+                            masked.append('***@' + r.split('@',1)[1])
+                        elif r:
+                            masked.append('***')
+                    from .models import EmailLog
+                    dbu.add(EmailLog(type='salary_due', unit_name=u.name, recipients=", ".join(masked)[:1000], subject=f"Nâng lương Q{q}/{end.year} - {u.name}", body=f"Gửi danh sách cho {u.name}", attachments=str(out), status='sent' if ok else 'failed'))
+                    dbu.commit()
+                except Exception:
+                    pass
+            # ZIP summary if enabled
+            try:
+                flag = (get_setting('SEND_SUMMARY_ZIP','0') or '0').strip().lower() in ('1','true','yes')
+                if flag and files:
+                    zip_path = Path('exports')/f"nang_luong_quy_{end.year}_Q{q}_by_unit.zip"
+                    if create_zip(files, str(zip_path)):
+                        send_email_with_attachment(f"[HRMS] Nâng lương Q{q}/{end.year} (ZIP tổng hợp)", f"ZIP tổng hợp danh sách nâng lương theo đơn vị Q{q}/{end.year}", [str(zip_path)])
+            except Exception:
+                pass
+        finally:
+            try:
+                dbu.close()
+            except Exception:
+                pass
+
     # Cảnh báo nâng lương vào ngày 15 của 2/5/8/11
     def run_salary_alert():
         today = date.today()
@@ -57,7 +110,7 @@ def schedule_jobs():
                 except Exception:
                     pass
                 # Gửi theo đơn vị nếu có mapping
-                run_salary_alert_by_unit(items, end)
+                run_salary_alert_by_unit(start, end)
         finally:
             db.close()
 
@@ -214,7 +267,21 @@ def schedule_jobs():
                 outu = Path('exports')/f"bhxh_{prev_year}_{prev_month:02d}_{u.name.replace(' ', '_')}.xlsx"
                 export_insurance_to_excel(db, start, end, str(outu), username='Scheduler', unit_id=u.id)
                 files.append(str(outu))
-                send_email_with_attachment('[HRMS] BHXH tháng theo đơn vị', f'Đính kèm BHXH {prev_month:02d}/{prev_year} - {u.name}', [str(outu)], to=recips)
+                ok_u = send_email_with_attachment('[HRMS] BHXH tháng theo đơn vị', f'Đính kèm BHXH {prev_month:02d}/{prev_year} - {u.name}', [str(outu)], to=recips)
+                try:
+                    # Ghi EmailLog chi tiết
+                    masked = []
+                    for r in recips:
+                        r = str(r or '').strip()
+                        if '@' in r:
+                            masked.append('***@' + r.split('@',1)[1])
+                        elif r:
+                            masked.append('***')
+                    from .db import SessionLocal
+                    from .models import EmailLog
+                    s2 = SessionLocal(); s2.add(EmailLog(type='bhxh_monthly', unit_name=u.name, recipients=", ".join(masked)[:1000], subject='BHXH tháng theo đơn vị', body=f"BHXH {prev_month:02d}/{prev_year} - {u.name}", attachments=str(outu), status='sent' if ok_u else 'failed')); s2.commit(); s2.close()
+                except Exception:
+                    pass
             try:
                 from .settings_service import get_setting
                 flag = (get_setting('SEND_SUMMARY_ZIP','0') or '0').strip().lower() in ('1','true','yes')
@@ -261,7 +328,20 @@ def schedule_jobs():
                 outu = Path('exports')/f"contracts_expiring_{today.isoformat()}_{days}d_{u.name.replace(' ', '_')}.xlsx"
                 export_contracts_expiring_to_excel(db, today, end, str(outu), unit_id=u.id)
                 files.append(str(outu))
-                send_email_with_attachment('[HRMS] HĐ sắp hết hạn theo đơn vị', f'Đính kèm HĐ sắp hết hạn trong {days} ngày tới - {u.name}', [str(outu)], to=recips)
+                ok_u = send_email_with_attachment('[HRMS] HĐ sắp hết hạn theo đơn vị', f'Đính kèm HĐ sắp hết hạn trong {days} ngày tới - {u.name}', [str(outu)], to=recips)
+                try:
+                    masked = []
+                    for r in recips:
+                        r = str(r or '').strip()
+                        if '@' in r:
+                            masked.append('***@' + r.split('@',1)[1])
+                        elif r:
+                            masked.append('***')
+                    from .db import SessionLocal
+                    from .models import EmailLog
+                    s2 = SessionLocal(); s2.add(EmailLog(type='contracts_expiring', unit_name=u.name, recipients=", ".join(masked)[:1000], subject='HĐ sắp hết hạn theo đơn vị', body=f"{days} ngày - {u.name}", attachments=str(outu), status='sent' if ok_u else 'failed')); s2.commit(); s2.close()
+                except Exception:
+                    pass
             try:
                 flag = (get_setting('SEND_SUMMARY_ZIP','0') or '0').strip().lower() in ('1','true','yes')
                 if flag and files:

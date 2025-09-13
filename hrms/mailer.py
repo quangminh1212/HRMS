@@ -60,6 +60,58 @@ def _shorten_recipients(recipients: List[str]) -> str:
         return ", ".join(recipients or [])
 
 
+def get_recipients_for_unit(unit_name: str) -> List[str]:
+    """Đọc cấu hình UNIT_EMAILS và trả về danh sách email cho tên đơn vị.
+    Hỗ trợ 2 định dạng:
+    - JSON: {"Unit A": ["a@x", "b@y"], "Unit B": "c@z"}
+    - Dạng chuỗi: "Unit A=a@x,b@y; Unit B=c@z"
+    Khớp tên đơn vị không phân biệt hoa thường.
+    """
+    try:
+        if not _get_setting:
+            return []
+        raw = _get_setting('UNIT_EMAILS', '') or ''
+        if not raw.strip():
+            return []
+        mapping: dict[str, list[str]] = {}
+        # Thử JSON trước
+        try:
+            import json
+            obj = json.loads(raw)
+            if isinstance(obj, dict):
+                for k, v in obj.items():
+                    if isinstance(v, list):
+                        emails = [str(x).strip() for x in v if str(x).strip()]
+                    else:
+                        emails = [e.strip() for e in str(v).split(',') if e.strip()]
+                    if emails:
+                        mapping[str(k).strip()] = emails
+        except Exception:
+            # Fallback parse dạng chuỗi
+            parts = [p for p in raw.split(';') if p.strip()]
+            for p in parts:
+                if '=' in p:
+                    name, emails = p.split('=', 1)
+                    vals = [e.strip() for e in emails.split(',') if e.strip()]
+                    if vals:
+                        mapping[name.strip()] = vals
+        if not mapping:
+            return []
+        def _norm(x: str) -> str:
+            return (x or '').strip().lower()
+        # Ưu tiên khớp chính xác
+        if unit_name in mapping:
+            return mapping[unit_name]
+        # Khớp không phân biệt hoa thường
+        target = _norm(unit_name)
+        for k, v in mapping.items():
+            if _norm(k) == target:
+                return v
+        return []
+    except Exception:
+        return []
+
+
 def send_email_with_attachment(subject: str, body: str, attachments: List[str], to: List[str] | None = None) -> bool:
     settings = load_settings()
     recipients = to or settings.alert_emails or []
@@ -100,7 +152,7 @@ def send_email_with_attachment(subject: str, body: str, attachments: List[str], 
             log = EmailLog(
                 type="generic",
                 unit_name=None,
-                recipients=", ".join(to or settings.alert_emails or []),
+                recipients=_shorten_recipients(to or settings.alert_emails or []),
                 subject=_apply_subject_prefix(subject),
                 body=(body or '')[:1000],
                 attachments=", ".join(attachments or [])[:2000],
@@ -121,7 +173,7 @@ def send_email_with_attachment(subject: str, body: str, attachments: List[str], 
             log = EmailLog(
                 type="generic",
                 unit_name=None,
-                recipients=", ".join(to or settings.alert_emails or []),
+                recipients=_shorten_recipients(to or settings.alert_emails or []),
                 subject=_apply_subject_prefix(subject),
                 body=(body or '')[:1000],
                 attachments=", ".join(attachments or [])[:2000],
