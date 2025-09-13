@@ -13,6 +13,7 @@ from .models import Person, User
 from .init_db import init_db
 from .seed import seed_basic_data
 from .security import verify_password
+from .salary import list_due_in_window, export_due_to_excel
 
 
 class LoginWindow(QWidget):
@@ -64,7 +65,10 @@ class MainWindow(QWidget):
         btn_layout = QHBoxLayout()
         self.btn_export = QPushButton("Xuất trích ngang")
         self.btn_export.clicked.connect(self.export_selected)
+        self.btn_due = QPushButton("Nâng lương quý này")
+        self.btn_due.clicked.connect(self.show_due)
         btn_layout.addWidget(self.btn_export)
+        btn_layout.addWidget(self.btn_due)
         layout.addWidget(QLabel("Tra cứu nhân sự"))
         layout.addWidget(self.search)
         layout.addWidget(self.list)
@@ -138,6 +142,38 @@ class MainWindow(QWidget):
             QMessageBox.critical(self, "Lỗi", str(e))
         finally:
             db.close()
+
+    def show_due(self):
+        from datetime import date
+        start, end = quarter_window(date.today())
+        db = SessionLocal()
+        try:
+            items = list_due_in_window(db, start, end)
+            if not items:
+                QMessageBox.information(self, "Kết quả", "Không có nhân sự đến hạn trong quý này")
+                return
+            Path("exports").mkdir(exist_ok=True)
+            xlsx = Path("exports") / f"nang_luong_quy_{end.year}_Q{((end.month-1)//3)+1}.xlsx"
+            export_due_to_excel(items, str(xlsx))
+            QMessageBox.information(self, "Thành công", f"Đã xuất danh sách: {xlsx}")
+        except Exception as e:
+            QMessageBox.critical(self, "Lỗi", str(e))
+        finally:
+            db.close()
+
+
+def quarter_window(d):
+    # cảnh báo vào ngày 15 của tháng 2/5/8/11, nhưng ở đây tạo cửa sổ quý
+    q = (d.month - 1) // 3 + 1
+    start_month = 3 * (q - 1) + 1
+    from datetime import date as _date
+    start = _date(d.year, start_month, 1)
+    # end: ngày cuối tháng trong quý
+    end_month = start_month + 2
+    from calendar import monthrange
+    last_day = monthrange(d.year, end_month)[1]
+    end = _date(d.year, end_month, last_day)
+    return start, end
 
 
 def main():

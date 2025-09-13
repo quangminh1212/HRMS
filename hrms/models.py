@@ -148,3 +148,43 @@ class AuditLog(Base):
     entity_id = Column(Integer, nullable=True)
     timestamp = Column(DateTime, default=datetime.utcnow)
     details = Column(String(500), nullable=True)
+
+
+class Contract(Base):
+    __tablename__ = "contracts"
+    id = Column(Integer, primary_key=True)
+    person_id = Column(Integer, ForeignKey("persons.id"), nullable=False)
+    contract_type = Column(String(100), nullable=False)  # ban kiem soat/nhan vien/
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=True)
+    note = Column(String(255), nullable=True)
+
+
+class RetirementNotice(Base):
+    __tablename__ = "retirement_notices"
+    id = Column(Integer, primary_key=True)
+    person_id = Column(Integer, ForeignKey("persons.id"), nullable=False)
+    planned_date = Column(Date, nullable=False)
+    notice_date = Column(Date, nullable=True)  # ngày thông báo 6 tháng trước
+    decision_date = Column(Date, nullable=True)  # ngày quyết định 3 tháng trước
+    note = Column(String(255), nullable=True)
+
+
+class InsuranceEvent(Base):
+    __tablename__ = "insurance_events"
+    id = Column(Integer, primary_key=True)
+    person_id = Column(Integer, ForeignKey("persons.id"), nullable=False)
+    event_type = Column(String(100), nullable=False)  # dieu chinh chuc danh/luong/phu cap; thai san; om dau;...
+    event_date = Column(Date, nullable=False)
+    details = Column(String(500), nullable=True)
+
+
+class JobPositionRequirement(Base):
+    __tablename__ = "job_position_requirements"
+    id = Column(Integer, primary_key=True)
+    position_name = Column(String(255), nullable=False)
+    required_degree = Column(String(255), nullable=True)
+    required_llct = Column(String(100), nullable=True)
+    required_qlnn = Column(String(100), nullable=True)
+    min_years_experience = Column(Integer, nullable=True)
+    __table_args__ = (UniqueConstraint('position_name', name='uq_position_req'),)
