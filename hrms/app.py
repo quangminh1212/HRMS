@@ -102,6 +102,8 @@ class MainWindow(QWidget):
         self.btn_letter_salary_cover.clicked.connect(self.export_salary_cover)
         self.btn_letter_retirement = QPushButton("Văn bản nghỉ hưu")
         self.btn_letter_retirement.clicked.connect(self.export_retirement_letters)
+        self.btn_letter_salary_person = QPushButton("Văn bản nâng lương")
+        self.btn_letter_salary_person.clicked.connect(self.export_salary_letters)
         self.btn_import = QPushButton("Import Excel nhân sự")
         self.btn_import.clicked.connect(self.import_excel)
         self.btn_ins_add = QPushButton("Thêm sự kiện BHXH")
@@ -122,6 +124,7 @@ class MainWindow(QWidget):
         btn_layout.addWidget(self.btn_report)
         btn_layout.addWidget(self.btn_letter_salary_cover)
         btn_layout.addWidget(self.btn_letter_retirement)
+        btn_layout.addWidget(self.btn_letter_salary_person)
         btn_layout.addWidget(self.btn_import)
         btn_layout.addWidget(self.btn_ins_add)
         btn_layout.addWidget(self.btn_ins_export)
@@ -464,6 +467,43 @@ class MainWindow(QWidget):
             out2 = Path('exports')/f"quyet_dinh_nghi_huu_{person.code}.docx"
             export_retirement_notification(ctx, str(out1))
             export_retirement_decision(ctx, str(out2))
+            QMessageBox.information(self, "Thành công", f"Đã xuất: {out1}\n{out2}")
+        except Exception as e:
+            QMessageBox.critical(self, "Lỗi", str(e))
+        finally:
+            if db:
+                db.close()
+
+    def export_salary_letters(self):
+        # Xuất Thông báo & Quyết định nâng lương cho nhân sự đã chọn nếu có đề xuất
+        from datetime import date
+        from .salary import compute_next_for_person
+        from .docx_exports import export_salary_notification, export_salary_decision
+        db, person = self.current_person()
+        try:
+            if not person:
+                QMessageBox.information(self, "Chưa chọn", "Chọn một nhân sự trước")
+                return
+            info = compute_next_for_person(db, person, date.today())
+            if not info:
+                QMessageBox.information(self, "Không có đề xuất", "Nhân sự chưa đến hạn nâng lương")
+                return
+            effective = info.get('due_date')
+            step = info.get('next_step') if info.get('type') == 'step' else ''
+            coef = info.get('next_coef') if info.get('type') == 'step' else f"{info.get('allowance_percent','')}%"
+            ctx = {
+                'full_name': person.full_name or '',
+                'code': person.code or '',
+                'unit': person.unit.name if person.unit else '',
+                'effective_date': effective.isoformat() if effective else date.today().isoformat(),
+                'step': str(step) if step != '' else '',
+                'coefficient': str(coef) if coef is not None else '',
+            }
+            Path('exports').mkdir(exist_ok=True)
+            out1 = Path('exports')/f"thong_bao_nang_luong_{person.code}.docx"
+            out2 = Path('exports')/f"quyet_dinh_nang_luong_{person.code}.docx"
+            export_salary_notification(ctx, str(out1))
+            export_salary_decision(ctx, str(out2))
             QMessageBox.information(self, "Thành công", f"Đã xuất: {out1}\n{out2}")
         except Exception as e:
             QMessageBox.critical(self, "Lỗi", str(e))
