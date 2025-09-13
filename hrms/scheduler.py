@@ -30,7 +30,7 @@ def schedule_jobs():
     def run_salary_alert_by_unit(start, end):
         from pathlib import Path
         from .salary import export_due_to_excel
-        from .mailer import send_email_with_attachment, get_recipients_for_unit, create_zip
+        from .mailer import get_recipients_for_unit, create_zip
         from .settings_service import get_setting
         from .models import Unit
         try:
@@ -39,6 +39,12 @@ def schedule_jobs():
             q = ((end.month - 1)//3) + 1
             files = []
             units = dbu.query(Unit).order_by(Unit.name).all()
+            # Retry params
+            try:
+                rc = int(get_setting('RETRY_COUNT','2') or '2')
+                rd = int(get_setting('RETRY_DELAY','10') or '10')
+            except Exception:
+                rc, rd = 2, 10
             for u in units:
                 recips = get_recipients_for_unit(u.name)
                 if not recips:
@@ -48,7 +54,8 @@ def schedule_jobs():
                     continue
                 out = Path('exports')/f"nang_luong_quy_{end.year}_Q{q}_{u.name.replace(' ', '_')}.xlsx"
                 export_due_to_excel(arr, str(out), template_name=None, username='Scheduler')
-                ok = send_email_with_attachment(f"[HRMS] Nâng lương Q{q}/{end.year} - {u.name}", f"Đính kèm danh sách cho {u.name}", [str(out)], to=recips)
+                from .mailer import send_email_with_attachment_retry
+                ok = send_email_with_attachment_retry(f"[HRMS] Nâng lương Q{q}/{end.year} - {u.name}", f"Đính kèm danh sách cho {u.name}", [str(out)], to=recips, retries=rc, delay=rd)
                 files.append(str(out))
                 try:
                     # mask recipients
@@ -70,7 +77,8 @@ def schedule_jobs():
                 if flag and files:
                     zip_path = Path('exports')/f"nang_luong_quy_{end.year}_Q{q}_by_unit.zip"
                     if create_zip(files, str(zip_path)):
-                        send_email_with_attachment(f"[HRMS] Nâng lương Q{q}/{end.year} (ZIP tổng hợp)", f"ZIP tổng hợp danh sách nâng lương theo đơn vị Q{q}/{end.year}", [str(zip_path)])
+                        from .mailer import send_email_with_attachment_retry
+                        send_email_with_attachment_retry(f"[HRMS] Nâng lương Q{q}/{end.year} (ZIP tổng hợp)", f"ZIP tổng hợp danh sách nâng lương theo đơn vị Q{q}/{end.year}", [str(zip_path)], retries=rc, delay=rd)
             except Exception:
                 pass
         finally:
@@ -84,6 +92,13 @@ def schedule_jobs():
         today = date.today()
         if today.day != 15 or today.month not in (2, 5, 8, 11):
             return
+        # Retry params
+        try:
+            from .settings_service import get_setting
+            rc = int(get_setting('RETRY_COUNT','2') or '2')
+            rd = int(get_setting('RETRY_DELAY','10') or '10')
+        except Exception:
+            rc, rd = 2, 10
         from .app import quarter_window
         start, end = quarter_window(today)
         db = SessionLocal()
@@ -106,7 +121,7 @@ from .mailer import send_email_with_attachment_retry as send_email_with_attachme
                     out = Path("exports") / f"nang_luong_quy_{end.year}_Q{q}.xlsx"
                     export_due_to_excel(items, str(out), template_name=None, username="Scheduler")
                     body = msg + f"\nĐính kèm file: {out.name}"
-                    send_email_with_attachment("[HRMS] Danh sách đến hạn nâng lương", body, [str(out)])
+                    send_email_with_attachment("[HRMS] Danh sách đến hạn nâng lương", body, [str(out)], retries=rc, delay=rd)
                 except Exception:
                     pass
                 # Gửi theo đơn vị nếu có mapping
@@ -119,6 +134,13 @@ from .mailer import send_email_with_attachment_retry as send_email_with_attachme
         db = SessionLocal()
         try:
             today = date.today()
+            # Retry params
+            try:
+                from .settings_service import get_setting
+                rc = int(get_setting('RETRY_COUNT','2') or '2')
+                rd = int(get_setting('RETRY_DELAY','10') or '10')
+            except Exception:
+                rc, rd = 2, 10
             six = date(today.year + (today.month + 6 - 1) // 12, ((today.month + 6 - 1) % 12) + 1, today.day)
             three = date(today.year + (today.month + 3 - 1) // 12, ((today.month + 3 - 1) % 12) + 1, today.day)
             list6 = []
@@ -154,7 +176,7 @@ from .mailer import send_email_with_attachment_retry as send_email_with_attachme
                     Path('exports').mkdir(exist_ok=True)
                     out = Path('exports')/f"nghi_huu_thong_bao_{today.isoformat()}.xlsx"
                     export_retirement_alerts_to_excel(db, list6, list3, str(out))
-                    send_email_with_attachment('[HRMS] Danh sách nghỉ hưu (6/3 tháng)', 'Đính kèm danh sách nghỉ hưu (6/3 tháng)', [str(out)])
+                    send_email_with_attachment('[HRMS] Danh sách nghỉ hưu (6/3 tháng)', 'Đính kèm danh sách nghỉ hưu (6/3 tháng)', [str(out)], retries=rc, delay=rd)
                 except Exception:
                     pass
         finally:
@@ -168,6 +190,13 @@ from .mailer import send_email_with_attachment_retry as send_email_with_attachme
         from .insurance import export_insurance_to_excel
 from .mailer import send_email_with_attachment_retry as send_email_with_attachment, get_recipients_for_unit
         today = date.today()
+        # Retry params
+        try:
+            from .settings_service import get_setting
+            rc = int(get_setting('RETRY_COUNT','2') or '2')
+            rd = int(get_setting('RETRY_DELAY','10') or '10')
+        except Exception:
+            rc, rd = 2, 10
         # khoảng tháng trước
         prev_month = (today.month - 2) % 12 + 1
         prev_year = today.year - 1 if today.month == 1 else today.year
@@ -180,7 +209,7 @@ from .mailer import send_email_with_attachment_retry as send_email_with_attachme
             # tổng hợp chung
             out = Path('exports')/f"bhxh_{prev_year}_{prev_month:02d}.xlsx"
             export_insurance_to_excel(db, start, end, str(out), username='Scheduler')
-            send_email_with_attachment('[HRMS] Báo cáo BHXH tháng', f'Đính kèm BHXH {prev_month:02d}/{prev_year}', [str(out)])
+            send_email_with_attachment('[HRMS] Báo cáo BHXH tháng', f'Đính kèm BHXH {prev_month:02d}/{prev_year}', [str(out)], retries=rc, delay=rd)
             # theo đơn vị
             from .models import Unit
             units = db.query(Unit).all()
@@ -190,7 +219,7 @@ from .mailer import send_email_with_attachment_retry as send_email_with_attachme
                     continue
                 outu = Path('exports')/f"bhxh_{prev_year}_{prev_month:02d}_{u.name.replace(' ', '_')}.xlsx"
                 export_insurance_to_excel(db, start, end, str(outu), username='Scheduler', unit_id=u.id)
-                send_email_with_attachment('[HRMS] BHXH tháng theo đơn vị', f'Đính kèm BHXH {prev_month:02d}/{prev_year} - {u.name}', [str(outu)], to=recips)
+                send_email_with_attachment('[HRMS] BHXH tháng theo đơn vị', f'Đính kèm BHXH {prev_month:02d}/{prev_year} - {u.name}', [str(outu)], to=recips, retries=rc, delay=rd)
         except Exception:
             pass
         finally:
@@ -205,6 +234,12 @@ from .mailer import send_email_with_attachment_retry as send_email_with_attachme
         from .settings_service import get_setting
         today = date.today()
         days = int(get_setting('CONTRACT_ALERT_DAYS', '30') or '30')
+        # Retry params
+        try:
+            rc = int(get_setting('RETRY_COUNT','2') or '2')
+            rd = int(get_setting('RETRY_DELAY','10') or '10')
+        except Exception:
+            rc, rd = 2, 10
         end = today + timedelta(days=days)
         db = SessionLocal()
         try:
@@ -212,7 +247,7 @@ from .mailer import send_email_with_attachment_retry as send_email_with_attachme
             # tổng hợp chung
             out = Path('exports')/f"contracts_expiring_{today.isoformat()}_{days}d.xlsx"
             export_contracts_expiring_to_excel(db, today, end, str(out))
-            send_email_with_attachment('[HRMS] Hợp đồng sắp hết hạn', f'Đính kèm danh sách HĐ sắp hết hạn trong {days} ngày tới', [str(out)])
+            send_email_with_attachment('[HRMS] Hợp đồng sắp hết hạn', f'Đính kèm danh sách HĐ sắp hết hạn trong {days} ngày tới', [str(out)], retries=rc, delay=rd)
             # theo đơn vị
             from .models import Unit
             units = db.query(Unit).all()
@@ -328,7 +363,7 @@ from .mailer import send_email_with_attachment_retry as send_email_with_attachme
                 outu = Path('exports')/f"contracts_expiring_{today.isoformat()}_{days}d_{u.name.replace(' ', '_')}.xlsx"
                 export_contracts_expiring_to_excel(db, today, end, str(outu), unit_id=u.id)
                 files.append(str(outu))
-                ok_u = send_email_with_attachment('[HRMS] HĐ sắp hết hạn theo đơn vị', f'Đính kèm HĐ sắp hết hạn trong {days} ngày tới - {u.name}', [str(outu)], to=recips)
+                ok_u = send_email_with_attachment('[HRMS] HĐ sắp hết hạn theo đơn vị', f'Đính kèm HĐ sắp hết hạn trong {days} ngày tới - {u.name}', [str(outu)], to=recips, retries=rc, delay=rd)
                 try:
                     masked = []
                     for r in recips:

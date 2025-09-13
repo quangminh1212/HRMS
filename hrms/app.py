@@ -1314,6 +1314,8 @@ class MainWindow(QWidget):
         f.addRow("UNIT_EMAILS", unit_emails)
         f.addRow("SEND_SUMMARY_ZIP (1/0)", summary_zip)
         f.addRow("CONTRACT_ALERT_DAYS", contract_alert_days)
+        f.addRow("RETRY_COUNT", QLineEdit(get_setting('RETRY_COUNT','2') or '2'))
+        f.addRow("RETRY_DELAY", QLineEdit(get_setting('RETRY_DELAY','10') or '10'))
         f.addRow("EXPORT_TTL_DAYS", export_ttl_days)
         f.addRow("XLSX_DATE_FORMAT", date_fmt)
         f.addRow("XLSX_NUMBER_FORMAT_COEF", coef_fmt)
@@ -1338,6 +1340,24 @@ class MainWindow(QWidget):
             set_setting('UNIT_EMAILS', unit_emails.text())
             set_setting('SEND_SUMMARY_ZIP', (summary_zip.text() or '0'))
             set_setting('CONTRACT_ALERT_DAYS', (contract_alert_days.text() or '30'))
+            # RETRY_COUNT/DELAY: đọc từ form theo label
+            try:
+                from PySide6.QtWidgets import QLineEdit
+                # QFormLayout order known: locate by label text
+                for i in range(f.rowCount()):
+                    label_item = f.itemAt(i, QFormLayout.LabelRole)
+                    field_item = f.itemAt(i, QFormLayout.FieldRole)
+                    if not label_item or not field_item: continue
+                    wlabel = label_item.widget()
+                    wfield = field_item.widget()
+                    if not wlabel or not wfield: continue
+                    name = getattr(wlabel, 'text', lambda: '')()
+                    if name == 'RETRY_COUNT' and isinstance(wfield, QLineEdit):
+                        set_setting('RETRY_COUNT', (wfield.text() or '2'))
+                    if name == 'RETRY_DELAY' and isinstance(wfield, QLineEdit):
+                        set_setting('RETRY_DELAY', (wfield.text() or '10'))
+            except Exception:
+                pass
             set_setting('EXPORT_TTL_DAYS', (export_ttl_days.text() or '30'))
             set_setting('XLSX_DATE_FORMAT', (date_fmt.text() or 'DD/MM/YYYY'))
             set_setting('XLSX_NUMBER_FORMAT_COEF', (coef_fmt.text() or '0.00'))
