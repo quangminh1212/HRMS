@@ -6,6 +6,7 @@ from hrms.models import Person, SalaryRank, SalaryStep, SalaryHistory
 from hrms.salary import compute_next_for_person, export_salary_history_for_person
 from hrms.init_db import init_db
 from hrms.seed import seed_basic_data
+from openpyxl import load_workbook
 
 
 def setup_module(module):
@@ -47,6 +48,15 @@ def test_export_salary_history(tmp_path):
         export_salary_history_for_person(db, p, str(out))
         assert out.exists()
         assert out.stat().st_size > 0
+        # Kiểm tra header, freeze panes, và biểu đồ
+        wb = load_workbook(str(out))
+        ws = wb.active
+        expected = ["Mã NV", "Họ tên", "Ngày hiệu lực", "Ngạch", "Bậc", "Hệ số", "Ghi chú"]
+        assert [cell.value for cell in ws[1]] == expected
+        assert ws.freeze_panes == "A2"
+        if ws.max_row > 1:
+            charts = getattr(ws, "_charts", [])
+            assert len(charts) >= 1
     finally:
         db.close()
 
@@ -61,5 +71,11 @@ def test_export_salary_histories(tmp_path):
         export_salary_histories_for_people(db, people, str(out))
         assert out.exists()
         assert out.stat().st_size > 0
+        # Kiểm tra header và freeze panes
+        wb = load_workbook(str(out))
+        ws = wb.active
+        expected = ["Mã NV", "Họ tên", "Ngày hiệu lực", "Ngạch", "Bậc", "Hệ số", "Ghi chú"]
+        assert [cell.value for cell in ws[1]] == expected
+        assert ws.freeze_panes == "A2"
     finally:
         db.close()

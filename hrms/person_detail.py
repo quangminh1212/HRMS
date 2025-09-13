@@ -87,12 +87,21 @@ class PersonDetailDialog(QDialog):
             if not p:
                 QMessageBox.critical(self, "Lỗi", "Không tìm thấy nhân sự")
                 return
+            # RBAC: chỉ admin/hr và quản lý đơn vị (chỉ người trong đơn vị)
+            current_user = getattr(self.parent(), 'current_user', {}) if self.parent() else {}
+            role = (current_user.get('role') or '').lower() if isinstance(current_user, dict) else ''
+            if role not in ('admin','hr','unit_manager'):
+                QMessageBox.warning(self, "Không có quyền", "Bạn không có quyền xuất lịch sử lương")
+                return
+            if role == 'unit_manager' and current_user.get('unit_id') and p.unit_id and p.unit_id != current_user.get('unit_id'):
+                QMessageBox.warning(self, "Không có quyền", "Chỉ quản lý đơn vị được xuất nhân sự thuộc đơn vị mình")
+                return
+
             Path("exports").mkdir(exist_ok=True)
             out = Path("exports") / f"salary_history_{p.code}.xlsx"
             export_salary_history_for_person(db, p, str(out))
             # Audit
             try:
-                current_user = getattr(self.parent(), 'current_user', {}) if self.parent() else {}
                 uid = current_user.get('id') if isinstance(current_user, dict) else None
                 log_action(db, uid, 'export_salary_history', 'Person', p.id, f"file={out}")
             except Exception:

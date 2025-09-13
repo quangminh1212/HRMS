@@ -184,25 +184,29 @@ class MainWindow(QWidget):
             pos_id = self.filter_position.currentData()
             if pos_id:
                 q = q.filter(Person.position_id == pos_id)
-            # Lọc theo ngạch/bậc dựa trên lịch sử lương mới nhất
+            # Lọc theo ngạch/bậc dựa trên lịch sử lương mới nhất (tối ưu hóa ở DB)
             rank_id = self.filter_rank.currentData()
             step_val = self.filter_step.currentData()
             if rank_id or step_val:
                 from .models import SalaryHistory
                 from sqlalchemy import func
                 sub = db.query(
-                    SalaryHistory.person_id,
+                    SalaryHistory.person_id.label('pid'),
                     func.max(SalaryHistory.effective_date).label('max_date')
                 ).group_by(SalaryHistory.person_id).subquery()
-                latest = db.query(SalaryHistory.person_id, SalaryHistory.rank_id, SalaryHistory.step).join(
+                latest = db.query(
+                    SalaryHistory.person_id.label('pid'),
+                    SalaryHistory.rank_id.label('rank_id'),
+                    SalaryHistory.step.label('step')
+                ).join(
                     sub,
-                    (SalaryHistory.person_id == sub.c.person_id) & (SalaryHistory.effective_date == sub.c.max_date)
-                )
-                ids = [pid for pid, r, s in latest if ((not rank_id or r == rank_id) and (not step_val or s == step_val))]
-                if ids:
-                    q = q.filter(Person.id.in_(ids))
-                else:
-                    q = q.filter(Person.id == -1)
+                    (SalaryHistory.person_id == sub.c.pid) & (SalaryHistory.effective_date == sub.c.max_date)
+                ).subquery()
+                q = q.join(latest, Person.id == latest.c.pid)
+                if rank_id:
+                    q = q.filter(latest.c.rank_id == rank_id)
+                if step_val:
+                    q = q.filter(latest.c.step == step_val)
             st = self.filter_status.currentText()
             if st and not st.startswith("--"):
                 q = q.filter(Person.status.ilike(f"%{st}%"))

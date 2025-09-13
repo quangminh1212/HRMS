@@ -181,14 +181,26 @@ def export_due_to_excel(items: List[Dict[str, Any]], file_path: str) -> None:
 
 
 def export_salary_history_for_person(db: Session, person: Person, file_path: str) -> None:
-    """Xuất toàn bộ lịch sử lương của một nhân sự ra Excel."""
+    """Xuất toàn bộ lịch sử lương của một nhân sự ra Excel, có định dạng và biểu đồ hệ số theo thời gian."""
     from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill
+    from openpyxl.utils import get_column_letter
+    from openpyxl.chart import LineChart, Reference
 
     wb = Workbook()
     ws = wb.active
     ws.title = "Salary history"
     headers = ["Mã NV", "Họ tên", "Ngày hiệu lực", "Ngạch", "Bậc", "Hệ số", "Ghi chú"]
     ws.append(headers)
+
+    # Header style + freeze panes
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill("solid", fgColor="4F81BD")
+    for c in ws[1]:
+        c.font = header_font
+        c.fill = header_fill
+        c.alignment = Alignment(horizontal="center", vertical="center")
+    ws.freeze_panes = "A2"
 
     hists = (
         db.query(SalaryHistory)
@@ -215,12 +227,39 @@ def export_salary_history_for_person(db: Session, person: Person, file_path: str
             h.note or "",
         ])
 
+    # Auto filter toàn bảng
+    ws.auto_filter.ref = f"A1:G{ws.max_row}"
+
+    # Auto width cột
+    widths = [len(h) for h in headers]
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        for idx, val in enumerate(row):
+            l = len(str(val)) if val is not None else 0
+            if l > widths[idx]:
+                widths[idx] = l
+    for i, w in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(i)].width = min(max(w + 2, 10), 40)
+
+    # Biểu đồ hệ số theo thời gian nếu có dữ liệu
+    if ws.max_row > 1:
+        chart = LineChart()
+        chart.title = f"Biểu đồ hệ số theo thời gian - {person.full_name or ''}"
+        chart.y_axis.title = "Hệ số"
+        chart.x_axis.title = "Ngày hiệu lực"
+        data = Reference(ws, min_col=6, min_row=1, max_row=ws.max_row)  # cột Hệ số
+        chart.add_data(data, titles_from_data=True)
+        cats = Reference(ws, min_col=3, min_row=2, max_row=ws.max_row)  # cột Ngày hiệu lực
+        chart.set_categories(cats)
+        ws.add_chart(chart, "I2")
+
     wb.save(file_path)
 
 
 def export_salary_histories_for_people(db: Session, people: List[Person], file_path: str) -> None:
-    """Xuất lịch sử lương cho danh sách nhân sự (một sheet tổng hợp)."""
+    """Xuất lịch sử lương cho danh sách nhân sự (một sheet tổng hợp) với định dạng."""
     from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill
+    from openpyxl.utils import get_column_letter
 
     wb = Workbook()
     ws = wb.active
@@ -228,7 +267,17 @@ def export_salary_histories_for_people(db: Session, people: List[Person], file_p
     headers = ["Mã NV", "Họ tên", "Ngày hiệu lực", "Ngạch", "Bậc", "Hệ số", "Ghi chú"]
     ws.append(headers)
 
+    # Header style + freeze panes
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill("solid", fgColor="4F81BD")
+    for c in ws[1]:
+        c.font = header_font
+        c.fill = header_fill
+        c.alignment = Alignment(horizontal="center", vertical="center")
+    ws.freeze_panes = "A2"
+
     if not people:
+        ws.auto_filter.ref = "A1:G1"
         wb.save(file_path)
         return
 
@@ -263,5 +312,16 @@ def export_salary_histories_for_people(db: Session, people: List[Person], file_p
             h.coefficient,
             h.note or "",
         ])
+
+    # Auto filter + auto width
+    ws.auto_filter.ref = f"A1:G{ws.max_row}"
+    widths = [len(h) for h in headers]
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        for idx, val in enumerate(row):
+            l = len(str(val)) if val is not None else 0
+            if l > widths[idx]:
+                widths[idx] = l
+    for i, w in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(i)].width = min(max(w + 2, 10), 40)
 
     wb.save(file_path)
