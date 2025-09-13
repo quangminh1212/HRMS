@@ -103,20 +103,26 @@ class MainWindow(QWidget):
         self.btn_ins_add.clicked.connect(self.add_insurance)
         self.btn_ins_export = QPushButton("Xuất Excel BHXH")
         self.btn_ins_export.clicked.connect(self.export_insurance)
+        self.btn_contract_add = QPushButton("Thêm HĐ")
+        self.btn_contract_add.clicked.connect(self.add_contract)
+        self.btn_contract_export = QPushButton("Xuất HĐ")
+        self.btn_contract_export.clicked.connect(self.export_contract)
         btn_layout.addWidget(self.btn_export)
         btn_layout.addWidget(self.btn_due)
         btn_layout.addWidget(self.btn_appointment)
         btn_layout.addWidget(self.btn_work)
         btn_layout.addWidget(self.btn_export_work)
+        btn_layout.addWidget(self.btn_contract_add)
+        btn_layout.addWidget(self.btn_contract_export)
         btn_layout.addWidget(self.btn_report)
         btn_layout.addWidget(self.btn_import)
         btn_layout.addWidget(self.btn_ins_add)
         btn_layout.addWidget(self.btn_ins_export)
         layout.addWidget(QLabel("Tra cứu nhân sự"))
-        layout.addLayout(filter_bar)
         layout.addWidget(self.search)
         layout.addWidget(self.list)
         layout.addLayout(btn_layout)
+        self.setLayout(layout)
         self.setLayout(layout)
 
         # RBAC: áp dụng quyền theo role
@@ -172,7 +178,12 @@ class MainWindow(QWidget):
             from .models import Unit, Position
             self.filter_unit.clear()
             self.filter_unit.addItem("-- Đơn vị --", None)
-            for u in db.query(Unit).order_by(Unit.name).all():
+            role = (self.current_user.get('role') or '').lower()
+            only_unit_id = self.current_user.get('unit_id') if role not in ('admin','hr') else None
+            units_q = db.query(Unit).order_by(Unit.name)
+            if only_unit_id:
+                units_q = units_q.filter(Unit.id == only_unit_id)
+            for u in units_q.all():
                 self.filter_unit.addItem(u.name, u.id)
             # Positions
             self.filter_position.clear()
@@ -196,6 +207,10 @@ class MainWindow(QWidget):
         self.btn_ins_add.setEnabled(is_admin)
         self.btn_ins_export.setEnabled(is_admin)
         self.btn_manage_users.setEnabled(is_admin)
+        is_mgr = role in ('admin','hr','unit_manager')
+        self.btn_work.setEnabled(is_mgr)
+        self.btn_contract_add.setEnabled(is_mgr)
+        self.btn_contract_export.setEnabled(is_mgr)
 
     def drain_notifications(self):
         # Lấy thông báo từ scheduler và hiển thị popup
@@ -488,6 +503,14 @@ class MainWindow(QWidget):
             if db:
                 db.close()
 
+    def _check_unit_permission(self, person) -> bool:
+        role = (self.current_user.get('role') or '').lower()
+        if role in ('admin','hr'):
+            return True
+        if role == 'unit_manager' and person and person.unit_id == self.current_user.get('unit_id'):
+            return True
+        return False
+
     def add_insurance(self):
         from PySide6.QtWidgets import QInputDialog
         from datetime import date
@@ -499,6 +522,9 @@ class MainWindow(QWidget):
                 return
             etype, ok = QInputDialog.getText(self, "Loại sự kiện BHXH", "Nhập loại sự kiện:")
             if not ok or not etype:
+                return
+            if not self._check_unit_permission(person):
+                QMessageBox.warning(self, "Không có quyền", "Chỉ quản lý đơn vị mới được thêm cho người thuộc đơn vị mình")
                 return
             add_insurance_event(db, person, etype, date.today())
             # Audit
@@ -533,6 +559,54 @@ class MainWindow(QWidget):
             QMessageBox.critical(self, "Lỗi", str(e))
         finally:
             db.close()
+
+    def add_contract(self):
+        from PySide6.QtWidgets import QInputDialog
+        from datetime import date
+        from .contracts import add_contract as _add_contract
+        db, person = self.current_person()
+        try:
+            if not person:
+                QMessageBox.information(self, "Chưa chọn", "Chọn một nhân sự trước")
+                return
+            if not self._check_unit_permission(person):
+                QMessageBox.warning(self, "Không có quyền", "Chỉ quản lý đơn vị mới được thêm cho người thuộc đơn vị mình")
+                return
+            ctype, ok = QInputDialog.getText(self, "Loại HĐ", "Nhập loại hợp đồng:")
+            if not ok or not ctype:
+                return
+            c = _add_contract(db, person, ctype, date.today())
+            try:
+                log_action(db, self.current_user.get('id'), 'add_contract', 'Contract', c.id, f"type={ctype}")
+            except Exception:
+                pass
+            QMessageBox.information(self, "Thành công", "Đã thêm hợp đồng")
+        except Exception as e:
+            QMessageBox.critical(self, "Lỗi", str(e))
+        finally:
+            if db:
+                db.close()
+
+    def export_contract(self):
+        from .contracts import export_contracts_for_person
+        db, person = self.current_person()
+        try:
+            if not person:
+                QMessageBox.information(self, "Chưa chọn", "Chọn một nhân sự trước")
+                return
+            Path("exports").mkdir(exist_ok=True)
+            file_path = Path("exports") / f"contracts_{person.code}.xlsx"
+            export_contracts_for_person(db, person, str(file_path))
+            try:
+                log_action(db, self.current_user.get('id'), 'export_contracts', 'Person', person.id, f"file={file_path}")
+            except Exception:
+                pass
+            QMessageBox.information(self, "Thành công", f"Đã xuất: {file_path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Lỗi", str(e))
+        finally:
+            if db:
+                db.close()
 
 
 def quarter_window(d):
