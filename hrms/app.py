@@ -1310,6 +1310,7 @@ class MainWindow(QWidget):
         summary_zip = QLineEdit(get_setting('SEND_SUMMARY_ZIP','0') or '0')
         contract_alert_days = QLineEdit(get_setting('CONTRACT_ALERT_DAYS','30') or '30')
         export_ttl_days = QLineEdit(get_setting('EXPORT_TTL_DAYS','30') or '30')
+        email_log_ttl = QLineEdit(get_setting('EMAIL_LOG_TTL_DAYS','365') or '365')
         f.addRow("EMAIL_SUBJECT_PREFIX", subject_prefix)
         f.addRow("UNIT_EMAILS", unit_emails)
         f.addRow("SEND_SUMMARY_ZIP (1/0)", summary_zip)
@@ -1317,6 +1318,7 @@ class MainWindow(QWidget):
         f.addRow("RETRY_COUNT", QLineEdit(get_setting('RETRY_COUNT','2') or '2'))
         f.addRow("RETRY_DELAY", QLineEdit(get_setting('RETRY_DELAY','10') or '10'))
         f.addRow("EXPORT_TTL_DAYS", export_ttl_days)
+        f.addRow("EMAIL_LOG_TTL_DAYS", email_log_ttl)
         f.addRow("XLSX_DATE_FORMAT", date_fmt)
         f.addRow("XLSX_NUMBER_FORMAT_COEF", coef_fmt)
         f.addRow("XLSX_FREEZE_COL:GLOBAL", freeze_global)
@@ -1359,6 +1361,7 @@ class MainWindow(QWidget):
             except Exception:
                 pass
             set_setting('EXPORT_TTL_DAYS', (export_ttl_days.text() or '30'))
+            set_setting('EMAIL_LOG_TTL_DAYS', (email_log_ttl.text() or '365'))
             set_setting('XLSX_DATE_FORMAT', (date_fmt.text() or 'DD/MM/YYYY'))
             set_setting('XLSX_NUMBER_FORMAT_COEF', (coef_fmt.text() or '0.00'))
             set_setting('XLSX_FREEZE_COL:GLOBAL', (freeze_global.text() or 'A').upper())
@@ -1445,8 +1448,8 @@ class MainWindow(QWidget):
             unit_box.addItem("-- Chọn đơn vị --", None)
             for u in units:
                 unit_box.addItem(u.name, u.id); unit_map[u.id] = u.name
-            btn_load = QPushButton("Tải"); btn_add = QPushButton("Thêm"); btn_del = QPushButton("Xoá"); btn_toggle = QPushButton("Bật/Tắt")
-            top.addWidget(unit_box); top.addWidget(btn_load); top.addWidget(btn_add); top.addWidget(btn_del); top.addWidget(btn_toggle)
+            btn_load = QPushButton("Tải"); btn_add = QPushButton("Thêm"); btn_del = QPushButton("Xoá"); btn_toggle = QPushButton("Bật/Tắt"); btn_save_note = QPushButton("Lưu Note")
+            top.addWidget(unit_box); top.addWidget(btn_load); top.addWidget(btn_add); top.addWidget(btn_del); top.addWidget(btn_toggle); top.addWidget(btn_save_note)
             lay.addLayout(top)
             table = QTableWidget(0, 4); table.setHorizontalHeaderLabels(["Email", "Active", "Note", "Created"])
             lay.addWidget(table)
@@ -1533,8 +1536,24 @@ class MainWindow(QWidget):
                     s2.rollback(); QMessageBox.critical(md, "Lỗi", str(ex))
                 finally:
                     s2.close(); load_rows()
-            def do_import_settings():
+            def do_save_note():
+                uid = unit_box.currentData();
+                row = table.currentRow()
+                if not uid or row < 0:
+                    return
+                em = table.item(row,0).text() if table.item(row,0) else ''
+                note_val = table.item(row,2).text() if table.item(row,2) else ''
+                s2 = _SL();
                 try:
+                    rec = s2.query(UnitEmailRecipient).filter(UnitEmailRecipient.unit_id==uid, UnitEmailRecipient.email==em).first()
+                    if rec:
+                        rec.note = note_val; s2.commit()
+                except Exception as ex:
+                    s2.rollback(); QMessageBox.critical(md, "Lỗi", str(ex))
+                finally:
+                    s2.close(); load_rows()
+            btn_load.clicked.connect(load_rows); btn_add.clicked.connect(do_add); btn_del.clicked.connect(do_del); btn_toggle.clicked.connect(do_toggle); btn_save_note.clicked.connect(do_save_note); btn_import_settings.clicked.connect(do_import_settings)
+            md.resize(760, 560); md.exec()
                     from .settings_service import get_setting
                     raw = get_setting('UNIT_EMAILS','') or ''
                     if not raw.strip():
@@ -1649,10 +1668,11 @@ class MainWindow(QWidget):
         f.addRow("User ID", user_id_edit)
         btn_resend = QPushButton("Gửi lại")
         btn_resend_all = QPushButton("Gửi lại tất cả (lọc)")
+        btn_resend_group = QPushButton("Gửi lại theo nhóm (đơn vị)")
         btn_open_exports = QPushButton("Mở exports")
         btn_delete = QPushButton("Xoá")
         btn_delete_all = QPushButton("Xoá tất cả (lọc)")
-        hb = QHBoxLayout(); hb.addWidget(btn_refresh); hb.addWidget(btn_export); hb.addWidget(btn_view); hb.addWidget(btn_resend); hb.addWidget(btn_resend_all); hb.addWidget(btn_open_exports); hb.addWidget(btn_delete); hb.addWidget(btn_delete_all); f.addRow(hb)
+        hb = QHBoxLayout(); hb.addWidget(btn_refresh); hb.addWidget(btn_export); hb.addWidget(btn_view); hb.addWidget(btn_resend); hb.addWidget(btn_resend_all); hb.addWidget(btn_resend_group); hb.addWidget(btn_open_exports); hb.addWidget(btn_delete); hb.addWidget(btn_delete_all); f.addRow(hb)
         lay.addLayout(f)
         # Bảng kết quả
         table = QTableWidget(0, 8)
@@ -1899,6 +1919,53 @@ class MainWindow(QWidget):
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_resend_all.clicked.connect(resend_all_filtered)
+        def resend_grouped_by_unit():
+            try:
+                # Gom theo đơn vị và loại hợp lệ
+                allowed = {'salary_due','bhxh_monthly','contracts_expiring'}
+                groups = {}
+                from pathlib import Path
+                for i in range(table.rowCount()):
+                    t = table.item(i,1).text() if table.item(i,1) else ''
+                    if t not in allowed: continue
+                    unit_name = table.item(i,2).text() if table.item(i,2) else ''
+                    if not unit_name: continue
+                    attach_disp = table.item(i,5).data(Qt.UserRole) if table.item(i,5) else (table.item(i,5).text() if table.item(i,5) else '')
+                    paths = []
+                    for part in (attach_disp or '').split(','):
+                        p = part.strip()
+                        if p and Path(p).exists():
+                            paths.append(str(Path(p)))
+                    if not paths: continue
+                    key = (t, unit_name)
+                    groups.setdefault(key, set())
+                    for p in paths:
+                        groups[key].add(p)
+                if not groups:
+                    QMessageBox.information(dlg, "Không có dữ liệu", "Không có nhóm hợp lệ để gửi lại")
+                    return
+                sent = 0; failed = 0; total = len(groups)
+                from .mailer import get_recipients_for_unit, send_email_with_attachment
+                for (t, unit_name), files in groups.items():
+                    recips = get_recipients_for_unit(unit_name)
+                    if not recips:
+                        failed += 1; continue
+                    subject = f"[HRMS] Resend {t} - {unit_name}"
+                    body = f"Gửi lại theo nhóm {t} cho {unit_name}. Đính kèm {len(files)} tệp."
+                    ok = send_email_with_attachment(subject, body, sorted(list(files)), to=recips)
+                    # Log lại
+                    try:
+                        from .db import SessionLocal
+                        from .models import EmailLog
+                        s = SessionLocal(); s.add(EmailLog(type=t, unit_name=unit_name, recipients='', subject=subject, body=body, attachments=', '.join(sorted(list(files))), status='sent' if ok else 'failed', user_id=self.current_user.get('id'))); s.commit(); s.close()
+                    except Exception:
+                        pass
+                    if ok: sent += 1
+                    else: failed += 1
+                QMessageBox.information(dlg, "Kết quả", f"Nhóm: {total}\nThành công: {sent}\nThất bại: {failed}")
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_resend_group.clicked.connect(resend_grouped_by_unit)
         load()
         dlg.resize(1100, 600)
         dlg.exec()
