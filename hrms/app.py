@@ -121,6 +121,8 @@ class MainWindow(QWidget):
         self.btn_due.clicked.connect(self.show_due)
         self.btn_email_salary_due = QPushButton("Gửi email nâng lương (quý)")
         self.btn_email_salary_due.clicked.connect(self.send_quarter_salary_email)
+        self.btn_email_salary_due_units = QPushButton("Gửi nâng lương theo đơn vị")
+        self.btn_email_salary_due_units.clicked.connect(self.send_quarter_salary_email_by_unit)
         self.btn_appointment = QPushButton("Kiểm tra bổ nhiệm")
         self.btn_appointment.clicked.connect(self.check_appointment)
         self.btn_work = QPushButton("Thêm quá trình công tác")
@@ -159,6 +161,7 @@ class MainWindow(QWidget):
         btn_layout.addWidget(self.btn_detail)
         btn_layout.addWidget(self.btn_due)
         btn_layout.addWidget(self.btn_email_salary_due)
+        btn_layout.addWidget(self.btn_email_salary_due_units)
         btn_layout.addWidget(self.btn_appointment)
         btn_layout.addWidget(self.btn_work)
         btn_layout.addWidget(self.btn_export_work)
@@ -416,6 +419,7 @@ class MainWindow(QWidget):
         self.btn_email_history.setEnabled(role in ('admin','hr'))
         # Gửi email nâng lương (quý) chỉ cho admin/hr
         self.btn_email_salary_due.setEnabled(is_admin)
+        self.btn_email_salary_due_units.setEnabled(is_admin)
         # Nút email nghỉ hưu: chỉ admin/hr
         if not hasattr(self, 'btn_email_retirement'):
             self.btn_email_retirement = QPushButton("Gửi email nghỉ hưu (6/3 tháng)")
@@ -847,6 +851,96 @@ class MainWindow(QWidget):
         finally:
             db.close()
 
+    def send_quarter_salary_email_by_unit(self):
+        # Gửi nâng lương theo từng đơn vị + ZIP tổng hợp nếu bật
+        role = (self.current_user.get('role') or '').lower()
+        if role not in ('admin','hr'):
+            QMessageBox.warning(self, "Không có quyền", "Chỉ admin/HR mới gửi")
+            return
+        from datetime import date
+        from pathlib import Path
+        from .salary import list_due_in_window, export_due_to_excel
+        from .mailer import send_email_with_attachment, get_recipients_for_unit, create_zip
+        from .settings_service import get_setting
+        start, end = quarter_window(date.today())
+        db = SessionLocal()
+        try:
+            # Thu thập đơn vị có dữ liệu và người nhận
+            from .models import Unit
+            units = db.query(Unit).order_by(Unit.name).all()
+            data = []  # (checkbox, unit_name, unit_id, count, recips)
+            from PySide6.QtWidgets import QDialog, QVBoxLayout, QCheckBox, QPushButton, QLabel, QHBoxLayout
+            dlg = QDialog(self); dlg.setWindowTitle("Gửi nâng lương theo đơn vị")
+            v = QVBoxLayout(dlg)
+            v.addWidget(QLabel(f"Quý hiện tại: Q{((end.month-1)//3)+1}/{end.year}"))
+            checks = []
+            for u in units:
+                arr = list_due_in_window(db, start, end, unit_id=u.id)
+                recips = get_recipients_for_unit(u.name)
+                text = f"{u.name} - {len(arr)} người; {len(recips)} email"
+                cb = QCheckBox(text)
+                cb.setChecked(bool(arr and recips))
+                v.addWidget(cb)
+                checks.append(cb)
+                data.append((cb, u.name, u.id, len(arr), recips))
+            row = QHBoxLayout(); btn_ok = QPushButton("Gửi"); btn_cancel = QPushButton("Hủy"); row.addWidget(btn_ok); row.addWidget(btn_cancel)
+            v.addLayout(row)
+
+            def do_send():
+                try:
+                    Path('exports').mkdir(exist_ok=True)
+                    q = ((end.month - 1)//3) + 1
+                    sent_files = []
+                    sent = 0; failed = 0
+                    for cb, unit_name, unit_id, cnt, recips in data:
+                        if not cb.isChecked() or cnt <= 0 or not recips:
+                            continue
+                        arr = list_due_in_window(db, start, end, unit_id=unit_id)
+                        if not arr:
+                            continue
+                        out = Path('exports')/f"nang_luong_quy_{end.year}_Q{q}_{unit_name.replace(' ', '_')}.xlsx"
+                        export_due_to_excel(arr, str(out), template_name=self.get_template_for('salary_due'), username=self.current_user.get('username'))
+                        ok = send_email_with_attachment(f"[HRMS] Nâng lương Q{q}/{end.year} - {unit_name}", f"Đính kèm danh sách cho {unit_name}", [str(out)], to=recips)
+                        sent_files.append(str(out))
+                        try:
+                            # Audit
+                            log_action(SessionLocal(), self.current_user.get('id'), 'email_salary_due_unit', 'Salary', None, f"unit={unit_name};file={out};sent={ok};count={len(arr)}")
+                            # EmailLog chi tiết (mask recipients)
+                            masked = []
+                            for r in recips:
+                                r = str(r or '').strip()
+                                if '@' in r:
+                                    masked.append('***@' + r.split('@',1)[1])
+                                elif r:
+                                    masked.append('***')
+                            from .models import EmailLog
+                            s = SessionLocal();
+                            s.add(EmailLog(type='salary_due', unit_name=unit_name, recipients=", ".join(masked)[:1000], subject=f"Nâng lương Q{q}/{end.year} - {unit_name}", body=f"Gửi danh sách cho {unit_name}", attachments=str(out), status='sent' if ok else 'failed', user_id=self.current_user.get('id')))
+                            s.commit(); s.close()
+                        except Exception:
+                            pass
+                        if ok: sent += 1
+                        else: failed += 1
+                    # ZIP tổng hợp nếu bật
+                    try:
+                        flag = (get_setting('SEND_SUMMARY_ZIP','0') or '0').strip().lower() in ('1','true','yes')
+                        if flag and sent_files:
+                            zip_path = Path('exports')/f"nang_luong_quy_{end.year}_Q{q}_by_unit.zip"
+                            if create_zip(sent_files, str(zip_path)):
+                                send_email_with_attachment(f"[HRMS] Nâng lương Q{q}/{end.year} (ZIP tổng hợp)", f"ZIP tổng hợp danh sách nâng lương theo đơn vị Q{q}/{end.year}", [str(zip_path)])
+                    except Exception:
+                        pass
+                    QMessageBox.information(dlg, "Kết quả", f"Gửi thành công: {sent}\nThất bại: {failed}")
+                    dlg.accept()
+                except Exception as ex:
+                    QMessageBox.critical(dlg, "Lỗi", str(ex))
+            btn_ok.clicked.connect(do_send)
+            btn_cancel.clicked.connect(dlg.reject)
+            dlg.resize(520, 600)
+            dlg.exec()
+        finally:
+            db.close()
+
     def send_retirement_email(self):
         # Gửi email danh sách nghỉ hưu (6/3 tháng) kèm Excel 2 sheet
         role = (self.current_user.get('role') or '').lower()
@@ -1029,9 +1123,11 @@ class MainWindow(QWidget):
         subject_prefix = QLineEdit(get_setting('EMAIL_SUBJECT_PREFIX','') or '')
         unit_emails = QLineEdit(get_setting('UNIT_EMAILS','') or '')
         summary_zip = QLineEdit(get_setting('SEND_SUMMARY_ZIP','0') or '0')
+        contract_alert_days = QLineEdit(get_setting('CONTRACT_ALERT_DAYS','30') or '30')
         f.addRow("EMAIL_SUBJECT_PREFIX", subject_prefix)
         f.addRow("UNIT_EMAILS", unit_emails)
         f.addRow("SEND_SUMMARY_ZIP (1/0)", summary_zip)
+        f.addRow("CONTRACT_ALERT_DAYS", contract_alert_days)
         f.addRow("XLSX_DATE_FORMAT", date_fmt)
         f.addRow("XLSX_NUMBER_FORMAT_COEF", coef_fmt)
         f.addRow("XLSX_FREEZE_COL:GLOBAL", freeze_global)
@@ -1054,6 +1150,7 @@ class MainWindow(QWidget):
             set_setting('EMAIL_SUBJECT_PREFIX', subject_prefix.text())
             set_setting('UNIT_EMAILS', unit_emails.text())
             set_setting('SEND_SUMMARY_ZIP', (summary_zip.text() or '0'))
+            set_setting('CONTRACT_ALERT_DAYS', (contract_alert_days.text() or '30'))
             set_setting('XLSX_DATE_FORMAT', (date_fmt.text() or 'DD/MM/YYYY'))
             set_setting('XLSX_NUMBER_FORMAT_COEF', (coef_fmt.text() or '0.00'))
             set_setting('XLSX_FREEZE_COL:GLOBAL', (freeze_global.text() or 'A').upper())
@@ -1160,8 +1257,8 @@ class MainWindow(QWidget):
         hb = QHBoxLayout(); hb.addWidget(btn_refresh); hb.addWidget(btn_export); f.addRow(hb)
         lay.addLayout(f)
         # Bảng kết quả
-        table = QTableWidget(0, 7)
-        table.setHorizontalHeaderLabels(["Thời gian", "Loại", "Đơn vị", "Subject", "Recipients", "Tệp đính kèm", "Trạng thái"])
+        table = QTableWidget(0, 8)
+        table.setHorizontalHeaderLabels(["Thời gian", "Loại", "Đơn vị", "Subject", "Recipients", "Tệp đính kèm", "Trạng thái", "Lỗi"])
         lay.addWidget(table)
         # Tải dữ liệu
         def load():
@@ -1202,6 +1299,7 @@ class MainWindow(QWidget):
                     table.setItem(i, 4, QTableWidgetItem((getattr(r, 'recipients', '') or '')[:100]))
                     table.setItem(i, 5, QTableWidgetItem((getattr(r, 'attachments', '') or '')[:100]))
                     table.setItem(i, 6, QTableWidgetItem(getattr(r, 'status', '') or ''))
+                    table.setItem(i, 7, QTableWidgetItem(getattr(r, 'error', '') or ''))
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
             finally:
@@ -1215,10 +1313,10 @@ class MainWindow(QWidget):
                 outp = Path('exports')/f"email_logs_{_dt.now().strftime('%Y%m%d_%H%M%S')}.csv"
                 with open(outp, 'w', encoding='utf-8', newline='') as fcsv:
                     w = csv.writer(fcsv)
-                    w.writerow(["created_at","type","unit_name","subject","recipients","attachments","status"])
+                    w.writerow(["created_at","type","unit_name","subject","recipients","attachments","status","error"])
                     for i in range(table.rowCount()):
                         it = lambda r,c: (table.item(r,c).text() if table.item(r,c) else '')
-                        w.writerow([it(i,0), it(i,1), it(i,2), it(i,3), it(i,4), it(i,5), it(i,6)])
+                        w.writerow([it(i,0), it(i,1), it(i,2), it(i,3), it(i,4), it(i,5), it(i,6), it(i,7)])
                 QMessageBox.information(dlg, "Đã xuất", f"{outp}")
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
