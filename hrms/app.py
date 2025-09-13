@@ -2,7 +2,7 @@ from PySide6.QtWidgets import (
     QApplication, QWidget, QLineEdit, QPushButton, QVBoxLayout, QLabel,
     QListWidget, QMessageBox, QHBoxLayout
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 import sys
 from pathlib import Path
 
@@ -14,6 +14,8 @@ from .init_db import init_db
 from .seed import seed_basic_data
 from .security import verify_password
 from .salary import list_due_in_window, export_due_to_excel
+from .audit import log_action
+from .scheduler import NOTIFY_QUEUE
 
 
 class LoginWindow(QWidget):
@@ -45,18 +47,19 @@ class LoginWindow(QWidget):
             if not user or not verify_password(password, user.password_hash):
                 QMessageBox.critical(self, "Đăng nhập thất bại", "Sai thông tin đăng nhập")
                 return
+            user_info = {"id": user.id, "username": user.username, "role": user.role, "unit_id": user.unit_id}
         finally:
             db.close()
-        self.main = MainWindow(current_user=username)
+        self.main = MainWindow(current_user=user_info)
         self.main.show()
         self.close()
 
 
 class MainWindow(QWidget):
-    def __init__(self, current_user: str):
+    def __init__(self, current_user: dict):
         super().__init__()
         self.current_user = current_user
-        self.setWindowTitle(f"HRMS - Tra cứu nhân sự ({current_user})")
+        self.setWindowTitle(f"HRMS - Tra cứu nhân sự ({current_user.get('username')})")
         layout = QVBoxLayout()
         self.search = QLineEdit()
         self.search.setPlaceholderText("Nhập tên cần tìm...")
@@ -95,6 +98,16 @@ class MainWindow(QWidget):
         layout.addWidget(self.list)
         layout.addLayout(btn_layout)
         self.setLayout(layout)
+
+        # RBAC: áp dụng quyền theo role
+        self.apply_role_permissions()
+
+        # Thiết lập timer để lấy thông báo từ scheduler và popup
+        self.timer = QTimer(self)
+        self.timer.setInterval(2000)
+        self.timer.timeout.connect(self.drain_notifications)
+        self.timer.start()
+
         self.refresh()
 
     def refresh(self):
@@ -115,6 +128,25 @@ class MainWindow(QWidget):
             QMessageBox.critical(self, "Lỗi", str(e))
         finally:
             db.close()
+
+    def apply_role_permissions(self):
+        role = (self.current_user.get('role') or '').lower()
+        is_admin = role in ('admin', 'hr')
+        # Người dùng thường: chỉ xem và xuất trích ngang, xem nâng lương/báo cáo
+        self.btn_import.setEnabled(is_admin)
+        self.btn_work.setEnabled(is_admin)
+        self.btn_export_work.setEnabled(is_admin)
+        self.btn_ins_add.setEnabled(is_admin)
+        self.btn_ins_export.setEnabled(is_admin)
+
+    def drain_notifications(self):
+        # Lấy thông báo từ scheduler và hiển thị popup
+        try:
+            while not NOTIFY_QUEUE.empty():
+                title, message = NOTIFY_QUEUE.get_nowait()
+                QMessageBox.information(self, title, message)
+        except Exception:
+            pass
 
     def current_person(self):
         item = self.list.currentItem()
@@ -165,6 +197,11 @@ class MainWindow(QWidget):
                 row_cells[0].text = k
                 row_cells[1].text = v
             doc.save(str(file_path))
+            # Audit
+            try:
+                log_action(db, self.current_user.get('id'), 'export_profile', 'Person', person.id, f"file={file_path}")
+            except Exception:
+                pass
             QMessageBox.information(self, "Thành công", f"Đã xuất: {file_path}")
         except Exception as e:
             QMessageBox.critical(self, "Lỗi", str(e))
@@ -184,6 +221,11 @@ class MainWindow(QWidget):
             Path("exports").mkdir(exist_ok=True)
             xlsx = Path("exports") / f"nang_luong_quy_{end.year}_Q{((end.month-1)//3)+1}.xlsx"
             export_due_to_excel(items, str(xlsx))
+            # Audit
+            try:
+                log_action(db, self.current_user.get('id'), 'export_salary_due', 'Salary', None, f"file={xlsx}")
+            except Exception:
+                pass
             QMessageBox.information(self, "Thành công", f"Đã xuất danh sách: {xlsx}")
         except Exception as e:
             QMessageBox.critical(self, "Lỗi", str(e))
@@ -206,6 +248,12 @@ class MainWindow(QWidget):
                 QMessageBox.information(self, "Kết quả", f"Đủ điều kiện bổ nhiệm vị trí: {target}")
             else:
                 QMessageBox.warning(self, "Chưa đạt", "\n".join(reasons) or "Chưa đủ điều kiện")
+            # Audit
+            try:
+                details = f"target={target}; ok={ok_eligible}; reasons={';'.join(reasons)}"
+                log_action(db, self.current_user.get('id'), 'check_appointment', 'Appointment', None, details)
+            except Exception:
+                pass
         finally:
             if db:
                 db.close()
@@ -229,6 +277,11 @@ class MainWindow(QWidget):
             wp = WorkProcess(person_id=person.id, unit=unit, position=pos, start_date=date.today())
             db.add(wp)
             db.commit()
+            # Audit
+            try:
+                log_action(db, self.current_user.get('id'), 'add_work_process', 'WorkProcess', wp.id, f"unit={unit};pos={pos}")
+            except Exception:
+                pass
             QMessageBox.information(self, "Thành công", "Đã thêm quá trình công tác")
         except Exception as e:
             QMessageBox.critical(self, "Lỗi", str(e))
@@ -258,6 +311,11 @@ class MainWindow(QWidget):
                 row[1].text = w.unit or ""
                 row[2].text = w.position or ""
             doc.save(str(file_path))
+            # Audit
+            try:
+                log_action(db, self.current_user.get('id'), 'export_work_process', 'Person', person.id, f"file={file_path}")
+            except Exception:
+                pass
             QMessageBox.information(self, "Thành công", f"Đã xuất: {file_path}")
         except Exception as e:
             QMessageBox.critical(self, "Lỗi", str(e))
@@ -276,6 +334,11 @@ class MainWindow(QWidget):
             Path("exports").mkdir(exist_ok=True)
             file_path = Path("exports") / f"bao_cao_nhanh_{year}.xlsx"
             export_report_to_excel(summary, demo, str(file_path))
+            # Audit
+            try:
+                log_action(db, self.current_user.get('id'), 'export_quick_report', 'Report', None, f"file={file_path}")
+            except Exception:
+                pass
             QMessageBox.information(self, "Thành công", f"Đã xuất: {file_path}")
         except Exception as e:
             QMessageBox.critical(self, "Lỗi", str(e))
@@ -291,10 +354,20 @@ class MainWindow(QWidget):
             xlsx_path, _ = QFileDialog.getOpenFileName(self, "Chọn file Excel", "", "Excel Files (*.xlsx)")
             if not xlsx_path:
                 return
+            # RBAC: chỉ admin/hr mới được import
+            if (self.current_user.get('role') or '').lower() not in ('admin','hr'):
+                QMessageBox.warning(self, "Không có quyền", "Bạn không có quyền import")
+                return
             result = import_persons_from_excel(db, xlsx_path)
             if not result.get("ok"):
                 QMessageBox.critical(self, "Import lỗi", result.get("error", "Lỗi không rõ"))
                 return
+            # Audit
+            try:
+                details = f"file={xlsx_path}; created={result['created']}; updated={result['updated']}"
+                log_action(db, self.current_user.get('id'), 'import_persons', 'Person', None, details)
+            except Exception:
+                pass
             QMessageBox.information(self, "Import thành công", f"Tạo mới: {result['created']}, Cập nhật: {result['updated']}")
             self.refresh()
         except Exception as e:
@@ -316,6 +389,11 @@ class MainWindow(QWidget):
             if not ok or not etype:
                 return
             add_insurance_event(db, person, etype, date.today())
+            # Audit
+            try:
+                log_action(db, self.current_user.get('id'), 'add_insurance_event', 'InsuranceEvent', None, f"type={etype}")
+            except Exception:
+                pass
             QMessageBox.information(self, "Thành công", "Đã thêm sự kiện BHXH")
         except Exception as e:
             QMessageBox.critical(self, "Lỗi", str(e))
@@ -333,6 +411,11 @@ class MainWindow(QWidget):
             Path("exports").mkdir(exist_ok=True)
             file_path = Path("exports") / f"bhxh_{start.year}.xlsx"
             export_insurance_to_excel(db, start, end, str(file_path))
+            # Audit
+            try:
+                log_action(db, self.current_user.get('id'), 'export_insurance', 'InsuranceEvent', None, f"file={file_path}")
+            except Exception:
+                pass
             QMessageBox.information(self, "Thành công", f"Đã xuất: {file_path}")
         except Exception as e:
             QMessageBox.critical(self, "Lỗi", str(e))

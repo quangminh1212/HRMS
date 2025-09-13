@@ -1,5 +1,6 @@
 from datetime import datetime, time, date
 from typing import Optional
+from queue import Queue
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -8,9 +9,16 @@ from .models import Person
 from .salary import list_due_in_window
 from .retirement import calculate_retirement_date
 
+# Hàng đợi thông báo để UI lấy và hiển thị popup
+NOTIFY_QUEUE: Queue[tuple[str, str]] = Queue()
+
 
 def notify(title: str, message: str):
-    # Tối giản: in ra console; có thể nâng cấp thành popup trong UI nếu cần
+    # Đưa thông báo vào hàng đợi và in log console
+    try:
+        NOTIFY_QUEUE.put_nowait((title, message))
+    except Exception:
+        pass
     print(f"[NOTICE] {title}: {message}")
 
 
