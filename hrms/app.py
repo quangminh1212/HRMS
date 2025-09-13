@@ -467,7 +467,7 @@ class MainWindow(QWidget):
                 return
             Path("exports").mkdir(exist_ok=True)
             xlsx = Path("exports") / f"nang_luong_quy_{end.year}_Q{((end.month-1)//3)+1}.xlsx"
-            export_due_to_excel(items, str(xlsx), template_name=self.get_template_for('salary_due'))
+            export_due_to_excel(items, str(xlsx), template_name=self.get_template_for('salary_due'), username=self.current_user.get('username'))
             # Audit
             try:
                 log_action(db, self.current_user.get('id'), 'export_salary_due', 'Salary', None, f"file={xlsx}")
@@ -789,7 +789,7 @@ class MainWindow(QWidget):
             Path("exports").mkdir(exist_ok=True)
             ts = datetime.now().strftime('%Y%m%d_%H%M%S')
             out = Path("exports")/f"salary_histories_{ts}.xlsx"
-            export_salary_histories_for_people(db, people, str(out), template_name=self.get_template_for('salary_histories'))
+            export_salary_histories_for_people(db, people, str(out), template_name=self.get_template_for('salary_histories'), username=self.current_user.get('username'))
             try:
                 log_action(db, self.current_user.get('id'), 'export_salary_histories', 'Person', None, f"count={len(people)};file={out}")
             except Exception:
@@ -816,6 +816,8 @@ class MainWindow(QWidget):
         smtp_pass = QLineEdit(get_setting('SMTP_PASSWORD','') or ''); smtp_pass.setEchoMode(QLineEdit.Password)
         alert_emails = QLineEdit(get_setting('ALERT_EMAILS','') or '')
         org_name = QLineEdit(get_setting('ORG_NAME','') or '')
+        date_fmt = QLineEdit(get_setting('XLSX_DATE_FORMAT','DD/MM/YYYY') or 'DD/MM/YYYY')
+        coef_fmt = QLineEdit(get_setting('XLSX_NUMBER_FORMAT_COEF','0.00') or '0.00')
         freeze_global = QLineEdit(get_setting('XLSX_FREEZE_COL:GLOBAL','A') or 'A')
         freeze_bhxh = QLineEdit(get_setting('XLSX_FREEZE_COL:bhxh','') or '')
         freeze_contracts = QLineEdit(get_setting('XLSX_FREEZE_COL:contracts','') or '')
@@ -828,6 +830,8 @@ class MainWindow(QWidget):
         f.addRow("SMTP_PASSWORD", smtp_pass)
         f.addRow("ALERT_EMAILS", alert_emails)
         f.addRow("ORG_NAME", org_name)
+        f.addRow("XLSX_DATE_FORMAT", date_fmt)
+        f.addRow("XLSX_NUMBER_FORMAT_COEF", coef_fmt)
         f.addRow("XLSX_FREEZE_COL:GLOBAL", freeze_global)
         f.addRow("XLSX_FREEZE_COL:bhxh", freeze_bhxh)
         f.addRow("XLSX_FREEZE_COL:contracts", freeze_contracts)
@@ -844,6 +848,8 @@ class MainWindow(QWidget):
             set_setting('SMTP_PASSWORD', smtp_pass.text())
             set_setting('ALERT_EMAILS', alert_emails.text())
             set_setting('ORG_NAME', org_name.text())
+            set_setting('XLSX_DATE_FORMAT', (date_fmt.text() or 'DD/MM/YYYY'))
+            set_setting('XLSX_NUMBER_FORMAT_COEF', (coef_fmt.text() or '0.00'))
             set_setting('XLSX_FREEZE_COL:GLOBAL', (freeze_global.text() or 'A').upper())
             if freeze_bhxh.text(): set_setting('XLSX_FREEZE_COL:bhxh', freeze_bhxh.text().upper())
             if freeze_contracts.text(): set_setting('XLSX_FREEZE_COL:contracts', freeze_contracts.text().upper())
@@ -984,7 +990,7 @@ class MainWindow(QWidget):
         try:
             Path("exports").mkdir(exist_ok=True)
             file_path = Path("exports") / f"bhxh_{start.year}.xlsx"
-            export_insurance_to_excel(db, start, end, str(file_path), template_name=self.get_template_for('bhxh'))
+            export_insurance_to_excel(db, start, end, str(file_path), template_name=self.get_template_for('bhxh'), username=self.current_user.get('username'))
             # Audit
             try:
                 log_action(db, self.current_user.get('id'), 'export_insurance', 'InsuranceEvent', None, f"file={file_path}")
@@ -1032,7 +1038,7 @@ class MainWindow(QWidget):
                 return
             Path("exports").mkdir(exist_ok=True)
             file_path = Path("exports") / f"contracts_{person.code}.xlsx"
-            export_contracts_for_person(db, person, str(file_path), template_name=self.get_template_for('contracts'))
+            export_contracts_for_person(db, person, str(file_path), template_name=self.get_template_for('contracts'), username=self.current_user.get('username'))
             try:
                 log_action(db, self.current_user.get('id'), 'export_contracts', 'Person', person.id, f"file={file_path}")
             except Exception:

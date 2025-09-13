@@ -14,7 +14,7 @@ def add_insurance_event(db: Session, person: Person, event_type: str, event_date
     return ev
 
 
-def export_insurance_to_excel(db: Session, start_date: date, end_date: date, path: str, template_name: Optional[str] = None) -> None:
+def export_insurance_to_excel(db: Session, start_date: date, end_date: date, path: str, template_name: Optional[str] = None, username: Optional[str] = None) -> None:
     from typing import Optional
     from .excel_utils import prepare_workbook_with_template, style_header, auto_filter_and_width, set_date_format
 
@@ -31,12 +31,13 @@ def export_insurance_to_excel(db: Session, start_date: date, end_date: date, pat
 
     # Định dạng chung
     style_header(ws, header_row=1)
-    set_date_format(ws, date_columns=[4], start_row=2)
+    from .settings_service import get_setting
+    date_fmt = get_setting('XLSX_DATE_FORMAT', 'DD/MM/YYYY') or 'DD/MM/YYYY'
+    set_date_format(ws, date_columns=[4], start_row=2, fmt=date_fmt)
     auto_filter_and_width(ws, header_row=1)
     from .excel_utils import set_header_footer, set_freeze
-    from .settings_service import get_setting
     org = get_setting('ORG_NAME', None)
-    set_header_footer(ws, title='Danh sách sự kiện BHXH', org=org)
+    set_header_footer(ws, title='Danh sách sự kiện BHXH', username=username, org=org)
     # Freeze theo cấu hình
     try:
         from openpyxl.utils import column_index_from_string

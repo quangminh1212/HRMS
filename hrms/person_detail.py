@@ -115,7 +115,7 @@ class PersonDetailDialog(QDialog):
                     template_name = parent.get_template_for('salary_history')
             except Exception:
                 pass
-            export_salary_history_for_person(db, p, str(out), template_name=template_name)
+            export_salary_history_for_person(db, p, str(out), template_name=template_name, username=(current_user.get('username') if isinstance(current_user, dict) else None))
             # Audit
             try:
                 uid = current_user.get('id') if isinstance(current_user, dict) else None
