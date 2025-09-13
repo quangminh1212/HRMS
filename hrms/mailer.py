@@ -3,6 +3,21 @@ import smtplib
 from typing import List
 
 from .config import load_settings
+try:
+    from .settings_service import get_setting as _get_setting
+except Exception:
+    _get_setting = None
+
+
+def _apply_subject_prefix(subject: str) -> str:
+    try:
+        if _get_setting:
+            prefix = _get_setting('EMAIL_SUBJECT_PREFIX', '') or ''
+            if prefix:
+                return f"{prefix} {subject}"
+    except Exception:
+        pass
+    return subject
 
 
 def send_alert(subject: str, body: str, to: List[str] | None = None) -> bool:
@@ -11,7 +26,7 @@ def send_alert(subject: str, body: str, to: List[str] | None = None) -> bool:
     if not settings.smtp_host or not recipients:
         return False
     msg = EmailMessage()
-    msg["Subject"] = subject
+    msg["Subject"] = _apply_subject_prefix(subject)
     msg["From"] = settings.smtp_user or "no-reply@example.com"
     msg["To"] = ", ".join(recipients)
     msg.set_content(body)
@@ -33,7 +48,7 @@ def send_email_with_attachment(subject: str, body: str, attachments: List[str], 
     if not settings.smtp_host or not recipients:
         return False
     msg = EmailMessage()
-    msg["Subject"] = subject
+    msg["Subject"] = _apply_subject_prefix(subject)
     msg["From"] = settings.smtp_user or "no-reply@example.com"
     msg["To"] = ", ".join(recipients)
     msg.set_content(body)

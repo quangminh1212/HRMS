@@ -66,28 +66,40 @@ def schedule_jobs():
             today = date.today()
             six = date(today.year + (today.month + 6 - 1) // 12, ((today.month + 6 - 1) % 12) + 1, today.day)
             three = date(today.year + (today.month + 3 - 1) // 12, ((today.month + 3 - 1) % 12) + 1, today.day)
-            due6 = 0
-            due3 = 0
+            list6 = []
+            list3 = []
             for p in db.query(Person).all():
                 rd = calculate_retirement_date(p)
                 if not rd:
                     continue
                 if rd == six:
-                    due6 += 1
+                    list6.append(p)
                 if rd == three:
-                    due3 += 1
-            if due6:
-                msg = f"Có {due6} nhân sự sắp nghỉ hưu sau 6 tháng"
+                    list3.append(p)
+            if list6:
+                msg = f"Có {len(list6)} nhân sự sắp nghỉ hưu sau 6 tháng"
                 notify("Nghỉ hưu (6 tháng)", msg)
                 try:
                     send_alert("[HRMS] Nghỉ hưu (6 tháng)", msg)
                 except Exception:
                     pass
-            if due3:
-                msg = f"Có {due3} nhân sự sắp nghỉ hưu sau 3 tháng"
+            if list3:
+                msg = f"Có {len(list3)} nhân sự sắp nghỉ hưu sau 3 tháng"
                 notify("Nghỉ hưu (3 tháng)", msg)
                 try:
                     send_alert("[HRMS] Nghỉ hưu (3 tháng)", msg)
+                except Exception:
+                    pass
+            # Nếu có danh sách, export Excel và gửi kèm
+            if list6 or list3:
+                try:
+                    from pathlib import Path
+                    from .reporting import export_retirement_alerts_to_excel
+                    from .mailer import send_email_with_attachment
+                    Path('exports').mkdir(exist_ok=True)
+                    out = Path('exports')/f"nghi_huu_thong_bao_{today.isoformat()}.xlsx"
+                    export_retirement_alerts_to_excel(db, list6, list3, str(out))
+                    send_email_with_attachment('[HRMS] Danh sách nghỉ hưu (6/3 tháng)', 'Đính kèm danh sách nghỉ hưu (6/3 tháng)', [str(out)])
                 except Exception:
                     pass
         finally:

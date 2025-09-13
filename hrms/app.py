@@ -111,6 +111,8 @@ class MainWindow(QWidget):
         self.btn_export_work.clicked.connect(self.export_work_process)
         self.btn_report = QPushButton("Báo cáo nhanh")
         self.btn_report.clicked.connect(self.quick_report)
+        self.btn_email_report = QPushButton("Gửi báo cáo nhanh (email)")
+        self.btn_email_report.clicked.connect(self.send_quick_report_email)
         self.btn_letter_salary_cover = QPushButton("CV rà soát nâng lương")
         self.btn_letter_salary_cover.clicked.connect(self.export_salary_cover)
         self.btn_letter_retirement = QPushButton("Văn bản nghỉ hưu")
@@ -145,6 +147,7 @@ class MainWindow(QWidget):
         btn_layout.addWidget(self.btn_contract_add)
         btn_layout.addWidget(self.btn_contract_export)
         btn_layout.addWidget(self.btn_report)
+        btn_layout.addWidget(self.btn_email_report)
         btn_layout.addWidget(self.btn_letter_salary_cover)
         btn_layout.addWidget(self.btn_letter_retirement)
         btn_layout.addWidget(self.btn_letter_salary_person)
@@ -362,12 +365,22 @@ class MainWindow(QWidget):
         self.btn_settings.setEnabled(is_admin)
         # Gửi email nâng lương (quý) chỉ cho admin/hr
         self.btn_email_salary_due.setEnabled(is_admin)
+        # Nút email nghỉ hưu: chỉ admin/hr
+        if not hasattr(self, 'btn_email_retirement'):
+            self.btn_email_retirement = QPushButton("Gửi email nghỉ hưu (6/3 tháng)")
+            self.btn_email_retirement.clicked.connect(self.send_retirement_email)
+            # chèn vào layout nút, đặt sau email báo cáo nhanh
+            # chú ý: layout đã tạo sẵn, thêm vào cuối để tránh phá vỡ UI
+            self.layout().itemAt(3).addWidget(self.btn_email_retirement) if hasattr(self, 'layout') else None
+        self.btn_email_retirement.setEnabled(is_admin)
         is_mgr = role in ('admin','hr','unit_manager')
         self.btn_work.setEnabled(is_mgr)
         self.btn_contract_add.setEnabled(is_mgr)
         self.btn_contract_export.setEnabled(is_mgr)
         # Xuất lịch sử lương theo danh sách lọc: chỉ admin/hr và quản lý đơn vị (sẽ lọc theo đơn vị)
         self.btn_salary_export_filtered.setEnabled(is_mgr)
+        # Gửi báo cáo nhanh (email): chỉ admin/hr
+        self.btn_email_report.setEnabled(role in ('admin','hr'))
 
     def drain_notifications(self):
         # Lấy thông báo từ scheduler và hiển thị popup
@@ -777,6 +790,47 @@ class MainWindow(QWidget):
         finally:
             db.close()
 
+    def send_retirement_email(self):
+        # Gửi email danh sách nghỉ hưu (6/3 tháng) kèm Excel 2 sheet
+        role = (self.current_user.get('role') or '').lower()
+        if role not in ('admin','hr'):
+            QMessageBox.warning(self, "Không có quyền", "Chỉ admin/HR mới gửi")
+            return
+        from datetime import date
+        from pathlib import Path
+        from .reporting import export_retirement_alerts_to_excel
+        from .retirement import calculate_retirement_date
+        from .mailer import send_email_with_attachment
+        db = SessionLocal()
+        try:
+            today = date.today()
+            six = date(today.year + (today.month + 6 - 1) // 12, ((today.month + 6 - 1) % 12) + 1, today.day)
+            three = date(today.year + (today.month + 3 - 1) // 12, ((today.month + 3 - 1) % 12) + 1, today.day)
+            persons = db.query(Person).all()
+            list6 = [p for p in persons if calculate_retirement_date(p) == six]
+            list3 = [p for p in persons if calculate_retirement_date(p) == three]
+            if not list6 and not list3:
+                QMessageBox.information(self, "Kết quả", "Chưa có người trùng mốc 6/3 tháng kể từ hôm nay")
+                return
+            Path('exports').mkdir(exist_ok=True)
+            out = Path('exports')/f"nghi_huu_thong_bao_{today.isoformat()}.xlsx"
+            export_retirement_alerts_to_excel(db, list6, list3, str(out))
+            subject = f"[HRMS] Danh sách nghỉ hưu (6/3 tháng) {today.isoformat()}"
+            body = "Đính kèm danh sách nghỉ hưu dự kiến theo mốc 6 và 3 tháng."
+            ok = send_email_with_attachment(subject, body, [str(out)])
+            try:
+                log_action(SessionLocal(), self.current_user.get('id'), 'email_retirement_alerts', 'Retirement', None, f"file={out};sent={ok};six={len(list6)};three={len(list3)}")
+            except Exception:
+                pass
+            if ok:
+                QMessageBox.information(self, "Thành công", f"Đã gửi email: {out}")
+            else:
+                QMessageBox.warning(self, "Chưa gửi", "Không gửi được email. Kiểm tra cấu hình SMTP/ALERT_EMAILS")
+        except Exception as e:
+            QMessageBox.critical(self, "Lỗi", str(e))
+        finally:
+            db.close()
+
     def quick_report(self):
         from datetime import date
         from .reporting import compute_annual_summary, compute_demographics, export_report_to_excel
@@ -797,8 +851,41 @@ class MainWindow(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Lỗi", str(e))
         finally:
-            if db:
-                db.close()
+            db.close()
+
+    def send_quick_report_email(self):
+        # Gửi báo cáo nhanh qua email (đính kèm file Excel)
+        role = (self.current_user.get('role') or '').lower()
+        if role not in ('admin','hr'):
+            QMessageBox.warning(self, "Không có quyền", "Chỉ admin/HR mới gửi")
+            return
+        from datetime import date
+        from pathlib import Path
+        from .reporting import compute_annual_summary, compute_demographics, export_report_to_excel
+        from .mailer import send_email_with_attachment
+        year = date.today().year
+        db = SessionLocal()
+        try:
+            summary = compute_annual_summary(db, year)
+            demo = compute_demographics(db, date.today())
+            Path("exports").mkdir(exist_ok=True)
+            file_path = Path("exports") / f"bao_cao_nhanh_{year}.xlsx"
+            export_report_to_excel(summary, demo, str(file_path))
+            subject = f"[HRMS] Báo cáo nhanh {year}"
+            body = "Đính kèm báo cáo nhanh tổng hợp và cơ cấu nhân sự."
+            ok = send_email_with_attachment(subject, body, [str(file_path)])
+            try:
+                log_action(SessionLocal(), self.current_user.get('id'), 'email_quick_report', 'Report', None, f"file={file_path};sent={ok}")
+            except Exception:
+                pass
+            if ok:
+                QMessageBox.information(self, "Thành công", f"Đã gửi email: {file_path}")
+            else:
+                QMessageBox.warning(self, "Chưa gửi", "Không gửi được email. Kiểm tra cấu hình SMTP/ALERT_EMAILS")
+        except Exception as e:
+            QMessageBox.critical(self, "Lỗi", str(e))
+        finally:
+            db.close()
 
     def export_salary_histories_filtered(self):
         # Xuất lịch sử lương cho danh sách đang hiển thị (lọc)

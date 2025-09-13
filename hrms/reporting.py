@@ -123,3 +123,39 @@ def export_report_to_excel(summary: Dict[str, Any], demo: Dict[str, Any], path: 
     write_counter("Professional", demo["professional"])
 
     wb.save(path)
+
+
+def export_retirement_alerts_to_excel(db: Session, persons_six: List[Person], persons_three: List[Person], path: str) -> None:
+    from openpyxl import Workbook
+    from .excel_utils import style_header, auto_filter_and_width, set_header_footer, set_date_format
+    from .retirement import calculate_retirement_date
+    from .settings_service import get_setting
+
+    wb = Workbook()
+    # Sheet for +6 months
+    ws1 = wb.active
+    ws1.title = "Retire+6m"
+    ws1.append(["Mã NV", "Họ tên", "Đơn vị", "Chức vụ", "Ngày nghỉ hưu"])
+    for p in persons_six:
+        rd = calculate_retirement_date(p)
+        ws1.append([p.code, p.full_name, p.unit.name if p.unit else "", p.position.name if p.position else "", rd])
+    style_header(ws1, header_row=1)
+    auto_filter_and_width(ws1, header_row=1)
+    date_fmt = get_setting('XLSX_DATE_FORMAT', 'DD/MM/YYYY') or 'DD/MM/YYYY'
+    set_date_format(ws1, date_columns=[5], start_row=2, fmt=date_fmt)
+
+    # Sheet for +3 months
+    ws2 = wb.create_sheet("Retire+3m")
+    ws2.append(["Mã NV", "Họ tên", "Đơn vị", "Chức vụ", "Ngày nghỉ hưu"])
+    for p in persons_three:
+        rd = calculate_retirement_date(p)
+        ws2.append([p.code, p.full_name, p.unit.name if p.unit else "", p.position.name if p.position else "", rd])
+    style_header(ws2, header_row=1)
+    auto_filter_and_width(ws2, header_row=1)
+    set_date_format(ws2, date_columns=[5], start_row=2, fmt=date_fmt)
+
+    org = get_setting('ORG_NAME', None)
+    set_header_footer(ws1, title='Danh sách nghỉ hưu (+6 tháng)', org=org)
+    set_header_footer(ws2, title='Danh sách nghỉ hưu (+3 tháng)', org=org)
+
+    wb.save(path)
