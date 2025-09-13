@@ -63,3 +63,11 @@ def set_date_format(ws, date_columns: List[int], start_row: int = 2, fmt: str = 
             cell = ws.cell(row=row, column=col)
             if cell.value is not None:
                 cell.number_format = fmt
+
+
+def set_number_format(ws, number_columns: List[int], start_row: int = 2, fmt: str = '0.00') -> None:
+    for col in number_columns:
+        for row in range(start_row, ws.max_row + 1):
+            cell = ws.cell(row=row, column=col)
+            if cell.value is not None:
+                cell.number_format = fmt

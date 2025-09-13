@@ -152,14 +152,14 @@ def list_due_in_window(
     return results
 
 
-def export_due_to_excel(items: List[Dict[str, Any]], file_path: str) -> None:
-    from .excel_utils import prepare_workbook_with_template, style_header, auto_filter_and_width, set_date_format
+def export_due_to_excel(items: List[Dict[str, Any]], file_path: str, template_name: Optional[str] = None) -> None:
+    from .excel_utils import prepare_workbook_with_template, style_header, auto_filter_and_width, set_date_format, set_number_format
 
     headers = [
         "Họ tên", "Đơn vị", "Chức vụ", "Loại", "Bậc hiện tại", "Hệ số hiện tại",
         "Bậc dự kiến", "Hệ số dự kiến", "% vượt khung", "Ngày hiệu lực gần nhất", "Ngày dự kiến",
     ]
-    wb, ws = prepare_workbook_with_template(template_name='salary_due.xlsx', title='Nang luong', headers=headers)
+    wb, ws = prepare_workbook_with_template(template_name=(template_name or 'salary_due.xlsx'), title='Nang luong', headers=headers)
 
     for it in items:
         ws.append([
@@ -177,23 +177,23 @@ def export_due_to_excel(items: List[Dict[str, Any]], file_path: str) -> None:
         ])
 
     style_header(ws, header_row=1)
-    # Cột 10-11 là ngày
+    # Cột 10-11 là ngày; cột 6 và 8 là hệ số
     set_date_format(ws, date_columns=[10,11], start_row=2)
+    set_number_format(ws, number_columns=[6,8], start_row=2, fmt='0.00')
     auto_filter_and_width(ws, header_row=1)
 
     wb.save(file_path)
 
 
-def export_salary_history_for_person(db: Session, person: Person, file_path: str) -> None:
+def export_salary_history_for_person(db: Session, person: Person, file_path: str, template_name: Optional[str] = None) -> None:
     """Xuất toàn bộ lịch sử lương của một nhân sự ra Excel, có định dạng và biểu đồ hệ số theo thời gian."""
-    from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment, PatternFill
     from openpyxl.utils import get_column_letter
     from openpyxl.chart import LineChart, Reference
+    from .excel_utils import prepare_workbook_with_template, auto_filter_and_width, set_number_format, set_date_format
 
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Salary history"
+    headers = ["Mã NV", "Họ tên", "Ngày hiệu lực", "Ngạch", "Bậc", "Hệ số", "Ghi chú"]
+    wb, ws = prepare_workbook_with_template(template_name=(template_name or 'salary_history.xlsx'), title='Salary history', headers=headers)
     headers = ["Mã NV", "Họ tên", "Ngày hiệu lực", "Ngạch", "Bậc", "Hệ số", "Ghi chú"]
     ws.append(headers)
 
@@ -231,18 +231,10 @@ def export_salary_history_for_person(db: Session, person: Person, file_path: str
             h.note or "",
         ])
 
-    # Auto filter toàn bảng
-    ws.auto_filter.ref = f"A1:G{ws.max_row}"
-
-    # Auto width cột
-    widths = [len(h) for h in headers]
-    for row in ws.iter_rows(min_row=2, values_only=True):
-        for idx, val in enumerate(row):
-            l = len(str(val)) if val is not None else 0
-            if l > widths[idx]:
-                widths[idx] = l
-    for i, w in enumerate(widths, start=1):
-        ws.column_dimensions[get_column_letter(i)].width = min(max(w + 2, 10), 40)
+    # Auto filter + date/number formats + auto width
+    auto_filter_and_width(ws, header_row=1)
+    set_date_format(ws, date_columns=[3], start_row=2)
+    set_number_format(ws, number_columns=[6], start_row=2, fmt='0.00')
 
     # Biểu đồ hệ số theo thời gian nếu có dữ liệu
     if ws.max_row > 1:
@@ -259,29 +251,27 @@ def export_salary_history_for_person(db: Session, person: Person, file_path: str
     wb.save(file_path)
 
 
-def export_salary_histories_for_people(db: Session, people: List[Person], file_path: str) -> None:
+def export_salary_histories_for_people(db: Session, people: List[Person], file_path: str, template_name: Optional[str] = None) -> None:
     """Xuất lịch sử lương cho danh sách nhân sự (một sheet tổng hợp) với định dạng."""
-    from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment, PatternFill
-    from openpyxl.utils import get_column_letter
+    from .excel_utils import prepare_workbook_with_template, auto_filter_and_width, set_number_format, set_date_format
 
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Salary histories"
     headers = ["Mã NV", "Họ tên", "Ngày hiệu lực", "Ngạch", "Bậc", "Hệ số", "Ghi chú"]
-    ws.append(headers)
+    wb, ws = prepare_workbook_with_template(template_name=(template_name or 'salary_histories.xlsx'), title='Salary histories', headers=headers)
 
-    # Header style + freeze panes
+    # Header style + freeze panes (nếu template chưa có, style_header đã được áp dụng trước đó ở prepare step)
     header_font = Font(bold=True, color="FFFFFF")
     header_fill = PatternFill("solid", fgColor="4F81BD")
     for c in ws[1]:
-        c.font = header_font
-        c.fill = header_fill
-        c.alignment = Alignment(horizontal="center", vertical="center")
-    ws.freeze_panes = "A2"
+        if not c.font or not c.font.bold:
+            c.font = header_font
+            c.fill = header_fill
+            c.alignment = Alignment(horizontal="center", vertical="center")
+    if ws.freeze_panes is None:
+        ws.freeze_panes = "A2"
 
     if not people:
-        ws.auto_filter.ref = "A1:G1"
+        auto_filter_and_width(ws, header_row=1)
         wb.save(file_path)
         return
 
@@ -317,15 +307,9 @@ def export_salary_histories_for_people(db: Session, people: List[Person], file_p
             h.note or "",
         ])
 
-    # Auto filter + auto width
-    ws.auto_filter.ref = f"A1:G{ws.max_row}"
-    widths = [len(h) for h in headers]
-    for row in ws.iter_rows(min_row=2, values_only=True):
-        for idx, val in enumerate(row):
-            l = len(str(val)) if val is not None else 0
-            if l > widths[idx]:
-                widths[idx] = l
-    for i, w in enumerate(widths, start=1):
-        ws.column_dimensions[get_column_letter(i)].width = min(max(w + 2, 10), 40)
+    # Auto filter + date/number formats + auto width
+    auto_filter_and_width(ws, header_row=1)
+    set_date_format(ws, date_columns=[3], start_row=2)
+    set_number_format(ws, number_columns=[6], start_row=2, fmt='0.00')
 
     wb.save(file_path)

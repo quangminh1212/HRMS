@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 from sqlalchemy.orm import Session
 
@@ -14,14 +14,15 @@ def add_insurance_event(db: Session, person: Person, event_type: str, event_date
     return ev
 
 
-def export_insurance_to_excel(db: Session, start_date: date, end_date: date, path: str) -> None:
+def export_insurance_to_excel(db: Session, start_date: date, end_date: date, path: str, template_name: Optional[str] = None) -> None:
+    from typing import Optional
     from .excel_utils import prepare_workbook_with_template, style_header, auto_filter_and_width, set_date_format
 
     q = db.query(InsuranceEvent).filter(InsuranceEvent.event_date >= start_date, InsuranceEvent.event_date <= end_date)
     rows = q.all()
 
     headers = ["Mã NV", "Họ tên", "Loại sự kiện", "Ngày", "Ghi chú"]
-    wb, ws = prepare_workbook_with_template(template_name='bhxh.xlsx', title='BHXH', headers=headers)
+    wb, ws = prepare_workbook_with_template(template_name=(template_name or 'bhxh.xlsx'), title='BHXH', headers=headers)
 
     # Ghi dữ liệu
     for r in rows:

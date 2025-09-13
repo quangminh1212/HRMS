@@ -116,6 +116,8 @@ class MainWindow(QWidget):
         self.btn_letter_salary_person = QPushButton("Văn bản nâng lương")
         self.btn_letter_salary_person.clicked.connect(self.export_salary_letters)
         self.btn_pdf_toggle = QComboBox(); self.btn_pdf_toggle.addItems(["DOCX","PDF"])  # chế độ xuất
+        # Template Excel chooser
+        self.excel_template_box = QComboBox(); self.load_excel_templates()
         self.btn_import = QPushButton("Import Excel nhân sự")
         self.btn_import.clicked.connect(self.import_excel)
         self.btn_ins_add = QPushButton("Thêm sự kiện BHXH")
@@ -141,6 +143,7 @@ class MainWindow(QWidget):
         btn_layout.addWidget(self.btn_letter_retirement)
         btn_layout.addWidget(self.btn_letter_salary_person)
         btn_layout.addWidget(self.btn_pdf_toggle)
+        btn_layout.addWidget(self.excel_template_box)
         btn_layout.addWidget(self.btn_import)
         btn_layout.addWidget(self.btn_ins_add)
         btn_layout.addWidget(self.btn_ins_export)
@@ -218,6 +221,25 @@ class MainWindow(QWidget):
             QMessageBox.critical(self, "Lỗi", str(e))
         finally:
             db.close()
+
+    def get_selected_excel_template(self) -> str | None:
+        # Trả về tên file template (không gồm đường dẫn) hoặc None
+        data = self.excel_template_box.currentData()
+        return data if isinstance(data, str) or data is None else None
+
+    def load_excel_templates(self):
+        # Nạp danh sách template Excel từ templates/xlsx
+        try:
+            self.excel_template_box.clear()
+            self.excel_template_box.addItem("(Mặc định)", None)
+            tpl_dir = Path('templates') / 'xlsx'
+            if tpl_dir.exists():
+                for p in sorted([x for x in tpl_dir.iterdir() if x.suffix.lower() == '.xlsx']):
+                    self.excel_template_box.addItem(p.name, p.name)
+        except Exception:
+            # Bỏ qua lỗi nạp template
+            self.excel_template_box.clear()
+            self.excel_template_box.addItem("(Mặc định)", None)
 
     def load_filters(self):
         db = SessionLocal()
@@ -377,7 +399,7 @@ class MainWindow(QWidget):
                 return
             Path("exports").mkdir(exist_ok=True)
             xlsx = Path("exports") / f"nang_luong_quy_{end.year}_Q{((end.month-1)//3)+1}.xlsx"
-            export_due_to_excel(items, str(xlsx))
+            export_due_to_excel(items, str(xlsx), template_name=self.get_selected_excel_template())
             # Audit
             try:
                 log_action(db, self.current_user.get('id'), 'export_salary_due', 'Salary', None, f"file={xlsx}")
@@ -699,7 +721,7 @@ class MainWindow(QWidget):
             Path("exports").mkdir(exist_ok=True)
             ts = datetime.now().strftime('%Y%m%d_%H%M%S')
             out = Path("exports")/f"salary_histories_{ts}.xlsx"
-            export_salary_histories_for_people(db, people, str(out))
+            export_salary_histories_for_people(db, people, str(out), template_name=self.get_selected_excel_template())
             try:
                 log_action(db, self.current_user.get('id'), 'export_salary_histories', 'Person', None, f"count={len(people)};file={out}")
             except Exception:
@@ -873,7 +895,7 @@ class MainWindow(QWidget):
         try:
             Path("exports").mkdir(exist_ok=True)
             file_path = Path("exports") / f"bhxh_{start.year}.xlsx"
-            export_insurance_to_excel(db, start, end, str(file_path))
+            export_insurance_to_excel(db, start, end, str(file_path), template_name=self.get_selected_excel_template())
             # Audit
             try:
                 log_action(db, self.current_user.get('id'), 'export_insurance', 'InsuranceEvent', None, f"file={file_path}")
@@ -921,7 +943,7 @@ class MainWindow(QWidget):
                 return
             Path("exports").mkdir(exist_ok=True)
             file_path = Path("exports") / f"contracts_{person.code}.xlsx"
-            export_contracts_for_person(db, person, str(file_path))
+            export_contracts_for_person(db, person, str(file_path), template_name=self.get_selected_excel_template())
             try:
                 log_action(db, self.current_user.get('id'), 'export_contracts', 'Person', person.id, f"file={file_path}")
             except Exception:

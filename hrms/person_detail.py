@@ -97,9 +97,18 @@ class PersonDetailDialog(QDialog):
                 QMessageBox.warning(self, "Không có quyền", "Chỉ quản lý đơn vị được xuất nhân sự thuộc đơn vị mình")
                 return
 
+            # Lấy template Excel từ màn hình chính nếu có
+            template_name = None
+            try:
+                parent = self.parent()
+                if parent and hasattr(parent, 'get_selected_excel_template'):
+                    template_name = parent.get_selected_excel_template()
+            except Exception:
+                template_name = None
+
             Path("exports").mkdir(exist_ok=True)
             out = Path("exports") / f"salary_history_{p.code}.xlsx"
-            export_salary_history_for_person(db, p, str(out))
+            export_salary_history_for_person(db, p, str(out), template_name=template_name)
             # Audit
             try:
                 uid = current_user.get('id') if isinstance(current_user, dict) else None
