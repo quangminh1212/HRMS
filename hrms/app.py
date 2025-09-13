@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (
     QApplication, QWidget, QLineEdit, QPushButton, QVBoxLayout, QLabel,
-    QListWidget, QMessageBox, QHBoxLayout
+    QListWidget, QMessageBox, QHBoxLayout, QComboBox, QDialog, QFormLayout
 )
 from PySide6.QtCore import Qt, QTimer
 import sys
@@ -61,6 +61,25 @@ class MainWindow(QWidget):
         self.current_user = current_user
         self.setWindowTitle(f"HRMS - Tra cứu nhân sự ({current_user.get('username')})")
         layout = QVBoxLayout()
+
+        # Hàng filter
+        filter_bar = QHBoxLayout()
+        self.filter_unit = QComboBox()
+        self.filter_unit.addItem("-- Đơn vị --", None)
+        self.filter_position = QComboBox()
+        self.filter_position.addItem("-- Chức vụ --", None)
+        self.filter_status = QComboBox()
+        self.filter_status.addItems(["-- Trạng thái --", "Đang công tác", "Nghỉ thai sản", "Đi học", "Thôi việc"])  # có thể mở rộng
+        self.btn_filter_refresh = QPushButton("Lọc")
+        self.btn_filter_refresh.clicked.connect(lambda: self.on_search(self.search.text()))
+        self.btn_manage_users = QPushButton("Quản lý người dùng")
+        self.btn_manage_users.clicked.connect(self.manage_users)
+        filter_bar.addWidget(self.filter_unit)
+        filter_bar.addWidget(self.filter_position)
+        filter_bar.addWidget(self.filter_status)
+        filter_bar.addWidget(self.btn_filter_refresh)
+        filter_bar.addWidget(self.btn_manage_users)
+
         self.search = QLineEdit()
         self.search.setPlaceholderText("Nhập tên cần tìm...")
         self.search.textChanged.connect(self.on_search)
@@ -94,6 +113,7 @@ class MainWindow(QWidget):
         btn_layout.addWidget(self.btn_ins_add)
         btn_layout.addWidget(self.btn_ins_export)
         layout.addWidget(QLabel("Tra cứu nhân sự"))
+        layout.addLayout(filter_bar)
         layout.addWidget(self.search)
         layout.addWidget(self.list)
         layout.addLayout(btn_layout)
@@ -101,6 +121,9 @@ class MainWindow(QWidget):
 
         # RBAC: áp dụng quyền theo role
         self.apply_role_permissions()
+
+        # Tải danh mục filter
+        self.load_filters()
 
         # Thiết lập timer để lấy thông báo từ scheduler và popup
         self.timer = QTimer(self)
@@ -117,9 +140,20 @@ class MainWindow(QWidget):
         db = SessionLocal()
         try:
             q = db.query(Person)
+            # Lọc theo tên
             if text:
                 like = f"%{text}%"
                 q = q.filter(Person.full_name.ilike(like))
+            # Lọc theo đơn vị/chức vụ/trạng thái
+            unit_id = self.filter_unit.currentData()
+            if unit_id:
+                q = q.filter(Person.unit_id == unit_id)
+            pos_id = self.filter_position.currentData()
+            if pos_id:
+                q = q.filter(Person.position_id == pos_id)
+            st = self.filter_status.currentText()
+            if st and not st.startswith("--"):
+                q = q.filter(Person.status.ilike(f"%{st}%"))
             people = q.order_by(Person.full_name).all()
             self.list.clear()
             for p in people:
@@ -127,6 +161,29 @@ class MainWindow(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Lỗi", str(e))
         finally:
+            db.close()
+
+    def load_filters(self):
+        db = SessionLocal()
+        try:
+            self.filter_unit.blockSignals(True)
+            self.filter_position.blockSignals(True)
+            # Units
+            from .models import Unit, Position
+            self.filter_unit.clear()
+            self.filter_unit.addItem("-- Đơn vị --", None)
+            for u in db.query(Unit).order_by(Unit.name).all():
+                self.filter_unit.addItem(u.name, u.id)
+            # Positions
+            self.filter_position.clear()
+            self.filter_position.addItem("-- Chức vụ --", None)
+            for p in db.query(Position).order_by(Position.name).all():
+                self.filter_position.addItem(p.name, p.id)
+        except Exception as e:
+            QMessageBox.critical(self, "Lỗi", str(e))
+        finally:
+            self.filter_unit.blockSignals(False)
+            self.filter_position.blockSignals(False)
             db.close()
 
     def apply_role_permissions(self):
@@ -138,6 +195,7 @@ class MainWindow(QWidget):
         self.btn_export_work.setEnabled(is_admin)
         self.btn_ins_add.setEnabled(is_admin)
         self.btn_ins_export.setEnabled(is_admin)
+        self.btn_manage_users.setEnabled(is_admin)
 
     def drain_notifications(self):
         # Lấy thông báo từ scheduler và hiển thị popup
@@ -345,6 +403,60 @@ class MainWindow(QWidget):
         finally:
             if db:
                 db.close()
+
+    def manage_users(self):
+        # Chỉ admin/hr mới được
+        if (self.current_user.get('role') or '').lower() not in ('admin','hr'):
+            QMessageBox.warning(self, "Không có quyền", "Bạn không có quyền quản lý người dùng")
+            return
+        # Dialog tạo nhanh người dùng
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Thêm người dùng")
+        f = QFormLayout(dlg)
+        user_edit = QLineEdit()
+        pw_edit = QLineEdit(); pw_edit.setEchoMode(QLineEdit.Password)
+        role_box = QComboBox(); role_box.addItems(["user","hr","admin"])
+        unit_box = QComboBox(); unit_box.addItem("-- Đơn vị --", None)
+        # nạp đơn vị
+        db = SessionLocal()
+        from .models import Unit, User
+        for u in db.query(Unit).order_by(Unit.name).all():
+            unit_box.addItem(u.name, u.id)
+        f.addRow("Username", user_edit)
+        f.addRow("Password", pw_edit)
+        f.addRow("Role", role_box)
+        f.addRow("Đơn vị", unit_box)
+        btn_ok = QPushButton("Tạo")
+        btn_cancel = QPushButton("Hủy")
+        row = QHBoxLayout(); row.addWidget(btn_ok); row.addWidget(btn_cancel)
+        f.addRow(row)
+
+        def do_create():
+            username = user_edit.text().strip()
+            pw = pw_edit.text()
+            role = role_box.currentText()
+            unit_id = unit_box.currentData()
+            if not username or not pw:
+                QMessageBox.warning(dlg, "Thiếu thông tin", "Nhập username và password")
+                return
+            # Tạo user
+            from .security import hash_password
+            if db.query(User).filter(User.username == username).first():
+                QMessageBox.warning(dlg, "Tồn tại", "Username đã tồn tại")
+                return
+            u = User(username=username, password_hash=hash_password(pw), role=role, unit_id=unit_id)
+            db.add(u); db.commit();
+            try:
+                log_action(db, self.current_user.get('id'), 'create_user', 'User', u.id, f"role={role};unit_id={unit_id}")
+            except Exception:
+                pass
+            QMessageBox.information(dlg, "Thành công", "Đã tạo người dùng")
+            dlg.accept()
+
+        btn_ok.clicked.connect(do_create)
+        btn_cancel.clicked.connect(dlg.reject)
+        dlg.exec()
+        db.close()
 
     def import_excel(self):
         from PySide6.QtWidgets import QFileDialog
