@@ -67,8 +67,17 @@ class MainWindow(QWidget):
         self.btn_export.clicked.connect(self.export_selected)
         self.btn_due = QPushButton("Nâng lương quý này")
         self.btn_due.clicked.connect(self.show_due)
+        self.btn_appointment = QPushButton("Kiểm tra bổ nhiệm")
+        self.btn_appointment.clicked.connect(self.check_appointment)
+        self.btn_work = QPushButton("Thêm quá trình công tác")
+        self.btn_work.clicked.connect(self.add_work_process)
+        self.btn_export_work = QPushButton("Xuất quá trình công tác")
+        self.btn_export_work.clicked.connect(self.export_work_process)
         btn_layout.addWidget(self.btn_export)
         btn_layout.addWidget(self.btn_due)
+        btn_layout.addWidget(self.btn_appointment)
+        btn_layout.addWidget(self.btn_work)
+        btn_layout.addWidget(self.btn_export_work)
         layout.addWidget(QLabel("Tra cứu nhân sự"))
         layout.addWidget(self.search)
         layout.addWidget(self.list)
@@ -95,15 +104,22 @@ class MainWindow(QWidget):
         finally:
             db.close()
 
+    def current_person(self):
+        item = self.list.currentItem()
+        if not item:
+            return None, None
+        code = item.text().split(" - ")[-1]
+        db = SessionLocal()
+        p = db.query(Person).filter_by(code=code).first()
+        return db, p
+
     def export_selected(self):
         item = self.list.currentItem()
         if not item:
             QMessageBox.information(self, "Chưa chọn", "Vui lòng chọn một nhân sự trong danh sách")
             return
-        code = item.text().split(" - ")[-1]
-        db = SessionLocal()
+        db, person = self.current_person()
         try:
-            person = db.query(Person).filter_by(code=code).first()
             if not person:
                 QMessageBox.critical(self, "Lỗi", "Không tìm thấy nhân sự đã chọn")
                 return
@@ -141,7 +157,8 @@ class MainWindow(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Lỗi", str(e))
         finally:
-            db.close()
+            if db:
+                db.close()
 
     def show_due(self):
         from datetime import date
@@ -160,6 +177,81 @@ class MainWindow(QWidget):
             QMessageBox.critical(self, "Lỗi", str(e))
         finally:
             db.close()
+
+    def check_appointment(self):
+        from .appointment import check_appointment_eligibility
+        from PySide6.QtWidgets import QInputDialog
+        db, person = self.current_person()
+        try:
+            if not person:
+                QMessageBox.information(self, "Chưa chọn", "Chọn một nhân sự trước")
+                return
+            target, ok = QInputDialog.getText(self, "Vị trí bổ nhiệm", "Nhập vị trí cần kiểm tra:")
+            if not ok or not target:
+                return
+            ok_eligible, reasons = check_appointment_eligibility(db, person, target)
+            if ok_eligible:
+                QMessageBox.information(self, "Kết quả", f"Đủ điều kiện bổ nhiệm vị trí: {target}")
+            else:
+                QMessageBox.warning(self, "Chưa đạt", "\n".join(reasons) or "Chưa đủ điều kiện")
+        finally:
+            if db:
+                db.close()
+
+    def add_work_process(self):
+        from PySide6.QtWidgets import QInputDialog
+        from datetime import date
+        db, person = self.current_person()
+        try:
+            if not person:
+                QMessageBox.information(self, "Chưa chọn", "Chọn một nhân sự trước")
+                return
+            unit, ok = QInputDialog.getText(self, "Đơn vị", "Nhập đơn vị:")
+            if not ok or not unit:
+                return
+            pos, ok = QInputDialog.getText(self, "Chức vụ", "Nhập chức vụ:")
+            if not ok or not pos:
+                return
+            from .models import WorkProcess
+            # đơn giản: lấy start_date = ngày hiện tại
+            wp = WorkProcess(person_id=person.id, unit=unit, position=pos, start_date=date.today())
+            db.add(wp)
+            db.commit()
+            QMessageBox.information(self, "Thành công", "Đã thêm quá trình công tác")
+        except Exception as e:
+            QMessageBox.critical(self, "Lỗi", str(e))
+        finally:
+            if db:
+                db.close()
+
+    def export_work_process(self):
+        from .models import WorkProcess
+        db, person = self.current_person()
+        try:
+            if not person:
+                QMessageBox.information(self, "Chưa chọn", "Chọn một nhân sự trước")
+                return
+            wps = db.query(WorkProcess).filter_by(person_id=person.id).order_by(WorkProcess.start_date).all()
+            Path("exports").mkdir(exist_ok=True)
+            file_path = Path("exports") / f"work_process_{person.code}.docx"
+            doc = Document()
+            doc.add_heading(f"Quá trình công tác - {person.full_name}", level=1)
+            t = doc.add_table(rows=1, cols=3)
+            t.rows[0].cells[0].text = "Từ ngày"
+            t.rows[0].cells[1].text = "Đơn vị"
+            t.rows[0].cells[2].text = "Chức vụ"
+            for w in wps:
+                row = t.add_row().cells
+                row[0].text = (w.start_date.isoformat() + (" -> " + w.end_date.isoformat() if w.end_date else ""))
+                row[1].text = w.unit or ""
+                row[2].text = w.position or ""
+            doc.save(str(file_path))
+            QMessageBox.information(self, "Thành công", f"Đã xuất: {file_path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Lỗi", str(e))
+        finally:
+            if db:
+                db.close()
 
 
 def quarter_window(d):
@@ -180,6 +272,13 @@ def main():
     # Khởi tạo DB nếu chưa có và seed dữ liệu demo lần đầu
     init_db()
     seed_basic_data()
+
+    # Khởi động scheduler cảnh báo in-app
+    try:
+        from .scheduler import schedule_jobs
+        schedule_jobs()
+    except Exception as e:
+        print(f"[WARN] Scheduler not started: {e}")
 
     app = QApplication(sys.argv)
     w = LoginWindow()
