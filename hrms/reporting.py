@@ -86,6 +86,7 @@ def compute_demographics(db: Session, as_of: date) -> Dict[str, Any]:
 
 def export_report_to_excel(summary: Dict[str, Any], demo: Dict[str, Any], path: str) -> None:
     from openpyxl import Workbook
+    from .excel_utils import style_header, auto_filter_and_width
 
     wb = Workbook()
     ws1 = wb.active
@@ -97,17 +98,24 @@ def export_report_to_excel(summary: Dict[str, Any], demo: Dict[str, Any], path: 
     ws1.append(["Maternity (current)", summary["maternity"]])
     ws1.append(["Studying (current)", summary["studying"]])
     ws1.append(["Leaving (current)", summary["leaving"]])
+    # Style + filter cho Summary
+    style_header(ws1, header_row=1)
+    auto_filter_and_width(ws1, header_row=1)
 
     ws2 = wb.create_sheet("Demographics")
     ws2.append(["Bucket", "Count"])
     for k, v in demo["age_buckets"].items():
         ws2.append([k, v])
+    style_header(ws2, header_row=1)
+    auto_filter_and_width(ws2, header_row=1)
 
     def write_counter(sheet_name: str, data: Dict[str, int]):
         ws = wb.create_sheet(sheet_name)
         ws.append(["Category", "Count"])
         for k, v in data.items():
             ws.append([k, v])
+        style_header(ws, header_row=1)
+        auto_filter_and_width(ws, header_row=1)
 
     write_counter("Ethnicity", demo["ethnicity"])
     write_counter("Gender", demo["gender"])
