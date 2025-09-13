@@ -1309,10 +1309,12 @@ class MainWindow(QWidget):
         unit_emails = QLineEdit(get_setting('UNIT_EMAILS','') or '')
         summary_zip = QLineEdit(get_setting('SEND_SUMMARY_ZIP','0') or '0')
         contract_alert_days = QLineEdit(get_setting('CONTRACT_ALERT_DAYS','30') or '30')
+        export_ttl_days = QLineEdit(get_setting('EXPORT_TTL_DAYS','30') or '30')
         f.addRow("EMAIL_SUBJECT_PREFIX", subject_prefix)
         f.addRow("UNIT_EMAILS", unit_emails)
         f.addRow("SEND_SUMMARY_ZIP (1/0)", summary_zip)
         f.addRow("CONTRACT_ALERT_DAYS", contract_alert_days)
+        f.addRow("EXPORT_TTL_DAYS", export_ttl_days)
         f.addRow("XLSX_DATE_FORMAT", date_fmt)
         f.addRow("XLSX_NUMBER_FORMAT_COEF", coef_fmt)
         f.addRow("XLSX_FREEZE_COL:GLOBAL", freeze_global)
@@ -1336,6 +1338,7 @@ class MainWindow(QWidget):
             set_setting('UNIT_EMAILS', unit_emails.text())
             set_setting('SEND_SUMMARY_ZIP', (summary_zip.text() or '0'))
             set_setting('CONTRACT_ALERT_DAYS', (contract_alert_days.text() or '30'))
+            set_setting('EXPORT_TTL_DAYS', (export_ttl_days.text() or '30'))
             set_setting('XLSX_DATE_FORMAT', (date_fmt.text() or 'DD/MM/YYYY'))
             set_setting('XLSX_NUMBER_FORMAT_COEF', (coef_fmt.text() or '0.00'))
             set_setting('XLSX_FREEZE_COL:GLOBAL', (freeze_global.text() or 'A').upper())
@@ -1419,7 +1422,7 @@ class MainWindow(QWidget):
         if role not in ('admin','hr'):
             QMessageBox.warning(self, "Không có quyền", "Chỉ admin/HR mới truy cập")
             return
-        from PySide6.QtWidgets import QDialog, QFormLayout, QTableWidget, QTableWidgetItem, QPushButton
+        from PySide6.QtWidgets import QDialog, QFormLayout, QTableWidget, QTableWidgetItem, QPushButton, QCheckBox
         dlg = QDialog(self); dlg.setWindowTitle("Lịch sử Email")
         lay = QVBoxLayout(dlg)
         # Bộ lọc
@@ -1428,6 +1431,7 @@ class MainWindow(QWidget):
         type_box = QComboBox(); type_box.addItems(["(Tất cả)", "salary_due", "bhxh_monthly", "contracts_expiring", "quick_report", "retirement", "generic"])
         unit_edit = QLineEdit(); unit_edit.setPlaceholderText("Đơn vị chứa…")
         status_box = QComboBox(); status_box.addItems(["(Tất cả)", "sent", "failed"])
+        only_failed = QCheckBox("Chỉ lỗi")
         subject_search = QLineEdit(); subject_search.setPlaceholderText("Tìm tiêu đề…")
         from_date = QDateEdit(); from_date.setCalendarPopup(True)
         to_date = QDateEdit(); to_date.setCalendarPopup(True)
@@ -1436,13 +1440,15 @@ class MainWindow(QWidget):
         f.addRow("Loại", type_box)
         f.addRow("Đơn vị", unit_edit)
         f.addRow("Trạng thái", status_box)
+        f.addRow("", only_failed)
         f.addRow("Tiêu đề", subject_search)
         h = QHBoxLayout(); h.addWidget(QLabel("Từ")); h.addWidget(from_date); h.addWidget(e_from); h.addSpacing(12); h.addWidget(QLabel("Đến")); h.addWidget(to_date); h.addWidget(e_to)
         f.addRow("Thời gian", h)
         user_id_edit = QLineEdit(); user_id_edit.setPlaceholderText("User ID")
         f.addRow("User ID", user_id_edit)
         btn_resend = QPushButton("Gửi lại")
-        hb = QHBoxLayout(); hb.addWidget(btn_refresh); hb.addWidget(btn_export); hb.addWidget(btn_view); hb.addWidget(btn_resend); f.addRow(hb)
+        btn_resend_all = QPushButton("Gửi lại tất cả (lọc)")
+        hb = QHBoxLayout(); hb.addWidget(btn_refresh); hb.addWidget(btn_export); hb.addWidget(btn_view); hb.addWidget(btn_resend); hb.addWidget(btn_resend_all); f.addRow(hb)
         lay.addLayout(f)
         # Bảng kết quả
         table = QTableWidget(0, 8)
@@ -1462,7 +1468,9 @@ class MainWindow(QWidget):
                 if u:
                     q = q.filter(EmailLog.unit_name.ilike(f"%{u}%"))
                 st = status_box.currentText();
-                if not st.startswith("("):
+                if only_failed.isChecked():
+                    q = q.filter(EmailLog.status == 'failed')
+                elif not st.startswith("("):
                     q = q.filter(EmailLog.status == st)
                 subj = subject_search.text().strip();
                 if subj:
@@ -1591,6 +1599,49 @@ class MainWindow(QWidget):
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_resend.clicked.connect(resend_selected)
+        def resend_all_filtered():
+            try:
+                total = 0; sent = 0; failed = 0
+                for i in range(table.rowCount()):
+                    total += 1
+                    try:
+                        t = table.item(i,1).text() if table.item(i,1) else ''
+                        unit_name = table.item(i,2).text() if table.item(i,2) else ''
+                        subject = table.item(i,3).text() if table.item(i,3) else ''
+                        body = table.item(i,3).data(Qt.UserRole) if table.item(i,3) else ''
+                        attach_disp = table.item(i,5).data(Qt.UserRole) if table.item(i,5) else (table.item(i,5).text() if table.item(i,5) else '')
+                        paths = []
+                        from pathlib import Path
+                        for part in (attach_disp or '').split(','):
+                            p = part.strip()
+                            if p:
+                                pp = Path(p)
+                                if pp.exists():
+                                    paths.append(str(pp))
+                        recips = None
+                        if t in ('salary_due','bhxh_monthly','contracts_expiring') and unit_name:
+                            try:
+                                from .mailer import get_recipients_for_unit
+                                recips = get_recipients_for_unit(unit_name)
+                            except Exception:
+                                recips = None
+                        from .mailer import send_email_with_attachment
+                        ok = send_email_with_attachment(subject or '[HRMS] Resend', body or '', paths, to=recips)
+                        # Log lại
+                        try:
+                            from .db import SessionLocal
+                            from .models import EmailLog
+                            s = SessionLocal(); s.add(EmailLog(type=t or 'generic', unit_name=(unit_name or None), recipients='', subject=subject or '[HRMS] Resend', body=(body or '')[:1000], attachments=', '.join(paths), status='sent' if ok else 'failed', user_id=self.current_user.get('id'))); s.commit(); s.close()
+                        except Exception:
+                            pass
+                        if ok: sent += 1
+                        else: failed += 1
+                    except Exception:
+                        failed += 1
+                QMessageBox.information(dlg, "Kết quả", f"Tổng: {total}\nThành công: {sent}\nThất bại: {failed}")
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_resend_all.clicked.connect(resend_all_filtered)
         load()
         dlg.resize(1100, 600)
         dlg.exec()

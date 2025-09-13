@@ -8,7 +8,7 @@ from .db import SessionLocal
 from .models import Person
 from .salary import list_due_in_window
 from .retirement import calculate_retirement_date
-from .mailer import send_alert
+from .mailer import send_alert, send_email_with_attachment_retry
 
 # Hàng đợi thông báo để UI lấy và hiển thị popup
 NOTIFY_QUEUE: Queue[tuple[str, str]] = Queue()
@@ -100,7 +100,7 @@ def schedule_jobs():
                 try:
                     from pathlib import Path
                     from .salary import export_due_to_excel
-                    from .mailer import send_email_with_attachment
+from .mailer import send_email_with_attachment_retry as send_email_with_attachment
                     Path("exports").mkdir(exist_ok=True)
                     q = ((end.month - 1)//3) + 1
                     out = Path("exports") / f"nang_luong_quy_{end.year}_Q{q}.xlsx"
@@ -166,7 +166,7 @@ def schedule_jobs():
         from calendar import monthrange
         from pathlib import Path
         from .insurance import export_insurance_to_excel
-        from .mailer import send_email_with_attachment, get_recipients_for_unit
+from .mailer import send_email_with_attachment_retry as send_email_with_attachment, get_recipients_for_unit
         today = date.today()
         # khoảng tháng trước
         prev_month = (today.month - 2) % 12 + 1
@@ -234,7 +234,7 @@ def schedule_jobs():
         from calendar import monthrange
         from pathlib import Path
         from .insurance import export_insurance_to_excel
-        from .mailer import send_email_with_attachment, get_recipients_for_unit, create_zip
+from .mailer import send_email_with_attachment_retry as send_email_with_attachment, get_recipients_for_unit, create_zip
         today = date.today()
         prev_month = (today.month - 2) % 12 + 1
         prev_year = today.year - 1 if today.month == 1 else today.year
@@ -301,7 +301,7 @@ def schedule_jobs():
         from datetime import timedelta, date
         from pathlib import Path
         from .contracts import export_contracts_expiring_to_excel
-        from .mailer import send_email_with_attachment, get_recipients_for_unit, create_zip
+from .mailer import send_email_with_attachment_retry as send_email_with_attachment, get_recipients_for_unit, create_zip
         from .settings_service import get_setting
         today = date.today()
         days = int(get_setting('CONTRACT_ALERT_DAYS','30') or '30')
@@ -360,6 +360,34 @@ def schedule_jobs():
     sched.add_job(run_retirement_alert, 'cron', hour=9, minute=5)
     sched.add_job(run_insurance_monthly, 'cron', day=1, hour=9, minute=15)
     sched.add_job(run_contracts_expiring, 'cron', hour=9, minute=20)
+
+    # Dọn dẹp thư mục exports hằng ngày
+    def cleanup_exports():
+        try:
+            from pathlib import Path
+            import time, os
+            from .settings_service import get_setting
+            ttl_days = int(get_setting('EXPORT_TTL_DAYS','30') or '30')
+            cutoff = time.time() - ttl_days * 86400
+            p = Path('exports')
+            if not p.exists():
+                return
+            removed = 0
+            for f in p.iterdir():
+                try:
+                    if f.is_file():
+                        st = f.stat()
+                        if st.st_mtime < cutoff:
+                            os.remove(f)
+                            removed += 1
+                except Exception:
+                    pass
+            if removed:
+                print(f"[CLEANUP] Removed {removed} export file(s) older than {ttl_days} days")
+        except Exception as ex:
+            print(f"[CLEANUP] error: {ex}")
+
+    sched.add_job(cleanup_exports, 'cron', hour=3, minute=0)
 
     sched.start()
     return sched

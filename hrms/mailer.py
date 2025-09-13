@@ -112,7 +112,7 @@ def get_recipients_for_unit(unit_name: str) -> List[str]:
         return []
 
 
-def send_email_with_attachment(subject: str, body: str, attachments: List[str], to: List[str] | None = None) -> bool:
+def send_email_with_attachment(subject: str, body: str, attachments: List[str], to: List[str] | None = None, *, suppress_log: bool = False) -> bool:
     settings = load_settings()
     recipients = to or settings.alert_emails or []
     if not settings.smtp_host or not recipients:
@@ -145,45 +145,47 @@ def send_email_with_attachment(subject: str, body: str, attachments: List[str], 
                 server.login(settings.smtp_user, settings.smtp_password)
             server.send_message(msg)
         # Ghi EmailLog (best-effort)
-        try:
-            from .db import SessionLocal
-            from .models import EmailLog
-            s = SessionLocal()
-            log = EmailLog(
-                type="generic",
-                unit_name=None,
-                recipients=_shorten_recipients(to or settings.alert_emails or []),
-                subject=_apply_subject_prefix(subject),
-                body=(body or '')[:1000],
-                attachments=", ".join(attachments or [])[:2000],
-                status="sent",
-                error=None,
-                user_id=None,
-            )
-            s.add(log); s.commit(); s.close()
-        except Exception:
-            pass
+        if not suppress_log:
+            try:
+                from .db import SessionLocal
+                from .models import EmailLog
+                s = SessionLocal()
+                log = EmailLog(
+                    type="generic",
+                    unit_name=None,
+                    recipients=_shorten_recipients(to or settings.alert_emails or []),
+                    subject=_apply_subject_prefix(subject),
+                    body=(body or '')[:1000],
+                    attachments=", ".join(attachments or [])[:2000],
+                    status="sent",
+                    error=None,
+                    user_id=None,
+                )
+                s.add(log); s.commit(); s.close()
+            except Exception:
+                pass
         return True
     except Exception as ex:
         # Ghi log thất bại
-        try:
-            from .db import SessionLocal
-            from .models import EmailLog
-            s = SessionLocal()
-            log = EmailLog(
-                type="generic",
-                unit_name=None,
-                recipients=_shorten_recipients(to or settings.alert_emails or []),
-                subject=_apply_subject_prefix(subject),
-                body=(body or '')[:1000],
-                attachments=", ".join(attachments or [])[:2000],
-                status="failed",
-                error=str(ex)[:500],
-                user_id=None,
-            )
-            s.add(log); s.commit(); s.close()
-        except Exception:
-            pass
+        if not suppress_log:
+            try:
+                from .db import SessionLocal
+                from .models import EmailLog
+                s = SessionLocal()
+                log = EmailLog(
+                    type="generic",
+                    unit_name=None,
+                    recipients=_shorten_recipients(to or settings.alert_emails or []),
+                    subject=_apply_subject_prefix(subject),
+                    body=(body or '')[:1000],
+                    attachments=", ".join(attachments or [])[:2000],
+                    status="failed",
+                    error=str(ex)[:500],
+                    user_id=None,
+                )
+                s.add(log); s.commit(); s.close()
+            except Exception:
+                pass
         return False
 
 
@@ -200,3 +202,23 @@ def create_zip(files: list[str], out_zip: str) -> bool:
         return True
     except Exception:
         return False
+
+
+def send_email_with_attachment_retry(subject: str, body: str, attachments: List[str], to: List[str] | None = None, *, retries: int = 2, delay: int = 10) -> bool:
+    """Gửi email với retry. Chỉ ghi EmailLog cho lần cuối cùng (thành công/ thất bại)."""
+    try:
+        import time
+    except Exception:
+        time = None
+    attempts = retries + 1 if retries and retries > 0 else 1
+    for i in range(attempts):
+        suppress = (i < attempts - 1)
+        ok = send_email_with_attachment(subject, body, attachments, to=to, suppress_log=suppress)
+        if ok:
+            return True
+        if i < attempts - 1 and time is not None and delay and delay > 0:
+            try:
+                time.sleep(delay)
+            except Exception:
+                pass
+    return False
