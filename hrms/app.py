@@ -1875,8 +1875,8 @@ class MainWindow(QWidget):
         f.addRow("", cb_all_scope)
         # Saved filters UI
         saved_filters_combo = QComboBox(); saved_filters_combo.addItem("(Chưa có)")
-        btn_save_filter_as = QPushButton("Lưu tên…"); btn_overwrite_saved = QPushButton("Ghi đè"); btn_load_saved = QPushButton("Tải"); btn_delete_saved = QPushButton("Xoá"); btn_rename_saved = QPushButton("Đổi tên"); btn_dup_saved = QPushButton("Nhân bản"); btn_export_saved = QPushButton("Export JSON"); btn_import_saved = QPushButton("Nhập JSON")
-        row_saved = QHBoxLayout(); row_saved.addWidget(QLabel("Bộ lọc đã lưu")); row_saved.addWidget(saved_filters_combo); row_saved.addWidget(btn_save_filter_as); row_saved.addWidget(btn_overwrite_saved); row_saved.addWidget(btn_load_saved); row_saved.addWidget(btn_delete_saved); row_saved.addWidget(btn_rename_saved); row_saved.addWidget(btn_dup_saved); row_saved.addWidget(btn_export_saved); row_saved.addWidget(btn_import_saved)
+        btn_save_filter_as = QPushButton("Lưu tên…"); btn_overwrite_saved = QPushButton("Ghi đè"); btn_load_saved = QPushButton("Tải"); btn_delete_saved = QPushButton("Xoá"); btn_rename_saved = QPushButton("Đổi tên"); btn_dup_saved = QPushButton("Nhân bản"); btn_set_default = QPushButton("Mặc định"); btn_clear_default = QPushButton("Bỏ mặc định"); btn_export_current = QPushButton("Export chọn"); btn_export_saved = QPushButton("Export JSON"); btn_import_saved = QPushButton("Nhập JSON")
+        row_saved = QHBoxLayout(); row_saved.addWidget(QLabel("Bộ lọc đã lưu")); row_saved.addWidget(saved_filters_combo); row_saved.addWidget(btn_save_filter_as); row_saved.addWidget(btn_overwrite_saved); row_saved.addWidget(btn_load_saved); row_saved.addWidget(btn_delete_saved); row_saved.addWidget(btn_rename_saved); row_saved.addWidget(btn_dup_saved); row_saved.addWidget(btn_set_default); row_saved.addWidget(btn_clear_default); row_saved.addWidget(btn_export_current); row_saved.addWidget(btn_export_saved); row_saved.addWidget(btn_import_saved)
         f.addRow(row_saved)
 
         btn_resend = QPushButton("Gửi lại")
@@ -1943,12 +1943,30 @@ class MainWindow(QWidget):
                 except Exception:
                     pass
                 if not raw:
-                    # nếu không có filter đã lưu, giữ mặc định từ settings cho fast pager
+                    # nếu chưa có bộ lọc hiện tại, thử áp dụng bộ lọc mặc định đã lưu
                     try:
-                        cb_fast_pager.setChecked(bool(fast_pager))
+                        default_name = get_setting(f"EMAIL_HISTORY_SAVED_DEFAULT:{user_name_key}", '') or ''
+                        if default_name:
+                            raw2 = get_setting(f"EMAIL_HISTORY_SAVED_FILTER:{user_name_key}:{default_name}", '') or ''
+                            if raw2:
+                                raw = raw2
+                                try:
+                                    saved_filters_combo.blockSignals(True)
+                                    idx = saved_filters_combo.findText(default_name)
+                                    if idx >= 0:
+                                        saved_filters_combo.setCurrentIndex(idx)
+                                finally:
+                                    try: saved_filters_combo.blockSignals(False)
+                                    except Exception: pass
                     except Exception:
                         pass
-                    return
+                    if not raw:
+                        # nếu không có filter đã lưu, giữ mặc định từ settings cho fast pager
+                        try:
+                            cb_fast_pager.setChecked(bool(fast_pager))
+                        except Exception:
+                            pass
+                        return
                 import json
                 obj = json.loads(raw)
                 # type
@@ -2700,6 +2718,15 @@ class MainWindow(QWidget):
                 saved_filters_combo.clear(); saved_filters_combo.addItem("(Chưa có)")
                 for n in names:
                     saved_filters_combo.addItem(str(n))
+                # chọn mặc định nếu có
+                try:
+                    def_name = get_setting(f"EMAIL_HISTORY_SAVED_DEFAULT:{user_name_key}", '') or ''
+                    if def_name:
+                        idx = saved_filters_combo.findText(def_name)
+                        if idx >= 0:
+                            saved_filters_combo.setCurrentIndex(idx)
+                except Exception:
+                    pass
             except Exception:
                 pass
             finally:
@@ -2938,12 +2965,58 @@ class MainWindow(QWidget):
                 QMessageBox.information(dlg, "Đã nhân bản", f"Đã tạo: {new_name}")
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
+        def set_default_saved_filter():
+            try:
+                name = saved_filters_combo.currentText()
+                if not name or name.startswith("("):
+                    QMessageBox.information(dlg, "Chưa chọn", "Chọn một bộ lọc để đặt mặc định")
+                    return
+                from .settings_service import set_setting
+                user_name_key = (self.current_user.get('username') or '').strip()
+                set_setting(f"EMAIL_HISTORY_SAVED_DEFAULT:{user_name_key}", name)
+                QMessageBox.information(dlg, "Đã đặt mặc định", f"{name}")
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        def clear_default_saved_filter():
+            try:
+                from .settings_service import set_setting
+                user_name_key = (self.current_user.get('username') or '').strip()
+                set_setting(f"EMAIL_HISTORY_SAVED_DEFAULT:{user_name_key}", '')
+                QMessageBox.information(dlg, "Đã xoá", "Đã bỏ mặc định")
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        def export_current_saved_filter():
+            try:
+                from .settings_service import get_setting
+                user_name_key = (self.current_user.get('username') or '').strip()
+                name = saved_filters_combo.currentText()
+                if not name or name.startswith("("):
+                    QMessageBox.information(dlg, "Chưa chọn", "Chọn một bộ lọc để export")
+                    return
+                raw = get_setting(f"EMAIL_HISTORY_SAVED_FILTER:{user_name_key}:{name}", '') or ''
+                if not raw:
+                    QMessageBox.warning(dlg, "Không có", "Không tìm thấy nội dung bộ lọc")
+                    return
+                import json as _json
+                obj = _json.loads(raw)
+                from pathlib import Path
+                from datetime import datetime as _dt
+                Path('exports').mkdir(exist_ok=True)
+                p = Path('exports')/f"email_history_filter_{user_name_key}_{name}_{_dt.now().strftime('%Y%m%d_%H%M%S')}.json"
+                with open(p, 'w', encoding='utf-8') as f:
+                    _json.dump(obj, f, ensure_ascii=False, indent=2)
+                QMessageBox.information(dlg, "Đã xuất", str(p))
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_save_filter_as.clicked.connect(save_filter_as)
         btn_overwrite_saved.clicked.connect(overwrite_saved_filter)
         btn_load_saved.clicked.connect(load_saved_filter)
         btn_delete_saved.clicked.connect(delete_saved_filter)
         btn_rename_saved.clicked.connect(rename_saved_filter)
         btn_dup_saved.clicked.connect(duplicate_saved_filter)
+        btn_set_default.clicked.connect(set_default_saved_filter)
+        btn_clear_default.clicked.connect(clear_default_saved_filter)
+        btn_export_current.clicked.connect(export_current_saved_filter)
         btn_export_saved.clicked.connect(export_saved_filters)
         btn_import_saved.clicked.connect(import_saved_filters)
         refresh_saved_combo()
