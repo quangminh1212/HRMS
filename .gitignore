@@ -36,3 +36,9 @@ Thumbs.db
 
 # Generated exports
 exports/
+
+# Local SQLite databases (generated)
+data/*.db
+data/**/*.db
+data/*.sqlite
+data/**/*.sqlite

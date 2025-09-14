@@ -1693,7 +1693,7 @@ class MainWindow(QWidget):
         from_date = QDateEdit(); from_date.setCalendarPopup(True)
         to_date = QDateEdit(); to_date.setCalendarPopup(True)
         e_from = QCheckBox("Áp dụng"); e_to = QCheckBox("Áp dụng")
-        btn_refresh = QPushButton("Làm mới"); btn_export = QPushButton("Export CSV"); btn_view = QPushButton("Xem chi tiết")
+        btn_refresh = QPushButton("Làm mới"); btn_export = QPushButton("Export CSV"); btn_view = QPushButton("Xem chi tiết"); btn_save_filter = QPushButton("Lưu bộ lọc")
         f.addRow("Loại", type_box)
         f.addRow("Đơn vị", unit_edit)
         from PySide6.QtWidgets import QHBoxLayout as _HB, QPushButton as _PB
@@ -1718,7 +1718,7 @@ class MainWindow(QWidget):
         btn_delete = QPushButton("Xoá")
         btn_delete_all = QPushButton("Xoá tất cả (lọc)")
         hb = QHBoxLayout();
-        for b in (btn_refresh, btn_export, btn_view, btn_resend, btn_resend_all, btn_resend_group, btn_open_files, btn_open_folders, btn_open_exports, btn_copy_recip, btn_delete, btn_delete_all):
+        for b in (btn_refresh, btn_save_filter, btn_export, btn_view, btn_resend, btn_resend_all, btn_resend_group, btn_open_files, btn_open_folders, btn_open_exports, btn_copy_recip, btn_delete, btn_delete_all):
             hb.addWidget(b)
         f.addRow(hb)
         lay.addLayout(f)
@@ -1726,6 +1726,71 @@ class MainWindow(QWidget):
         table = QTableWidget(0, 8)
         table.setHorizontalHeaderLabels(["Thời gian", "Loại", "Đơn vị", "Subject", "Recipients", "Tệp đính kèm", "Trạng thái", "Lỗi"])
         lay.addWidget(table)
+        # Khôi phục bộ lọc theo user
+        def load_filter():
+            try:
+                from .settings_service import get_setting
+                key = f"EMAIL_HISTORY_FILTER:{(self.current_user.get('username') or '').strip()}"
+                raw = get_setting(key, '') or ''
+                if not raw: return
+                import json
+                obj = json.loads(raw)
+                # type
+                t = obj.get('type')
+                if t and t in [type_box.itemText(i) for i in range(type_box.count())]:
+                    type_box.setCurrentText(t)
+                # unit exact
+                usel = obj.get('unit_selected')
+                if usel:
+                    unit_box.setCurrentText(usel)
+                # unit contains
+                unit_edit.setText(obj.get('unit_contains',''))
+                # status
+                st = obj.get('status')
+                if st and st in [status_box.itemText(i) for i in range(status_box.count())]:
+                    status_box.setCurrentText(st)
+                only_failed.setChecked(bool(obj.get('only_failed', False)))
+                subject_search.setText(obj.get('subject',''))
+                # dates
+                from PySide6.QtCore import QDate
+                if obj.get('from_date'):
+                    y,m,d = obj['from_date'].split('-')
+                    from_date.setDate(QDate(int(y), int(m), int(d)))
+                    e_from.setChecked(True)
+                if obj.get('to_date'):
+                    y,m,d = obj['to_date'].split('-')
+                    to_date.setDate(QDate(int(y), int(m), int(d)))
+                    e_to.setChecked(True)
+                uid = obj.get('user_id')
+                user_id_edit.setText(str(uid) if uid is not None else '')
+            except Exception:
+                pass
+        def save_filter():
+            try:
+                from .settings_service import set_setting
+                key = f"EMAIL_HISTORY_FILTER:{(self.current_user.get('username') or '').strip()}"
+                from datetime import date as _date
+                def qdate_to_str(qd):
+                    try:
+                        return f"{qd.year()}-{qd.month():02d}-{qd.day():02d}"
+                    except Exception:
+                        return None
+                obj = {
+                    'type': type_box.currentText(),
+                    'unit_selected': unit_box.currentText() if unit_box.currentIndex()>0 else '',
+                    'unit_contains': unit_edit.text().strip(),
+                    'status': status_box.currentText(),
+                    'only_failed': only_failed.isChecked(),
+                    'subject': subject_search.text().strip(),
+                    'from_date': qdate_to_str(from_date.date()) if e_from.isChecked() else None,
+                    'to_date': qdate_to_str(to_date.date()) if e_to.isChecked() else None,
+                    'user_id': (int(user_id_edit.text()) if user_id_edit.text().isdigit() else None),
+                }
+                import json
+                set_setting(key, json.dumps(obj, ensure_ascii=False))
+            except Exception:
+                pass
+        load_filter()
         # Tải dữ liệu
         def load():
             from .db import SessionLocal
@@ -1793,7 +1858,6 @@ class MainWindow(QWidget):
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
             finally:
                 db.close()
-                db.close()
         def export_csv():
             try:
                 import csv
@@ -1810,7 +1874,8 @@ class MainWindow(QWidget):
                 QMessageBox.information(dlg, "Đã xuất", f"{outp}")
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
-        btn_refresh.clicked.connect(load)
+        btn_refresh.clicked.connect(lambda: (save_filter(), load()))
+        btn_save_filter.clicked.connect(save_filter)
         btn_export.clicked.connect(export_csv)
         def view_detail():
             i = table.currentRow()
@@ -2072,7 +2137,14 @@ class MainWindow(QWidget):
                     recips = get_recipients_for_unit(unit_name)
                     if not recips:
                         failed += 1; continue
-                    subject = f"[HRMS] Resend {t} - {unit_name}"
+                    # subject with optional prefix/suffix
+                    try:
+                        subj_prefix = getattr(resend_grouped_by_unit, '__subj_prefix').text().strip() if hasattr(resend_grouped_by_unit, '__subj_prefix') else ''
+                        subj_suffix = getattr(resend_grouped_by_unit, '__subj_suffix').text().strip() if hasattr(resend_grouped_by_unit, '__subj_suffix') else ''
+                    except Exception:
+                        subj_prefix = subj_suffix = ''
+                    base = f"[HRMS] Resend {t} - {unit_name}"
+                    subject = f"{subj_prefix}{base}{subj_suffix}"
                     body = f"Gửi lại theo nhóm {t} cho {unit_name}. Đính kèm {len(files)} tệp."
                     file_list = sorted(list(files))
                     # ZIP tùy chọn nếu có nhiều tệp
@@ -2117,8 +2189,13 @@ class MainWindow(QWidget):
         from PySide6.QtWidgets import QLineEdit as _QLE
         _zip_pattern = _QLE("resend_{type}_{unit}_{ts}.zip")
         resend_grouped_by_unit.__zip_pattern = _zip_pattern
+        subj_prefix = _QLE(""); subj_suffix = _QLE("")
+        resend_grouped_by_unit.__subj_prefix = subj_prefix
+        resend_grouped_by_unit.__subj_suffix = subj_suffix
         f.addRow("", _zip_cb)
         f.addRow("Tên ZIP", _zip_pattern)
+        f.addRow("Subject prefix", subj_prefix)
+        f.addRow("Subject suffix", subj_suffix)
         btn_resend_group.clicked.connect(resend_grouped_by_unit)
         load()
         dlg.resize(1100, 600)
