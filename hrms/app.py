@@ -2007,10 +2007,11 @@ class MainWindow(QWidget):
         btn_export_recip = QPushButton("Export recipients CSV")
         btn_copy_att_paths = QPushButton("Copy paths (lọc)")
         btn_export_att_list = QPushButton("Export attach list CSV")
+        btn_export_dataset_zip = QPushButton("Xuất dataset ZIP")
         btn_open_last = QPushButton("Mở file gần nhất")
         btn_reset_cols = QPushButton("Reset cột")
         btn_copy_recip_all = QPushButton("Copy recipients (lọc)")
-        for b in (btn_refresh, btn_save_filter, btn_reset_filter, btn_export, btn_quick_export, btn_copy_csv, btn_copy_row, btn_export_recip, btn_export_att_list, btn_copy_att_paths, btn_export_zip, btn_view, btn_resend, btn_resend_all, btn_resend_group, btn_view_zip, btn_open_files, btn_open_folders, btn_open_exports, btn_open_last, btn_copy_recip, btn_copy_recip_all, btn_delete, btn_delete_all, btn_reset_cols):
+        for b in (btn_refresh, btn_save_filter, btn_reset_filter, btn_export, btn_quick_export, btn_copy_csv, btn_copy_row, btn_export_recip, btn_export_att_list, btn_copy_att_paths, btn_export_zip, btn_export_dataset_zip, btn_view, btn_resend, btn_resend_all, btn_resend_group, btn_view_zip, btn_open_files, btn_open_folders, btn_open_exports, btn_open_last, btn_copy_recip, btn_copy_recip_all, btn_delete, btn_delete_all, btn_reset_cols):
             hb.addWidget(b)
         f.addRow(hb)
         # Last export label
@@ -5111,6 +5112,79 @@ class MainWindow(QWidget):
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_export_recip.clicked.connect(export_recipients_csv)
+        def export_dataset_zip():
+            try:
+                # Ensure current filter saved
+                try: save_filter()
+                except Exception: pass
+                from .settings_service import get_setting
+                import json as _json
+                from pathlib import Path
+                from datetime import datetime as _dt
+                import csv, zipfile
+                Path('exports').mkdir(exist_ok=True)
+                ts = _dt.now().strftime('%Y%m%d_%H%M%S')
+                base = Path('exports')/f"email_history_dataset_{ts}"
+                # Build CSV from table
+                csv_path = Path(str(base) + '.csv')
+                with open(csv_path, 'w', encoding='utf-8', newline='') as fcsv:
+                    try: fcsv.write('\ufeff')
+                    except Exception: pass
+                    w = csv.writer(fcsv)
+                    # header consistent with export_csv
+                    w.writerow(["created_at","type","type_slug","unit_name","unit_slug","subject","recipients","attachments","status","error","attachments_count"])
+                    def _slugify(s: str) -> str:
+                        try:
+                            import unicodedata, re
+                            s2 = unicodedata.normalize('NFKD', s)
+                            s2 = ''.join(c for c in s2 if not unicodedata.combining(c))
+                            s2 = s2.lower()
+                            s2 = re.sub(r"[^a-z0-9]+", "_", s2).strip('_')
+                            return s2
+                        except Exception:
+                            return (s or '').strip().lower().replace(' ', '_')
+                    for i in range(table.rowCount()):
+                        it = lambda r,c: (table.item(r,c).text() if table.item(r,c) else '')
+                        cnt = (table.item(i,8).text() if table.item(i,8) else '')
+                        unit = it(i,2); typ = it(i,1)
+                        w.writerow([it(i,0), typ, _slugify(typ), unit, _slugify(unit), it(i,3), it(i,4), it(i,5), it(i,6), it(i,7), cnt])
+                # Filter JSON from settings
+                ukey = (self.current_user.get('username') or '').strip()
+                raw = get_setting(f"EMAIL_HISTORY_FILTER:{ukey}", '') or '{}'
+                try:
+                    obj = _json.loads(raw)
+                except Exception:
+                    obj = raw
+                json_path = Path(str(base) + '.json')
+                with open(json_path, 'w', encoding='utf-8') as fj:
+                    _json.dump(obj, fj, ensure_ascii=False, indent=2)
+                # Zip both
+                zip_path = Path(str(base) + '.zip')
+                with zipfile.ZipFile(str(zip_path), 'w', compression=zipfile.ZIP_DEFLATED) as zf:
+                    zf.write(csv_path, arcname=csv_path.name)
+                    zf.write(json_path, arcname=json_path.name)
+                # Optionally cleanup CSV/JSON (keep for audit?) Leave as-is.
+                QMessageBox.information(dlg, "Đã xuất", str(zip_path))
+                try: _set_last_export(zip_path)
+                except Exception: pass
+                try: _update_last_export_label()
+                except Exception: pass
+                # Prompt open folder
+                try:
+                    from PySide6.QtWidgets import QMessageBox as _QMB
+                    import os, sys, subprocess
+                    if _QMB.question(dlg, "Mở thư mục", "Mở thư mục chứa file?", _QMB.Yes|_QMB.No) == _QMB.Yes:
+                        if sys.platform.startswith('win'):
+                            os.startfile(str(zip_path.parent))
+                        elif sys.platform == 'darwin':
+                            subprocess.Popen(['open', str(zip_path.parent)])
+                        else:
+                            subprocess.Popen(['xdg-open', str(zip_path.parent)])
+                except Exception:
+                    pass
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_export_dataset_zip.clicked.connect(export_dataset_zip)
         def open_last_export():
             try:
                 from .settings_service import get_setting as _gs
