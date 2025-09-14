@@ -31,6 +31,61 @@ def seed_email_logs(Session):
     s = Session()
     now = datetime.utcnow()
     rows = [
+        EmailLog(type='generic', unit_name='Unit A', recipients='a@x,y@z', subject='Hello World', body='Body A', attachments='', status='sent', error=None, created_at=now - timedelta(days=1), user_id=1),
+        EmailLog(type='generic', unit_name='Unit B', recipients='b@x', subject='Error: Mail bounced', body='Body B', attachments='exports/a.xlsx', status='failed', error='bounced', created_at=now - timedelta(days=2), user_id=2),
+        EmailLog(type='generic', unit_name='Unit A', recipients='c@x', subject='Report Q3', body='Body C', attachments='exports/a.txt, exports/b.txt', status='sent', error=None, created_at=now - timedelta(days=10), user_id=1),
+        EmailLog(type='generic', unit_name='Unit C', recipients='d@x', subject='Retry Subject', body='Body D', attachments=None, status='failed', error='timeout', created_at=now - timedelta(days=31), user_id=3),
+    ]
+    s.add_all(rows)
+    s.commit()
+
+
+def test_sort_by_attachment_count(tmp_path):
+    engine, TestingSession = setup_sqlite(tmp_path)
+    try:
+        seed_email_logs(TestingSession)
+        s = TestingSession()
+        att_count_expr = (func.length(EmailLog.attachments) - func.length(func.replace(EmailLog.attachments, ',', '')) + 1)
+        att_count_expr = func.coalesce(att_count_expr, 0)
+        rows = s.query(EmailLog, att_count_expr.label('cnt')).order_by(att_count_expr.desc()).all()
+        assert rows[0][1] >= rows[-1][1]
+    finally:
+        s.close()
+        engine.dispose()
+
+from datetime import datetime, timedelta
+
+from sqlalchemy import create_engine, event, func
+from sqlalchemy.orm import sessionmaker
+
+from hrms.db import Base
+from hrms.models import EmailLog
+
+
+def setup_sqlite(tmp_path):
+    db_path = tmp_path / "test.db"
+    engine = create_engine(f"sqlite:///{db_path}", future=True)
+    @event.listens_for(engine, "connect")
+    def _sqlite_regexp(dbapi_connection, connection_record):
+        import re as _re
+        def regexp(pattern, string):
+            try:
+                if string is None:
+                    return 0
+                return 1 if _re.search(pattern, str(string)) else 0
+            except Exception:
+                return 0
+        dbapi_connection.create_function("REGEXP", 2, regexp)
+        dbapi_connection.create_function("regexp", 2, regexp)
+    TestingSession = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
+    Base.metadata.create_all(engine)
+    return engine, TestingSession
+
+
+def seed_email_logs(Session):
+    s = Session()
+    now = datetime.utcnow()
+    rows = [
         EmailLog(type='generic', unit_name='Unit A', recipients='a@x,y@z', subject='Hello World', body='Body', attachments='', status='sent', error=None, created_at=now - timedelta(days=1), user_id=1),
         EmailLog(type='generic', unit_name='Unit B', recipients='b@x', subject='Error: Mail bounced', body='Body', attachments='exports/a.txt', status='failed', error='bounced', created_at=now - timedelta(days=2), user_id=2),
         EmailLog(type='generic', unit_name='Unit A', recipients='c@x', subject='Report Q3', body='Body', attachments='exports/a.txt, exports/b.txt', status='sent', error=None, created_at=now - timedelta(days=10), user_id=1),
