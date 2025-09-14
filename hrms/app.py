@@ -1727,6 +1727,8 @@ class MainWindow(QWidget):
         to_date = QDateEdit(); to_date.setCalendarPopup(True)
         e_from = QCheckBox("Áp dụng"); e_to = QCheckBox("Áp dụng")
         btn_refresh = QPushButton("Làm mới"); btn_export = QPushButton("Export CSV"); btn_view = QPushButton("Xem chi tiết"); btn_save_filter = QPushButton("Lưu bộ lọc"); btn_reset_filter = QPushButton("Reset bộ lọc"); btn_export_zip = QPushButton("Export ZIP")
+        # Preset nhanh cho khoảng thời gian
+        date_preset = QComboBox(); date_preset.addItems(["(Tuỳ chỉnh)", "7 ngày", "30 ngày", "90 ngày", "Tháng này", "Quý này", "Năm nay"])
         f.addRow("Loại", type_box)
         f.addRow("Đơn vị", unit_edit)
         from PySide6.QtWidgets import QHBoxLayout as _HB, QPushButton as _PB
@@ -1739,6 +1741,7 @@ class MainWindow(QWidget):
         f.addRow("Tiêu đề", subject_search)
         h = QHBoxLayout(); h.addWidget(QLabel("Từ")); h.addWidget(from_date); h.addWidget(e_from); h.addSpacing(12); h.addWidget(QLabel("Đến")); h.addWidget(to_date); h.addWidget(e_to)
         f.addRow("Thời gian", h)
+        f.addRow("Khoảng thời gian", date_preset)
         user_id_edit = QLineEdit(); user_id_edit.setPlaceholderText("User ID")
         f.addRow("User ID", user_id_edit)
         # Phân trang
@@ -1781,7 +1784,8 @@ class MainWindow(QWidget):
         btn_delete = QPushButton("Xoá")
         btn_delete_all = QPushButton("Xoá tất cả (lọc)")
         hb = QHBoxLayout();
-        for b in (btn_refresh, btn_save_filter, btn_reset_filter, btn_export, btn_export_zip, btn_view, btn_resend, btn_resend_all, btn_resend_group, btn_view_zip, btn_open_files, btn_open_folders, btn_open_exports, btn_copy_recip, btn_delete, btn_delete_all):
+        btn_copy_csv = QPushButton("Copy CSV")
+        for b in (btn_refresh, btn_save_filter, btn_reset_filter, btn_export, btn_copy_csv, btn_export_zip, btn_view, btn_resend, btn_resend_all, btn_resend_group, btn_view_zip, btn_open_files, btn_open_folders, btn_open_exports, btn_copy_recip, btn_delete, btn_delete_all):
             hb.addWidget(b)
         f.addRow(hb)
         # Thanh thống kê
@@ -1832,14 +1836,22 @@ class MainWindow(QWidget):
                 subject_search.setText(obj.get('subject',''))
                 # dates
                 from PySide6.QtCore import QDate
-                if obj.get('from_date'):
-                    y,m,d = obj['from_date'].split('-')
-                    from_date.setDate(QDate(int(y), int(m), int(d)))
-                    e_from.setChecked(True)
-                if obj.get('to_date'):
-                    y,m,d = obj['to_date'].split('-')
-                    to_date.setDate(QDate(int(y), int(m), int(d)))
-                    e_to.setChecked(True)
+                preset = obj.get('date_preset')
+                if preset and preset in [date_preset.itemText(i) for i in range(date_preset.count())]:
+                    try:
+                        date_preset.setCurrentText(preset)
+                        apply_preset(preset)
+                    except Exception:
+                        pass
+                else:
+                    if obj.get('from_date'):
+                        y,m,d = obj['from_date'].split('-')
+                        from_date.setDate(QDate(int(y), int(m), int(d)))
+                        e_from.setChecked(True)
+                    if obj.get('to_date'):
+                        y,m,d = obj['to_date'].split('-')
+                        to_date.setDate(QDate(int(y), int(m), int(d)))
+                        e_to.setChecked(True)
                 uid = obj.get('user_id')
                 user_id_edit.setText(str(uid) if uid is not None else '')
                 # group resend fields
@@ -1897,6 +1909,7 @@ class MainWindow(QWidget):
                     'subject': subject_search.text().strip(),
                     'from_date': qdate_to_str(from_date.date()) if e_from.isChecked() else None,
                     'to_date': qdate_to_str(to_date.date()) if e_to.isChecked() else None,
+                    'date_preset': date_preset.currentText() if 'date_preset' in locals() else None,
                     'user_id': (int(user_id_edit.text()) if user_id_edit.text().isdigit() else None),
                     'zip_pattern': getattr(resend_grouped_by_unit, '__zip_pattern').text() if hasattr(resend_grouped_by_unit, '__zip_pattern') else None,
                     'subj_prefix': getattr(resend_grouped_by_unit, '__subj_prefix').text() if hasattr(resend_grouped_by_unit, '__subj_prefix') else None,
@@ -1910,6 +1923,42 @@ class MainWindow(QWidget):
                 set_setting(key, json.dumps(obj, ensure_ascii=False))
             except Exception:
                 pass
+        # Áp dụng preset nhanh cho khoảng ngày
+        def apply_preset(name: str):
+            try:
+                from datetime import date as _date, timedelta as _td
+                from PySide6.QtCore import QDate
+                name = str(name or '').strip()
+                today = _date.today()
+                if name == '7 ngày':
+                    start = today - _td(days=6); end = today
+                elif name == '30 ngày':
+                    start = today - _td(days=29); end = today
+                elif name == '90 ngày':
+                    start = today - _td(days=89); end = today
+                elif name == 'Tháng này':
+                    start = _date(today.year, today.month, 1)
+                    from calendar import monthrange
+                    end = _date(today.year, today.month, monthrange(today.year, today.month)[1])
+                elif name == 'Quý này':
+                    try:
+                        s, e = quarter_window(today)
+                        start, end = s, e
+                    except Exception:
+                        return
+                elif name == 'Năm nay':
+                    start = _date(today.year, 1, 1); end = _date(today.year, 12, 31)
+                else:
+                    return
+                from_date.setDate(QDate(start.year, start.month, start.day))
+                to_date.setDate(QDate(end.year, end.month, end.day))
+                e_from.setChecked(True); e_to.setChecked(True)
+            except Exception:
+                pass
+        try:
+            date_preset.currentTextChanged.connect(apply_preset)
+        except Exception:
+            pass
         load_filter()
         # Tải dữ liệu
         def load():
@@ -2051,6 +2100,27 @@ class MainWindow(QWidget):
                 QMessageBox.information(dlg, "Đã xuất", f"{outp}")
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
+        def copy_current_csv():
+            try:
+                import csv, io
+                from PySide6.QtWidgets import QApplication
+                buf = io.StringIO()
+                w = csv.writer(buf)
+                w.writerow(["created_at","type","unit_name","subject","recipients","attachments","status","error"])
+                for i in range(table.rowCount()):
+                    it = lambda r,c: (table.item(r,c).text() if table.item(r,c) else '')
+                    w.writerow([it(i,0), it(i,1), it(i,2), it(i,3), it(i,4), it(i,5), it(i,6), it(i,7)])
+                QApplication.clipboard().setText(buf.getvalue())
+                # Audit
+                try:
+                    from .db import SessionLocal as _SL
+                    log_action(_SL(), self.current_user.get('id'), 'ui_email_history_copy_csv', 'EmailLog', None, '')
+                except Exception:
+                    pass
+                QMessageBox.information(dlg, "Đã copy", "Đã copy CSV vào clipboard")
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_copy_csv.clicked.connect(copy_current_csv)
         def go_prev():
             state['page'] = max(0, state['page'] - 1)
             load()
