@@ -1786,6 +1786,29 @@ class MainWindow(QWidget):
         f.addRow("Khoảng thời gian", date_preset)
         user_id_edit = QLineEdit(); user_id_edit.setPlaceholderText("User ID")
         f.addRow("User ID", user_id_edit)
+        # Tuỳ chọn nhanh
+        my_only_cb = QCheckBox("Chỉ của tôi")
+        sort_asc_cb = QCheckBox("Sắp xếp tăng dần")
+        def _on_my_only():
+            try:
+                uid = self.current_user.get('id')
+                if my_only_cb.isChecked() and uid:
+                    user_id_edit.setText(str(uid))
+                    user_id_edit.setEnabled(False)
+                else:
+                    user_id_edit.setEnabled(True)
+            except Exception:
+                pass
+            try:
+                save_filter()
+            except Exception:
+                pass
+            state['page'] = 0
+            load()
+        my_only_cb.toggled.connect(lambda _ : _on_my_only())
+        sort_asc_cb.toggled.connect(lambda _ : (save_filter(), state.__setitem__('page', 0), load()))
+        f.addRow("", my_only_cb)
+        f.addRow("", sort_asc_cb)
         # Phân trang
         pager_bar = QHBoxLayout()
         page_size_box = QComboBox(); page_size_box.addItems(["100","200","500"]) ; page_size_box.setCurrentText("100")
@@ -1827,7 +1850,8 @@ class MainWindow(QWidget):
         btn_delete_all = QPushButton("Xoá tất cả (lọc)")
         hb = QHBoxLayout();
         btn_copy_csv = QPushButton("Copy CSV")
-        for b in (btn_refresh, btn_save_filter, btn_reset_filter, btn_export, btn_copy_csv, btn_export_zip, btn_view, btn_resend, btn_resend_all, btn_resend_group, btn_view_zip, btn_open_files, btn_open_folders, btn_open_exports, btn_copy_recip, btn_delete, btn_delete_all):
+        btn_copy_row = QPushButton("Copy dòng")
+        for b in (btn_refresh, btn_save_filter, btn_reset_filter, btn_export, btn_copy_csv, btn_copy_row, btn_export_zip, btn_view, btn_resend, btn_resend_all, btn_resend_group, btn_view_zip, btn_open_files, btn_open_folders, btn_open_exports, btn_copy_recip, btn_delete, btn_delete_all):
             hb.addWidget(b)
         f.addRow(hb)
         # Thanh thống kê
@@ -1864,6 +1888,15 @@ class MainWindow(QWidget):
                 t = obj.get('type')
                 if t and t in [type_box.itemText(i) for i in range(type_box.count())]:
                     type_box.setCurrentText(t)
+                # options
+                try:
+                    my_only_cb.setChecked(bool(obj.get('my_only', False)))
+                except Exception:
+                    pass
+                try:
+                    sort_asc_cb.setChecked(bool(obj.get('sort_asc', False)))
+                except Exception:
+                    pass
                 # unit exact
                 usel = obj.get('unit_selected')
                 if usel:
@@ -1958,7 +1991,9 @@ class MainWindow(QWidget):
                     'has_attachments': has_attach_cb.isChecked(),
                     'from_date': qdate_to_str(from_date.date()) if e_from.isChecked() else None,
                     'to_date': qdate_to_str(to_date.date()) if e_to.isChecked() else None,
-                    'date_preset': date_preset.currentText() if 'date_preset' in locals() else None,
+                    'user_id': (int(user_id_edit.text()) if user_id_edit.text().isdigit() else None),
+                    'my_only': my_only_cb.isChecked(),
+                    'sort_asc': sort_asc_cb.isChecked(),
                     'user_id': (int(user_id_edit.text()) if user_id_edit.text().isdigit() else None),
                     'zip_pattern': getattr(resend_grouped_by_unit, '__zip_pattern').text() if hasattr(resend_grouped_by_unit, '__zip_pattern') else None,
                     'subj_prefix': getattr(resend_grouped_by_unit, '__subj_prefix').text() if hasattr(resend_grouped_by_unit, '__subj_prefix') else None,
@@ -2043,7 +2078,12 @@ class MainWindow(QWidget):
             from .models import EmailLog
             db = SessionLocal()
             try:
-                q = db.query(EmailLog).order_by(EmailLog.created_at.desc())
+                q = db.query(EmailLog)
+                sort_asc = False
+                try:
+                    sort_asc = bool(sort_asc_cb.isChecked())
+                except Exception:
+                    sort_asc = False
                 t = type_box.currentText();
                 if not t.startswith("("):
                     q = q.filter(EmailLog.type == t)
@@ -2085,7 +2125,7 @@ class MainWindow(QWidget):
                 offset = state['page'] * page_size
                 table.setRowCount(0)
                 if fast_pager:
-                    rows2 = q.order_by(EmailLog.created_at.desc()).limit(page_size+1).offset(offset).all()
+                    rows2 = q.order_by(EmailLog.created_at.asc() if sort_asc else EmailLog.created_at.desc()).limit(page_size+1).offset(offset).all()
                     has_next = len(rows2) > page_size
                     rows = rows2[:page_size]
                     for r in rows:
@@ -2123,7 +2163,7 @@ class MainWindow(QWidget):
                     if state['page'] < 0:
                         state['page'] = 0
                     offset = state['page'] * page_size
-                    rows = q.order_by(EmailLog.created_at.desc()).limit(page_size).offset(offset).all()
+                    rows = q.order_by(EmailLog.created_at.asc() if sort_asc else EmailLog.created_at.desc()).limit(page_size).offset(offset).all()
                     for r in rows:
                         i = table.rowCount(); table.insertRow(i)
                         it0 = QTableWidgetItem(str(getattr(r, 'created_at', '')))
@@ -2199,6 +2239,28 @@ class MainWindow(QWidget):
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_copy_csv.clicked.connect(copy_current_csv)
+        def copy_selected_row():
+            try:
+                i = table.currentRow()
+                if i < 0:
+                    QMessageBox.information(dlg, "Chưa chọn", "Chọn một dòng để copy")
+                    return
+                import csv, io
+                buf = io.StringIO()
+                w = csv.writer(buf)
+                it = lambda c: (table.item(i,c).text() if table.item(i,c) else '')
+                w.writerow([it(0), it(1), it(2), it(3), it(4), it(5), it(6), it(7)])
+                QApplication.clipboard().setText(buf.getvalue())
+                try:
+                    from .db import SessionLocal as _SL
+                    eid = table.item(i,0).data(Qt.UserRole) if table.item(i,0) else None
+                    log_action(_SL(), self.current_user.get('id'), 'ui_email_history_copy_row', 'EmailLog', int(eid) if eid else None, '')
+                except Exception:
+                    pass
+                QMessageBox.information(dlg, "Đã copy", "Đã copy dòng hiện tại vào clipboard")
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_copy_row.clicked.connect(copy_selected_row)
         def go_prev():
             state['page'] = max(0, state['page'] - 1)
             load()
@@ -2208,6 +2270,11 @@ class MainWindow(QWidget):
             load()
         btn_prev.clicked.connect(go_prev)
         btn_next.clicked.connect(go_next)
+        # double click to view detail
+        try:
+            table.itemDoubleClicked.connect(lambda *_: view_detail())
+        except Exception:
+            pass
         def go_to_page():
             try:
                 val = int(page_input.text()) if page_input.text().isdigit() else 1
