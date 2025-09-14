@@ -2272,7 +2272,7 @@ class MainWindow(QWidget):
             except Exception:
                 pass
         try:
-            date_preset.currentTextChanged.connect(apply_preset)
+            date_preset.currentTextChanged.connect(lambda _ : (apply_preset(date_preset.currentText()), save_filter(), state.__setitem__('page', 0), load()))
         except Exception:
             pass
         load_filter()
@@ -2831,6 +2831,13 @@ class MainWindow(QWidget):
                 if name not in names:
                     names.append(name)
                 set_setting(f"EMAIL_HISTORY_SAVED_LIST:{user_name_key}", _json.dumps(names, ensure_ascii=False))
+                # Nếu chưa có mặc định, đặt bộ lọc mới làm mặc định
+                try:
+                    def_key = f"EMAIL_HISTORY_SAVED_DEFAULT:{user_name_key}"
+                    if not (get_setting(def_key, '') or ''):
+                        set_setting(def_key, name)
+                except Exception:
+                    pass
                 refresh_saved_combo()
                 QMessageBox.information(dlg, "Đã lưu", f"Đã lưu bộ lọc: {name}")
             except Exception as ex:
@@ -2875,6 +2882,13 @@ class MainWindow(QWidget):
                 set_setting(f"EMAIL_HISTORY_SAVED_LIST:{user_name_key}", _json.dumps(names, ensure_ascii=False))
                 # Clear saved body under key (optional)
                 set_setting(f"EMAIL_HISTORY_SAVED_FILTER:{user_name_key}:{name}", '')
+                # Nếu xóa bộ lọc mặc định, cũng bỏ mặc định
+                try:
+                    def_key = f"EMAIL_HISTORY_SAVED_DEFAULT:{user_name_key}"
+                    if (get_setting(def_key, '') or '') == name:
+                        set_setting(def_key, '')
+                except Exception:
+                    pass
                 refresh_saved_combo()
                 QMessageBox.information(dlg, "Đã xoá", f"Đã xoá bộ lọc: {name}")
             except Exception as ex:
@@ -3085,6 +3099,11 @@ class MainWindow(QWidget):
         btn_export_current.clicked.connect(export_current_saved_filter)
         btn_export_saved.clicked.connect(export_saved_filters)
         btn_import_saved.clicked.connect(import_saved_filters)
+        # chọn trên combobox sẽ tự tải bộ lọc
+        try:
+            saved_filters_combo.currentTextChanged.connect(lambda _ : load_saved_filter())
+        except Exception:
+            pass
         refresh_saved_combo()
         def reset_filter():
             try:
