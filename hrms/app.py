@@ -1768,7 +1768,7 @@ class MainWindow(QWidget):
         e_from = QCheckBox("Áp dụng"); e_to = QCheckBox("Áp dụng")
         btn_refresh = QPushButton("Làm mới"); btn_export = QPushButton("Export CSV"); btn_view = QPushButton("Xem chi tiết"); btn_save_filter = QPushButton("Lưu bộ lọc"); btn_reset_filter = QPushButton("Reset bộ lọc"); btn_export_zip = QPushButton("Export ZIP")
         # Preset nhanh cho khoảng thời gian
-        date_preset = QComboBox(); date_preset.addItems(["(Tuỳ chỉnh)", "7 ngày", "30 ngày", "90 ngày", "Tuần này", "Tháng này", "Tháng trước", "Quý này", "Quý trước", "Năm nay", "Năm trước"])
+        date_preset = QComboBox(); date_preset.addItems(["(Tuỳ chỉnh)", "7 ngày", "30 ngày", "90 ngày", "Tuần này", "Tuần trước", "Tháng này", "Tháng trước", "Quý này", "Quý trước", "Năm nay", "Năm trước"])
         f.addRow("Loại", type_box)
         f.addRow("Đơn vị", unit_edit)
         from PySide6.QtWidgets import QHBoxLayout as _HB, QPushButton as _PB
@@ -1987,6 +1987,9 @@ class MainWindow(QWidget):
                     start = today - _td(days=89); end = today
                 elif name == 'Tuần này':
                     start = today - _td(days=today.weekday()); end = start + _td(days=6)
+                elif name == 'Tuần trước':
+                    end = (today - _td(days=today.weekday() + 1))
+                    start = end - _td(days=6)
                 elif name == 'Tháng này':
                     start = _date(today.year, today.month, 1)
                     from calendar import monthrange
@@ -2385,26 +2388,47 @@ class MainWindow(QWidget):
                     # Truy vấn nhóm theo ngày
                     day_col = func.date(_EL.created_at)
                     q_day = s.query(day_col, _EL.type, _EL.status, func.count(1)).filter(*conds).group_by(day_col, _EL.type, _EL.status).order_by(day_col.desc())
+                    # Chuẩn bị số tệp đính kèm theo nhóm
+                    from collections import defaultdict
+                    att_by_unit = defaultdict(int)
+                    for unit_name, typ, stt, att in s.query(_EL.unit_name, _EL.type, _EL.status, _EL.attachments).filter(*conds).all():
+                        try:
+                            for part in (att or '').split(','):
+                                if part.strip():
+                                    att_by_unit[(str(unit_name or ''), str(typ or ''), str(stt or ''))] += 1
+                        except Exception:
+                            pass
+                    att_by_day = defaultdict(int)
+                    for day, typ, stt, att in s.query(func.date(_EL.created_at), _EL.type, _EL.status, _EL.attachments).filter(*conds).all():
+                        try:
+                            for part in (att or '').split(','):
+                                if part.strip():
+                                    att_by_day[(str(day or ''), str(typ or ''), str(stt or ''))] += 1
+                        except Exception:
+                            pass
                     # Hiển thị dialog bảng
                     from PySide6.QtWidgets import QDialog as _QD, QVBoxLayout as _QV, QTabWidget as _QTW, QTableWidget as _QT, QTableWidgetItem as _QTI, QPushButton as _QP, QHBoxLayout as _QH
                     d = _QD(dlg); d.setWindowTitle("Thống kê chi tiết")
                     lay2 = _QV(d)
                     tabs = _QTW(d)
                     lay2.addWidget(tabs)
-                    tbl1 = _QT(0,4); tbl1.setHorizontalHeaderLabels(["Đơn vị", "Loại", "Trạng thái", "Số lượng"])
+                    tbl1 = _QT(0,5); tbl1.setHorizontalHeaderLabels(["Đơn vị", "Loại", "Trạng thái", "Số lượng", "Số tệp"])
                     for unit_name, typ, stt, cnt in q_unit.all():
                         r = tbl1.rowCount(); tbl1.insertRow(r)
                         tbl1.setItem(r,0,_QTI(str(unit_name or '')))
                         tbl1.setItem(r,1,_QTI(str(typ or '')))
                         tbl1.setItem(r,2,_QTI(str(stt or '')))
                         tbl1.setItem(r,3,_QTI(str(cnt or 0)))
-                    tbl2 = _QT(0,4); tbl2.setHorizontalHeaderLabels(["Ngày", "Loại", "Trạng thái", "Số lượng"])
+                        tbl1.setItem(r,4,_QTI(str(att_by_unit.get((str(unit_name or ''), str(typ or ''), str(stt or '')), 0))))
+                    tbl2 = _QT(0,5); tbl2.setHorizontalHeaderLabels(["Ngày", "Loại", "Trạng thái", "Số lượng", "Số tệp"])
                     for day, typ, stt, cnt in q_day.all():
                         r = tbl2.rowCount(); tbl2.insertRow(r)
-                        tbl2.setItem(r,0,_QTI(str(day or '')))
+                        day_str = str(day or '')
+                        tbl2.setItem(r,0,_QTI(day_str))
                         tbl2.setItem(r,1,_QTI(str(typ or '')))
                         tbl2.setItem(r,2,_QTI(str(stt or '')))
                         tbl2.setItem(r,3,_QTI(str(cnt or 0)))
+                        tbl2.setItem(r,4,_QTI(str(att_by_day.get((day_str, str(typ or ''), str(stt or '')), 0))))
                     tabs.addTab(tbl1, "Theo đơn vị")
                     tabs.addTab(tbl2, "Theo ngày")
                     # Nút copy CSV
