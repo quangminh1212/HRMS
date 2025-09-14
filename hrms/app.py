@@ -1811,6 +1811,8 @@ class MainWindow(QWidget):
         # Tuỳ chọn nhanh
         my_only_cb = QCheckBox("Chỉ của tôi")
         sort_asc_cb = QCheckBox("Sắp xếp tăng dần")
+        sort_field = QComboBox(); sort_field.addItems(["Thời gian","Subject","Recipients","Error","Số tệp","Đơn vị","Loại","Trạng thái"])
+        sort_field.currentTextChanged.connect(lambda _ : (save_filter(), state.__setitem__('page', 0), load()))
         def _on_my_only():
             try:
                 uid = self.current_user.get('id')
@@ -1830,6 +1832,7 @@ class MainWindow(QWidget):
         my_only_cb.toggled.connect(lambda _ : _on_my_only())
         sort_asc_cb.toggled.connect(lambda _ : (save_filter(), state.__setitem__('page', 0), load()))
         f.addRow("", my_only_cb)
+        f.addRow("Sắp xếp theo", sort_field)
         f.addRow("", sort_asc_cb)
         # Phân trang
         pager_bar = QHBoxLayout()
@@ -1873,7 +1876,8 @@ class MainWindow(QWidget):
         hb = QHBoxLayout();
         btn_copy_csv = QPushButton("Copy CSV")
         btn_copy_row = QPushButton("Copy dòng")
-        for b in (btn_refresh, btn_save_filter, btn_reset_filter, btn_export, btn_copy_csv, btn_copy_row, btn_export_zip, btn_view, btn_resend, btn_resend_all, btn_resend_group, btn_view_zip, btn_open_files, btn_open_folders, btn_open_exports, btn_copy_recip, btn_delete, btn_delete_all):
+        btn_quick_export = QPushButton("Xuất nhanh")
+        for b in (btn_refresh, btn_save_filter, btn_reset_filter, btn_export, btn_quick_export, btn_copy_csv, btn_copy_row, btn_export_zip, btn_view, btn_resend, btn_resend_all, btn_resend_group, btn_view_zip, btn_open_files, btn_open_folders, btn_open_exports, btn_copy_recip, btn_delete, btn_delete_all):
             hb.addWidget(b)
         f.addRow(hb)
         # Thanh thống kê
@@ -1910,6 +1914,13 @@ class MainWindow(QWidget):
                 t = obj.get('type')
                 if t and t in [type_box.itemText(i) for i in range(type_box.count())]:
                     type_box.setCurrentText(t)
+                # sort field
+                try:
+                    sf = obj.get('sort_field')
+                    if sf and sf in [sort_field.itemText(i) for i in range(sort_field.count())]:
+                        sort_field.setCurrentText(sf)
+                except Exception:
+                    pass
                 # options
                 try:
                     my_only_cb.setChecked(bool(obj.get('my_only', False)))
@@ -2046,6 +2057,7 @@ class MainWindow(QWidget):
                     'zip_when_group': (getattr(resend_grouped_by_unit, '__zip_cb').isChecked() if hasattr(resend_grouped_by_unit, '__zip_cb') else False),
                     'page_size': page_size_box.currentText(),
                     'fast_pager': bool(cb_fast_pager.isChecked()),
+                    'sort_field': sort_field.currentText(),
                 }
                 import json
                 set_setting(key, json.dumps(obj, ensure_ascii=False))
@@ -2132,6 +2144,10 @@ class MainWindow(QWidget):
                     sort_asc = bool(sort_asc_cb.isChecked())
                 except Exception:
                     sort_asc = False
+                try:
+                    sort_key = sort_field.currentText().strip()
+                except Exception:
+                    sort_key = "Thời gian"
                 t = type_box.currentText();
                 if not t.startswith("("):
                     q = q.filter(EmailLog.type == t)
@@ -2210,8 +2226,30 @@ class MainWindow(QWidget):
                 page_size = int(page_size_box.currentText()) if page_size_box.currentText().isdigit() else 100
                 offset = state['page'] * page_size
                 table.setRowCount(0)
+                # Xây dựng order_by theo sort_key
+                from sqlalchemy import func
+                att_count_expr = (func.length(EmailLog.attachments) - func.length(func.replace(EmailLog.attachments, ',', '')) + 1)
+                att_count_expr = func.coalesce(att_count_expr, 0)
+                if sort_key == 'Thời gian':
+                    order_expr = EmailLog.created_at.asc() if sort_asc else EmailLog.created_at.desc()
+                elif sort_key == 'Subject':
+                    order_expr = EmailLog.subject.asc() if sort_asc else EmailLog.subject.desc()
+                elif sort_key == 'Recipients':
+                    order_expr = EmailLog.recipients.asc() if sort_asc else EmailLog.recipients.desc()
+                elif sort_key == 'Error':
+                    order_expr = EmailLog.error.asc() if sort_asc else EmailLog.error.desc()
+                elif sort_key == 'Số tệp':
+                    order_expr = att_count_expr.asc() if sort_asc else att_count_expr.desc()
+                elif sort_key == 'Đơn vị':
+                    order_expr = EmailLog.unit_name.asc() if sort_asc else EmailLog.unit_name.desc()
+                elif sort_key == 'Loại':
+                    order_expr = EmailLog.type.asc() if sort_asc else EmailLog.type.desc()
+                elif sort_key == 'Trạng thái':
+                    order_expr = EmailLog.status.asc() if sort_asc else EmailLog.status.desc()
+                else:
+                    order_expr = EmailLog.created_at.desc()
                 if fast_pager:
-                    rows2 = q.order_by(EmailLog.created_at.asc() if sort_asc else EmailLog.created_at.desc()).limit(page_size+1).offset(offset).all()
+                    rows2 = q.order_by(order_expr).limit(page_size+1).offset(offset).all()
                     has_next = len(rows2) > page_size
                     rows = rows2[:page_size]
                     for r in rows:
@@ -2258,7 +2296,7 @@ class MainWindow(QWidget):
                     if state['page'] < 0:
                         state['page'] = 0
                     offset = state['page'] * page_size
-                    rows = q.order_by(EmailLog.created_at.asc() if sort_asc else EmailLog.created_at.desc()).limit(page_size).offset(offset).all()
+                    rows = q.order_by(order_expr).limit(page_size).offset(offset).all()
                     for r in rows:
                         i = table.rowCount(); table.insertRow(i)
                         it0 = QTableWidgetItem(str(getattr(r, 'created_at', '')))
@@ -2367,6 +2405,8 @@ class MainWindow(QWidget):
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_copy_csv.clicked.connect(copy_current_csv)
+        # Xuất nhanh
+        btn_quick_export.clicked.connect(export_csv)
         def copy_selected_row():
             try:
                 i = table.currentRow()
