@@ -1819,6 +1819,8 @@ class MainWindow(QWidget):
         sort_field.currentTextChanged.connect(lambda _ : (save_filter(), state.__setitem__('page', 0), load()))
         sort_field2 = QComboBox(); sort_field2.addItems(["(Không)","Thời gian","Subject","Recipients","Error","Số tệp","Đơn vị","Loại","Trạng thái"])
         sort_field2.currentTextChanged.connect(lambda _ : (save_filter(), state.__setitem__('page', 0), load()))
+        sort_asc_cb2 = QCheckBox("Sắp xếp 2 tăng dần")
+        sort_asc_cb2.toggled.connect(lambda _ : (save_filter(), state.__setitem__('page', 0), load()))
         def _on_my_only():
             try:
                 uid = self.current_user.get('id')
@@ -1841,6 +1843,7 @@ class MainWindow(QWidget):
         f.addRow("Sắp xếp theo", sort_field)
         f.addRow("Sắp xếp 2", sort_field2)
         f.addRow("", sort_asc_cb)
+        f.addRow("", sort_asc_cb2)
         # Phân trang
         pager_bar = QHBoxLayout()
         page_size_box = QComboBox(); page_size_box.addItems(["100","200","500"]) ; page_size_box.setCurrentText("100")
@@ -1872,8 +1875,8 @@ class MainWindow(QWidget):
         f.addRow("", cb_all_scope)
         # Saved filters UI
         saved_filters_combo = QComboBox(); saved_filters_combo.addItem("(Chưa có)")
-        btn_save_filter_as = QPushButton("Lưu tên…"); btn_load_saved = QPushButton("Tải"); btn_delete_saved = QPushButton("Xoá")
-        row_saved = QHBoxLayout(); row_saved.addWidget(QLabel("Bộ lọc đã lưu")); row_saved.addWidget(saved_filters_combo); row_saved.addWidget(btn_save_filter_as); row_saved.addWidget(btn_load_saved); row_saved.addWidget(btn_delete_saved)
+        btn_save_filter_as = QPushButton("Lưu tên…"); btn_overwrite_saved = QPushButton("Ghi đè"); btn_load_saved = QPushButton("Tải"); btn_delete_saved = QPushButton("Xoá"); btn_export_saved = QPushButton("Export JSON"); btn_import_saved = QPushButton("Nhập JSON")
+        row_saved = QHBoxLayout(); row_saved.addWidget(QLabel("Bộ lọc đã lưu")); row_saved.addWidget(saved_filters_combo); row_saved.addWidget(btn_save_filter_as); row_saved.addWidget(btn_overwrite_saved); row_saved.addWidget(btn_load_saved); row_saved.addWidget(btn_delete_saved); row_saved.addWidget(btn_export_saved); row_saved.addWidget(btn_import_saved)
         f.addRow(row_saved)
 
         btn_resend = QPushButton("Gửi lại")
@@ -1963,6 +1966,10 @@ class MainWindow(QWidget):
                     sf2 = obj.get('sort_field2')
                     if sf2 and sf2 in [sort_field2.itemText(i) for i in range(sort_field2.count())]:
                         sort_field2.setCurrentText(sf2)
+                except Exception:
+                    pass
+                try:
+                    sort_asc_cb2.setChecked(bool(obj.get('sort_asc2', False)))
                 except Exception:
                     pass
                 # options
@@ -2107,6 +2114,7 @@ class MainWindow(QWidget):
                     'fast_pager': bool(cb_fast_pager.isChecked()),
                     'sort_field': sort_field.currentText(),
                     'sort_field2': sort_field2.currentText(),
+                    'sort_asc2': bool(sort_asc_cb2.isChecked()),
                 }
                 import json
                 set_setting(key, json.dumps(obj, ensure_ascii=False))
@@ -2259,6 +2267,10 @@ class MainWindow(QWidget):
                     sort_key2 = sort_field2.currentText().strip()
                 except Exception:
                     sort_key2 = "(Không)"
+                try:
+                    sort_asc2 = bool(sort_asc_cb2.isChecked())
+                except Exception:
+                    sort_asc2 = True
                 t = type_box.currentText();
                 if not t.startswith("("):
                     q = q.filter(EmailLog.type == t)
@@ -2366,7 +2378,7 @@ class MainWindow(QWidget):
                     return EmailLog.created_at.desc()
                 order_exprs = [make_order_expr(sort_key, sort_asc)]
                 if sort_key2 and sort_key2 != '(Không)':
-                    order_exprs.append(make_order_expr(sort_key2, sort_asc))
+                    order_exprs.append(make_order_expr(sort_key2, sort_asc2))
                 # luôn fallback theo thời gian để ổn định
                 order_exprs.append(EmailLog.created_at.desc())
                 if fast_pager:
@@ -2764,9 +2776,82 @@ class MainWindow(QWidget):
                 QMessageBox.information(dlg, "Đã xoá", f"Đã xoá bộ lọc: {name}")
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
+        def overwrite_saved_filter():
+            try:
+                name = saved_filters_combo.currentText()
+                if not name or name.startswith("("):
+                    QMessageBox.information(dlg, "Chưa chọn", "Chọn một bộ lọc đã lưu để ghi đè")
+                    return
+                # ensure current filter saved
+                try: save_filter()
+                except Exception: pass
+                from .settings_service import get_setting, set_setting
+                user_name_key = (self.current_user.get('username') or '').strip()
+                key_current = f"EMAIL_HISTORY_FILTER:{user_name_key}"
+                val = get_setting(key_current, '') or ''
+                if not val:
+                    QMessageBox.warning(dlg, "Không có", "Chưa có bộ lọc hiện tại để ghi đè")
+                    return
+                set_setting(f"EMAIL_HISTORY_SAVED_FILTER:{user_name_key}:{name}", val)
+                QMessageBox.information(dlg, "Đã lưu", f"Đã ghi đè bộ lọc: {name}")
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        def export_saved_filters():
+            try:
+                from .settings_service import get_setting
+                user_name_key = (self.current_user.get('username') or '').strip()
+                import json as _json
+                names_raw = get_setting(f"EMAIL_HISTORY_SAVED_LIST:{user_name_key}", '') or ''
+                names = []
+                if names_raw.strip():
+                    try: names = _json.loads(names_raw)
+                    except Exception: names = []
+                obj = {}
+                for n in names:
+                    raw = get_setting(f"EMAIL_HISTORY_SAVED_FILTER:{user_name_key}:{n}", '') or ''
+                    if raw:
+                        try: obj[n] = _json.loads(raw)
+                        except Exception: obj[n] = raw
+                from pathlib import Path
+                from datetime import datetime as _dt
+                Path('exports').mkdir(exist_ok=True)
+                p = Path('exports')/f"email_history_filters_{user_name_key}_{_dt.now().strftime('%Y%m%d_%H%M%S')}.json"
+                with open(p, 'w', encoding='utf-8') as f:
+                    _json.dump(obj, f, ensure_ascii=False, indent=2)
+                QMessageBox.information(dlg, "Đã xuất", str(p))
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        def import_saved_filters():
+            try:
+                from PySide6.QtWidgets import QFileDialog
+                import json as _json
+                file_path, _ = QFileDialog.getOpenFileName(dlg, "Chọn file JSON", "", "JSON Files (*.json)")
+                if not file_path:
+                    return
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    data = _json.load(f)
+                from .settings_service import get_setting, set_setting
+                user_name_key = (self.current_user.get('username') or '').strip()
+                names_raw = get_setting(f"EMAIL_HISTORY_SAVED_LIST:{user_name_key}", '') or ''
+                names = []
+                if names_raw.strip():
+                    try: names = _json.loads(names_raw)
+                    except Exception: names = []
+                for n, val in (data or {}).items():
+                    set_setting(f"EMAIL_HISTORY_SAVED_FILTER:{user_name_key}:{n}", _json.dumps(val, ensure_ascii=False) if not isinstance(val, str) else val)
+                    if n not in names:
+                        names.append(n)
+                set_setting(f"EMAIL_HISTORY_SAVED_LIST:{user_name_key}", _json.dumps(names, ensure_ascii=False))
+                refresh_saved_combo()
+                QMessageBox.information(dlg, "Đã nhập", f"Đã nhập {len(data or {})} bộ lọc")
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_save_filter_as.clicked.connect(save_filter_as)
+        btn_overwrite_saved.clicked.connect(overwrite_saved_filter)
         btn_load_saved.clicked.connect(load_saved_filter)
         btn_delete_saved.clicked.connect(delete_saved_filter)
+        btn_export_saved.clicked.connect(export_saved_filters)
+        btn_import_saved.clicked.connect(import_saved_filters)
         refresh_saved_combo()
         def reset_filter():
             try:

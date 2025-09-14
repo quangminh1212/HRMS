@@ -98,10 +98,11 @@ def get_recipients_for_unit(unit_name: str) -> List[str]:
     try:
         if not _get_setting:
             return []
-        flag = str(_get_setting('UNIT_EMAILS_FALLBACK_ENABLED', '0') or '0').strip().lower() in ('1','true','yes')
-        if not flag:
-            return []
         raw = _get_setting('UNIT_EMAILS', '') or ''
+        # Fallback được xem là bật nếu có cờ explicit hoặc có cấu hình mapping
+        flag = str(_get_setting('UNIT_EMAILS_FALLBACK_ENABLED', '0') or '0').strip().lower() in ('1','true','yes')
+        if not flag and not raw.strip():
+            return []
         if not raw.strip():
             return []
         mapping: dict[str, list[str]] = {}
