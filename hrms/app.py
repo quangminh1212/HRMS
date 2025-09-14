@@ -1914,7 +1914,8 @@ class MainWindow(QWidget):
         btn_copy_row = QPushButton("Copy dòng")
         btn_quick_export = QPushButton("Xuất nhanh")
         btn_reset_cols = QPushButton("Reset cột")
-        for b in (btn_refresh, btn_save_filter, btn_reset_filter, btn_export, btn_quick_export, btn_copy_csv, btn_copy_row, btn_export_zip, btn_view, btn_resend, btn_resend_all, btn_resend_group, btn_view_zip, btn_open_files, btn_open_folders, btn_open_exports, btn_copy_recip, btn_delete, btn_delete_all, btn_reset_cols):
+        btn_copy_recip_all = QPushButton("Copy recipients (lọc)")
+        for b in (btn_refresh, btn_save_filter, btn_reset_filter, btn_export, btn_quick_export, btn_copy_csv, btn_copy_row, btn_export_zip, btn_view, btn_resend, btn_resend_all, btn_resend_group, btn_view_zip, btn_open_files, btn_open_folders, btn_open_exports, btn_copy_recip, btn_copy_recip_all, btn_delete, btn_delete_all, btn_reset_cols):
             hb.addWidget(b)
         f.addRow(hb)
         def reset_columns():
@@ -1956,6 +1957,36 @@ class MainWindow(QWidget):
         # Bảng kết quả
         table = QTableWidget(0, 9)
         table.setHorizontalHeaderLabels(["Thời gian", "Loại", "Đơn vị", "Subject", "Recipients", "Tệp đính kèm", "Trạng thái", "Lỗi", "Số tệp"])
+        # Click tiêu đề cột để sắp xếp
+        try:
+            hdr = table.horizontalHeader()
+            col_map = {0: "Thời gian", 1: "Loại", 2: "Đơn vị", 3: "Subject", 4: "Recipients", 5: "Tệp đính kèm", 6: "Trạng thái", 7: "Lỗi", 8: "Số tệp"}
+            def on_header_clicked(ci: int):
+                try:
+                    label = col_map.get(ci)
+                    if not label:
+                        return
+                    if sort_field.currentText() == label:
+                        try:
+                            sort_asc_cb.setChecked(not sort_asc_cb.isChecked())
+                        except Exception:
+                            pass
+                    else:
+                        try:
+                            sort_field.setCurrentText(label)
+                        except Exception:
+                            pass
+                    try:
+                        save_filter()
+                    except Exception:
+                        pass
+                    state['page'] = 0
+                    load()
+                except Exception:
+                    pass
+            hdr.sectionClicked.connect(on_header_clicked)
+        except Exception:
+            pass
         # Lưu/khôi phục độ rộng cột
         try:
             from PySide6.QtWidgets import QHeaderView as _QHV
@@ -2805,11 +2836,15 @@ class MainWindow(QWidget):
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_copy_row.clicked.connect(copy_selected_row)
-        # Phím tắt: Ctrl+C copy dòng, Ctrl+Shift+C copy CSV
+        # Phím tắt: Ctrl+C copy dòng, Ctrl+Shift+C copy CSV; PgUp/PgDn và Alt+Left/Right chuyển trang
         try:
             from PySide6.QtGui import QShortcut, QKeySequence
             qs_copy_row = QShortcut(QKeySequence.Copy, table); qs_copy_row.activated.connect(copy_selected_row)
             qs_copy_all = QShortcut(QKeySequence("Ctrl+Shift+C"), table); qs_copy_all.activated.connect(copy_current_csv)
+            qs_prev = QShortcut(QKeySequence("PgUp"), table); qs_prev.activated.connect(go_prev)
+            qs_next = QShortcut(QKeySequence("PgDown"), table); qs_next.activated.connect(go_next)
+            qs_prev2 = QShortcut(QKeySequence("Alt+Left"), table); qs_prev2.activated.connect(go_prev)
+            qs_next2 = QShortcut(QKeySequence("Alt+Right"), table); qs_next2.activated.connect(go_next)
         except Exception:
             pass
         def go_prev():
@@ -4119,6 +4154,97 @@ class MainWindow(QWidget):
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_copy_recip.clicked.connect(copy_recipients)
+        def copy_recipients_filtered():
+            try:
+                from .db import SessionLocal as _SL
+                from .models import EmailLog as _EL
+                from sqlalchemy import func
+                import re as _re
+                pat = _re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+                s = _SL()
+                try:
+                    q = s.query(_EL)
+                    # áp dụng các filter tương tự phần export_stats/export_attachments_zip
+                    t = type_box.currentText()
+                    if not t.startswith("("):
+                        q = q.filter(_EL.type == t)
+                    u_sel = unit_box.currentText().strip() if unit_box.currentIndex() > -1 else ""
+                    if u_sel and not u_sel.startswith("("):
+                        q = q.filter(_EL.unit_name == u_sel)
+                    else:
+                        u = unit_edit.text().strip()
+                        if u:
+                            q = q.filter(_EL.unit_name.ilike(f"%{u}%"))
+                    st = status_box.currentText()
+                    if only_failed.isChecked():
+                        q = q.filter(_EL.status == 'failed')
+                    elif not st.startswith("("):
+                        q = q.filter(_EL.status == st)
+                    subj = subject_search.text().strip(); subj_rx = subject_regex.text().strip(); subj_not = subject_not.text().strip()
+                    if subj_rx:
+                        try:
+                            if s.bind and getattr(s.bind, 'dialect', None) and s.bind.dialect.name == 'sqlite':
+                                q = q.filter(_EL.subject.op('REGEXP')(subj_rx))
+                            else:
+                                q = q.filter(_EL.subject.ilike(f"%{subj_rx}%"))
+                        except Exception:
+                            q = q.filter(_EL.subject.ilike(f"%{subj_rx}%"))
+                    elif subj:
+                        q = q.filter(_EL.subject.ilike(f"%{subj}%"))
+                    if subj_not:
+                        q = q.filter(~_EL.subject.ilike(f"%{subj_not}%"))
+                    rc = recipients_contains.text().strip(); rn = recipients_not.text().strip()
+                    if rc: q = q.filter(_EL.recipients.ilike(f"%{rc}%"))
+                    if rn: q = q.filter(~_EL.recipients.ilike(f"%{rn}%"))
+                    b = body_search.text().strip(); bn = body_not.text().strip()
+                    if b: q = q.filter(_EL.body.ilike(f"%{b}%"))
+                    if bn: q = q.filter(~_EL.body.ilike(f"%{bn}%"))
+                    # attachments
+                    if has_attach_cb.isChecked():
+                        q = q.filter(_EL.attachments != None).filter(_EL.attachments != '')
+                    ax = attach_ext.text().strip(); ac = attach_contains.text().strip(); an = attach_not.text().strip()
+                    if ax: q = q.filter(_EL.attachments.ilike(f"%{ax}%"))
+                    if ac: q = q.filter(_EL.attachments.ilike(f"%{ac}%"))
+                    if an: q = q.filter(~_EL.attachments.ilike(f"%{an}%"))
+                    ma = (int(min_attachments.text()) if (min_attachments.text() or '').isdigit() else 0)
+                    if ma:
+                        q = q.filter((_EL.attachments != None)).filter((_EL.attachments != ''))
+                        q = q.filter((func.length(_EL.attachments) - func.length(func.replace(_EL.attachments, ',', '')) + 1) >= ma)
+                    # user id
+                    uidtxt = user_id_edit.text().strip()
+                    if uidtxt.isdigit():
+                        q = q.filter(_EL.user_id == int(uidtxt))
+                    # date range
+                    from datetime import datetime as _dt2
+                    if e_from.isChecked():
+                        fd = from_date.date(); q = q.filter(_EL.created_at >= _dt2(fd.year(), fd.month(), fd.day(), 0, 0, 0))
+                    if e_to.isChecked():
+                        td = to_date.date(); q = q.filter(_EL.created_at <= _dt2(td.year(), td.month(), td.day(), 23, 59, 59))
+                    # lấy recipients duy nhất
+                    rows = q.with_entities(_EL.recipients).all()
+                    seen = set(); out = []
+                    for (rec,) in rows:
+                        for part in (rec or '').split(','):
+                            e = (part or '').strip()
+                            if not e or not pat.match(e):
+                                continue
+                            el = e.lower()
+                            if el in seen: continue
+                            seen.add(el); out.append(e)
+                    from PySide6.QtWidgets import QApplication
+                    QApplication.clipboard().setText("; ".join(out))
+                    # Audit
+                    try:
+                        from .db import SessionLocal as __SL
+                        log_action(__SL(), self.current_user.get('id'), 'ui_email_history_copy_recipients_filtered', 'EmailLog', None, f"count={len(out)}")
+                    except Exception:
+                        pass
+                    QMessageBox.information(dlg, "Đã copy", f"Đã copy {len(out)} email")
+                finally:
+                    s.close()
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_copy_recip_all.clicked.connect(copy_recipients_filtered)
         def open_exports():
             try:
                 import os, sys, subprocess
