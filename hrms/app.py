@@ -1664,15 +1664,29 @@ class MainWindow(QWidget):
         type_box = QComboBox(); type_box.addItems(["(Tất cả)", "salary_due", "bhxh_monthly", "contracts_expiring", "quick_report", "retirement", "generic"])
         unit_edit = QLineEdit(); unit_edit.setPlaceholderText("Đơn vị chứa…")
         unit_box = QComboBox(); unit_box.addItem("(Tất cả)")
-        try:
-            from .db import SessionLocal as _SL
-            from .models import Unit as _Unit
-            _s = _SL();
-            for _u in _s.query(_Unit).order_by(_Unit.name).all():
-                unit_box.addItem(_u.name)
-            _s.close()
-        except Exception:
-            pass
+        def reload_units():
+            try:
+                unit_box.blockSignals(True)
+                cur = unit_box.currentText()
+                unit_box.clear(); unit_box.addItem("(Tất cả)")
+                from .db import SessionLocal as _SL
+                from .models import Unit as _Unit
+                _s = _SL();
+                try:
+                    for _u in _s.query(_Unit).order_by(_Unit.name).all():
+                        unit_box.addItem(_u.name)
+                finally:
+                    _s.close()
+                # cố gắng chọn lại mục cũ
+                for i in range(unit_box.count()):
+                    if unit_box.itemText(i) == cur:
+                        unit_box.setCurrentIndex(i); break
+            except Exception:
+                pass
+            finally:
+                try: unit_box.blockSignals(False)
+                except Exception: pass
+        reload_units()
         status_box = QComboBox(); status_box.addItems(["(Tất cả)", "sent", "failed"])
         only_failed = QCheckBox("Chỉ lỗi")
         subject_search = QLineEdit(); subject_search.setPlaceholderText("Tìm tiêu đề…")
@@ -1682,7 +1696,11 @@ class MainWindow(QWidget):
         btn_refresh = QPushButton("Làm mới"); btn_export = QPushButton("Export CSV"); btn_view = QPushButton("Xem chi tiết")
         f.addRow("Loại", type_box)
         f.addRow("Đơn vị", unit_edit)
-        f.addRow("Chọn đơn vị", unit_box)
+        from PySide6.QtWidgets import QHBoxLayout as _HB, QPushButton as _PB
+        _unit_row = _HB(); _unit_row.addWidget(unit_box); _btn_reload_units = _PB("Tải lại")
+        _btn_reload_units.clicked.connect(reload_units)
+        _unit_row.addWidget(_btn_reload_units)
+        f.addRow("Chọn đơn vị", _unit_row)
         f.addRow("Trạng thái", status_box)
         f.addRow("", only_failed)
         f.addRow("Tiêu đề", subject_search)
@@ -1988,7 +2006,15 @@ class MainWindow(QWidget):
                         if hasattr(resend_grouped_by_unit, '__zip_cb') and resend_grouped_by_unit.__zip_cb.isChecked() and len(file_list) > 1:
                             from pathlib import Path as _P
                             _P('exports').mkdir(exist_ok=True)
-                            zip_path = _P('exports')/f"resend_{t}_{unit_name.replace(' ','_')}.zip"
+                            # tên ZIP tuỳ chọn
+                            patt = resend_grouped_by_unit.__zip_pattern.text() if hasattr(resend_grouped_by_unit, '__zip_pattern') else ''
+                            if not patt:
+                                patt = "resend_{type}_{unit}_{ts}.zip"
+                            from datetime import datetime as _dt
+                            ts = _dt.now().strftime('%Y%m%d_%H%M%S')
+                            safe_unit = unit_name.replace(' ', '_')
+                            name = patt.replace('{type}', t).replace('{unit}', safe_unit).replace('{ts}', ts)
+                            zip_path = _P('exports')/name
                             if create_zip(file_list, str(zip_path)):
                                 ok = send_email_with_attachment(subject, body + "\n(Đính kèm ZIP)", [str(zip_path)], to=recips)
                             else:
@@ -2013,7 +2039,11 @@ class MainWindow(QWidget):
         from PySide6.QtWidgets import QCheckBox as _QCB
         _zip_cb = _QCB("ZIP khi gửi nhóm")
         resend_grouped_by_unit.__zip_cb = _zip_cb
+        from PySide6.QtWidgets import QLineEdit as _QLE
+        _zip_pattern = _QLE("resend_{type}_{unit}_{ts}.zip")
+        resend_grouped_by_unit.__zip_pattern = _zip_pattern
         f.addRow("", _zip_cb)
+        f.addRow("Tên ZIP", _zip_pattern)
         btn_resend_group.clicked.connect(resend_grouped_by_unit)
         load()
         dlg.resize(1100, 600)
