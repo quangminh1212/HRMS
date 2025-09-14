@@ -227,9 +227,16 @@ def schedule_jobs():
         from datetime import timedelta, date
         from pathlib import Path
         from .contracts import export_contracts_expiring_to_excel
-from .mailer import send_email_with_attachment_retry as send_email_with_attachment, get_recipients_for_unit, create_zip
+        from .mailer import send_email_with_attachment_retry as send_email_with_attachment, get_recipients_for_unit, create_zip
         from .settings_service import get_setting
         today = date.today()
+        # Retry params
+        try:
+            from .settings_service import get_setting as _gs
+            rc = int(_gs('RETRY_COUNT','2') or '2')
+            rd = int(_gs('RETRY_DELAY','10') or '10')
+        except Exception:
+            rc, rd = 2, 10
         days = int(get_setting('CONTRACT_ALERT_DAYS','30') or '30')
         end = today + timedelta(days=days)
         db = SessionLocal()
