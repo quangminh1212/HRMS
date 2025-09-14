@@ -1693,7 +1693,7 @@ class MainWindow(QWidget):
         from_date = QDateEdit(); from_date.setCalendarPopup(True)
         to_date = QDateEdit(); to_date.setCalendarPopup(True)
         e_from = QCheckBox("Áp dụng"); e_to = QCheckBox("Áp dụng")
-        btn_refresh = QPushButton("Làm mới"); btn_export = QPushButton("Export CSV"); btn_view = QPushButton("Xem chi tiết"); btn_save_filter = QPushButton("Lưu bộ lọc")
+        btn_refresh = QPushButton("Làm mới"); btn_export = QPushButton("Export CSV"); btn_view = QPushButton("Xem chi tiết"); btn_save_filter = QPushButton("Lưu bộ lọc"); btn_reset_filter = QPushButton("Reset bộ lọc"); btn_export_zip = QPushButton("Export ZIP")
         f.addRow("Loại", type_box)
         f.addRow("Đơn vị", unit_edit)
         from PySide6.QtWidgets import QHBoxLayout as _HB, QPushButton as _PB
@@ -1725,7 +1725,7 @@ class MainWindow(QWidget):
         btn_delete = QPushButton("Xoá")
         btn_delete_all = QPushButton("Xoá tất cả (lọc)")
         hb = QHBoxLayout();
-        for b in (btn_refresh, btn_save_filter, btn_export, btn_view, btn_resend, btn_resend_all, btn_resend_group, btn_view_zip, btn_open_files, btn_open_folders, btn_open_exports, btn_copy_recip, btn_delete, btn_delete_all):
+        for b in (btn_refresh, btn_save_filter, btn_reset_filter, btn_export, btn_export_zip, btn_view, btn_resend, btn_resend_all, btn_resend_group, btn_view_zip, btn_open_files, btn_open_folders, btn_open_exports, btn_copy_recip, btn_delete, btn_delete_all):
             hb.addWidget(b)
         f.addRow(hb)
         lay.addLayout(f)
@@ -1908,7 +1908,102 @@ class MainWindow(QWidget):
         page_size_box.currentTextChanged.connect(lambda _ : (state.__setitem__('page', 0), load()))
         btn_refresh.clicked.connect(lambda: (save_filter(), state.__setitem__('page', 0), load()))
         btn_save_filter.clicked.connect(save_filter)
+        def reset_filter():
+            try:
+                # Clear saved filter and UI fields
+                from .settings_service import set_setting
+                key = f"EMAIL_HISTORY_FILTER:{(self.current_user.get('username') or '').strip()}"
+                set_setting(key, '')
+            except Exception:
+                pass
+            try:
+                type_box.setCurrentIndex(0)
+                unit_box.setCurrentIndex(0)
+                unit_edit.clear()
+                status_box.setCurrentIndex(0)
+                only_failed.setChecked(False)
+                subject_search.clear()
+                e_from.setChecked(False)
+                e_to.setChecked(False)
+                user_id_edit.clear()
+                state['page'] = 0
+                load()
+            except Exception:
+                pass
+        btn_reset_filter.clicked.connect(reset_filter)
         btn_export.clicked.connect(export_csv)
+        def export_attachments_zip():
+            try:
+                from .db import SessionLocal
+                from .models import EmailLog
+                import zipfile, os
+                from pathlib import Path
+                from datetime import datetime as _dt
+                db2 = SessionLocal()
+                try:
+                    q = db2.query(EmailLog)
+                    t = type_box.currentText()
+                    if not t.startswith("("):
+                        q = q.filter(EmailLog.type == t)
+                    u_sel = unit_box.currentText().strip() if unit_box.currentIndex() > -1 else ""
+                    if u_sel and not u_sel.startswith("("):
+                        q = q.filter(EmailLog.unit_name == u_sel)
+                    else:
+                        u = unit_edit.text().strip()
+                        if u:
+                            q = q.filter(EmailLog.unit_name.ilike(f"%{u}%"))
+                    st = status_box.currentText()
+                    if only_failed.isChecked():
+                        q = q.filter(EmailLog.status == 'failed')
+                    elif not st.startswith("("):
+                        q = q.filter(EmailLog.status == st)
+                    subj = subject_search.text().strip()
+                    if subj:
+                        q = q.filter(EmailLog.subject.ilike(f"%{subj}%"))
+                    uidtxt = user_id_edit.text().strip()
+                    if uidtxt.isdigit():
+                        q = q.filter(EmailLog.user_id == int(uidtxt))
+                    # Date range
+                    from datetime import datetime as _dt2
+                    if e_from.isChecked():
+                        fd = from_date.date(); q = q.filter(EmailLog.created_at >= _dt2(fd.year(), fd.month(), fd.day(), 0, 0, 0))
+                    if e_to.isChecked():
+                        td = to_date.date(); q = q.filter(EmailLog.created_at <= _dt2(td.year(), td.month(), td.day(), 23, 59, 59))
+                    rows = q.order_by(EmailLog.created_at.desc()).all()
+                    files = []
+                    for r in rows:
+                        for part in (getattr(r,'attachments','') or '').split(','):
+                            p = part.strip()
+                            if not p:
+                                continue
+                            fp = Path(p)
+                            if fp.exists():
+                                files.append((getattr(r,'unit_name','') or '', getattr(r,'type','') or 'generic', fp))
+                    if not files:
+                        QMessageBox.information(dlg, "Không có file", "Không có tệp đính kèm hợp lệ trong kết quả lọc")
+                        return
+                    Path('exports').mkdir(exist_ok=True)
+                    ts = _dt.now().strftime('%Y%m%d_%H%M%S')
+                    zip_path = Path('exports')/f"email_attachments_{ts}.zip"
+                    with zipfile.ZipFile(str(zip_path), 'w', compression=zipfile.ZIP_DEFLATED) as zf:
+                        added = set()
+                        for unit_name, etype, fp in files:
+                            arcdir = f"{(unit_name or 'NoUnit').replace(' ','_')}/{(etype or 'generic')}"
+                            arcname = f"{arcdir}/{fp.name}"
+                            key = (arcname.lower(), fp.resolve())
+                            if key in added:
+                                continue
+                            try:
+                                zf.write(str(fp), arcname=arcname)
+                                added.add(key)
+                            except Exception:
+                                continue
+                    QMessageBox.information(dlg, "Đã xuất", f"{zip_path}")
+                finally:
+                    db2.close()
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_export_zip.clicked.connect(export_attachments_zip)
         def view_detail():
             i = table.currentRow()
             if i < 0:
