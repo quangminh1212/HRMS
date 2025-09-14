@@ -1784,11 +1784,15 @@ class MainWindow(QWidget):
         subject_not = QLineEdit(); subject_not.setPlaceholderText("Subject không chứa…")
         recipients_contains = QLineEdit(); recipients_contains.setPlaceholderText("Recipients chứa…")
         recipients_not = QLineEdit(); recipients_not.setPlaceholderText("Recipients không chứa…")
+        body_search = QLineEdit(); body_search.setPlaceholderText("Body chứa…")
+        body_not = QLineEdit(); body_not.setPlaceholderText("Body không chứa…")
         error_not = QLineEdit(); error_not.setPlaceholderText("Lỗi không chứa…")
         f.addRow("Subject regex", subject_regex)
         f.addRow("Subject không chứa", subject_not)
         f.addRow("Recipients chứa", recipients_contains)
         f.addRow("Recipients không chứa", recipients_not)
+        f.addRow("Body chứa", body_search)
+        f.addRow("Body không chứa", body_not)
         f.addRow("Lỗi chứa", error_search)
         f.addRow("Lỗi không chứa", error_not)
         h = QHBoxLayout(); h.addWidget(QLabel("Từ")); h.addWidget(from_date); h.addWidget(e_from); h.addSpacing(12); h.addWidget(QLabel("Đến")); h.addWidget(to_date); h.addWidget(e_to)
@@ -1874,8 +1878,8 @@ class MainWindow(QWidget):
         f.addRow(stats_bar)
         lay.addLayout(f)
         # Bảng kết quả
-        table = QTableWidget(0, 8)
-        table.setHorizontalHeaderLabels(["Thời gian", "Loại", "Đơn vị", "Subject", "Recipients", "Tệp đính kèm", "Trạng thái", "Lỗi"])
+        table = QTableWidget(0, 9)
+        table.setHorizontalHeaderLabels(["Thời gian", "Loại", "Đơn vị", "Subject", "Recipients", "Tệp đính kèm", "Trạng thái", "Lỗi", "Số tệp"])
         lay.addWidget(table)
         # Trạng thái phân trang
         state = {'page': 0, 'total': 0}
@@ -1923,6 +1927,8 @@ class MainWindow(QWidget):
                 subject_not.setText(obj.get('subject_not',''))
                 recipients_contains.setText(obj.get('recipients_contains',''))
                 recipients_not.setText(obj.get('recipients_not',''))
+                body_search.setText(obj.get('body',''))
+                body_not.setText(obj.get('body_not',''))
                 error_search.setText(obj.get('error',''))
                 error_not.setText(obj.get('error_not',''))
                 try:
@@ -2006,6 +2012,8 @@ class MainWindow(QWidget):
                     'subject_not': subject_not.text().strip(),
                     'recipients_contains': recipients_contains.text().strip(),
                     'recipients_not': recipients_not.text().strip(),
+                    'body': body_search.text().strip(),
+                    'body_not': body_not.text().strip(),
                     'error': error_search.text().strip(),
                     'error_not': error_not.text().strip(),
                     'has_attachments': has_attach_cb.isChecked(),
@@ -2141,6 +2149,12 @@ class MainWindow(QWidget):
                     q = q.filter(EmailLog.error.ilike(f"%{errtxt}%"))
                 if err_not:
                     q = q.filter(~EmailLog.error.ilike(f"%{err_not}%"))
+                # body filters
+                btxt = body_search.text().strip(); bnot = body_not.text().strip()
+                if btxt:
+                    q = q.filter(EmailLog.body.ilike(f"%{btxt}%"))
+                if bnot:
+                    q = q.filter(~EmailLog.body.ilike(f"%{bnot}%"))
                 if has_attach_cb.isChecked():
                     from sqlalchemy import or_
                     q = q.filter(EmailLog.attachments != None).filter(EmailLog.attachments != '')
@@ -2184,8 +2198,16 @@ class MainWindow(QWidget):
                         # Lưu full text ở UserRole để xem chi tiết
                         it3.setData(Qt.UserRole, getattr(r, 'body', '') or '')
                         it4.setData(Qt.UserRole, getattr(r, 'recipients', '') or '')
-                        it5.setData(Qt.UserRole, getattr(r, 'attachments', '') or '')
+                        full_att = getattr(r, 'attachments', '') or ''
+                        it5.setData(Qt.UserRole, full_att)
                         it7.setData(Qt.UserRole, getattr(r, 'error', '') or '')
+                        # Số tệp
+                        try:
+                            att_count = sum(1 for p in (full_att or '').split(',') if p.strip())
+                        except Exception:
+                            att_count = 0
+                        it8 = QTableWidgetItem(str(att_count))
+                        it8.setData(Qt.UserRole, att_count)
                         table.setItem(i, 0, it0)
                         table.setItem(i, 1, it1)
                         table.setItem(i, 2, it2)
@@ -2194,6 +2216,7 @@ class MainWindow(QWidget):
                         table.setItem(i, 5, it5)
                         table.setItem(i, 6, it6)
                         table.setItem(i, 7, it7)
+                        table.setItem(i, 8, it8)
                     page_label.setText(f"Trang {state['page']+1} (chế độ nhanh)")
                     btn_prev.setEnabled(state['page']>0)
                     btn_next.setEnabled(has_next)
@@ -2425,6 +2448,12 @@ class MainWindow(QWidget):
                         q = q.filter(_EL.error.ilike(f"%{errtxt}%"))
                     if err_not:
                         q = q.filter(~_EL.error.ilike(f"%{err_not}%"))
+                    # body filters
+                    btxt = body_search.text().strip(); bnot = body_not.text().strip()
+                    if btxt:
+                        q = q.filter(_EL.body.ilike(f"%{btxt}%"))
+                    if bnot:
+                        q = q.filter(~_EL.body.ilike(f"%{bnot}%"))
                     if has_attach_cb.isChecked():
                         q = q.filter(_EL.attachments != None).filter(_EL.attachments != '')
                     # recipients filters
@@ -2718,9 +2747,15 @@ class MainWindow(QWidget):
                         q = q.filter(EmailLog.subject.ilike(f"%{subj}%"))
                     if subj_not:
                         q = q.filter(~EmailLog.subject.ilike(f"%{subj_not}%"))
-                    uidtxt = user_id_edit.text().strip()
+                    uidtxt = user_id_edit.text().strip();
                     if uidtxt.isdigit():
                         q = q.filter(EmailLog.user_id == int(uidtxt))
+                    # body filters
+                    btxt = body_search.text().strip(); bnot = body_not.text().strip()
+                    if btxt:
+                        q = q.filter(EmailLog.body.ilike(f"%{btxt}%"))
+                    if bnot:
+                        q = q.filter(~EmailLog.body.ilike(f"%{bnot}%"))
                     # Date range
                     from datetime import datetime as _dt2
                     if e_from.isChecked():
@@ -3149,6 +3184,12 @@ class MainWindow(QWidget):
                             q = q.filter(EmailLog.error.ilike(f"%{errtxt}%"))
                         if err_not:
                             q = q.filter(~EmailLog.error.ilike(f"%{err_not}%"))
+                        # body filters
+                        btxt = body_search.text().strip(); bnot = body_not.text().strip()
+                        if btxt:
+                            q = q.filter(EmailLog.body.ilike(f"%{btxt}%"))
+                        if bnot:
+                            q = q.filter(~EmailLog.body.ilike(f"%{bnot}%"))
                         if has_attach_cb.isChecked():
                             q = q.filter(EmailLog.attachments != None).filter(EmailLog.attachments != '')
                         # recipients filters
