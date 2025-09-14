@@ -1762,6 +1762,8 @@ class MainWindow(QWidget):
         only_failed = QCheckBox("Chỉ lỗi")
         has_attach_cb = QCheckBox("Chỉ có đính kèm")
         has_body_cb = QCheckBox("Chỉ có body")
+        no_attach_cb = QCheckBox("Không có đính kèm")
+        no_error_cb = QCheckBox("Không có lỗi")
         subject_search = QLineEdit(); subject_search.setPlaceholderText("Tìm tiêu đề…")
         error_search = QLineEdit(); error_search.setPlaceholderText("Lỗi chứa…")
         from_date = QDateEdit(); from_date.setCalendarPopup(True)
@@ -1781,6 +1783,8 @@ class MainWindow(QWidget):
         f.addRow("", only_failed)
         f.addRow("", has_attach_cb)
         f.addRow("", has_body_cb)
+        f.addRow("", no_attach_cb)
+        f.addRow("", no_error_cb)
         f.addRow("Tiêu đề", subject_search)
         subject_regex = QLineEdit(); subject_regex.setPlaceholderText("Subject regex…")
         subject_not = QLineEdit(); subject_not.setPlaceholderText("Subject không chứa…")
@@ -1844,6 +1848,8 @@ class MainWindow(QWidget):
         my_only_cb.toggled.connect(lambda _ : _on_my_only())
         sort_asc_cb.toggled.connect(lambda _ : (save_filter(), state.__setitem__('page', 0), load()))
         has_body_cb.toggled.connect(lambda _ : (save_filter(), state.__setitem__('page', 0), load()))
+        no_attach_cb.toggled.connect(lambda _ : (save_filter(), state.__setitem__('page', 0), load()))
+        no_error_cb.toggled.connect(lambda _ : (save_filter(), state.__setitem__('page', 0), load()))
         f.addRow("", my_only_cb)
         f.addRow("Sắp xếp theo", sort_field)
         f.addRow("Sắp xếp 2", sort_field2)
@@ -2193,6 +2199,14 @@ class MainWindow(QWidget):
                     has_body_cb.setChecked(bool(obj.get('has_body', False)))
                 except Exception:
                     pass
+                try:
+                    no_attach_cb.setChecked(bool(obj.get('no_attachments', False)))
+                except Exception:
+                    pass
+                try:
+                    no_error_cb.setChecked(bool(obj.get('no_error', False)))
+                except Exception:
+                    pass
                 # dates
                 from PySide6.QtCore import QDate
                 preset = obj.get('date_preset')
@@ -2283,6 +2297,8 @@ class MainWindow(QWidget):
                     'subject_ends': subject_ends.text().strip(),
 'has_attachments': has_attach_cb.isChecked(),
                     'has_body': has_body_cb.isChecked(),
+                    'no_attachments': no_attach_cb.isChecked(),
+                    'no_error': no_error_cb.isChecked(),
                     'from_date': qdate_to_str(from_date.date()) if e_from.isChecked() else None,
                     'to_date': qdate_to_str(to_date.date()) if e_to.isChecked() else None,
                     'user_id': (int(user_id_edit.text()) if user_id_edit.text().isdigit() else None),
@@ -2424,6 +2440,8 @@ class MainWindow(QWidget):
                 if b: parts.append(f"Body chứa={b}")
                 if bn: parts.append(f"Body không chứa={bn}")
                 if has_body_cb.isChecked(): parts.append("Có body")
+                if no_attach_cb.isChecked(): parts.append("Không tệp")
+                if no_error_cb.isChecked(): parts.append("Không lỗi")
                 ax = attach_ext.text().strip(); ac = attach_contains.text().strip(); an = attach_not.text().strip()
                 if ax: parts.append(f"Đuôi tệp={ax}")
                 if ac: parts.append(f"Tệp chứa={ac}")
@@ -2517,6 +2535,9 @@ class MainWindow(QWidget):
                     q = q.filter(EmailLog.error.ilike(f"%{errtxt}%"))
                 if err_not:
                     q = q.filter(~EmailLog.error.ilike(f"%{err_not}%"))
+                if no_error_cb.isChecked():
+                    from sqlalchemy import or_
+                    q = q.filter(or_(EmailLog.error == None, EmailLog.error == ''))
                 # body filters
                 btxt = body_search.text().strip(); bnot = body_not.text().strip()
                 if btxt:
@@ -2528,6 +2549,9 @@ class MainWindow(QWidget):
                 if has_attach_cb.isChecked():
                     from sqlalchemy import or_
                     q = q.filter(EmailLog.attachments != None).filter(EmailLog.attachments != '')
+                if no_attach_cb.isChecked():
+                    from sqlalchemy import or_
+                    q = q.filter(or_(EmailLog.attachments == None, EmailLog.attachments == ''))
                 # attachment ext and min count
                 extv = attach_ext.text().strip(); min_att = (int(min_attachments.text()) if (min_attachments.text() or '').isdigit() else 0)
                 if extv:
