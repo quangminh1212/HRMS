@@ -1909,13 +1909,14 @@ class MainWindow(QWidget):
         # Saved filters UI
         saved_filters_combo = QComboBox(); saved_filters_combo.addItem("(Chưa có)")
         btn_apply_saved = QPushButton("Áp dụng")
-        btn_save_filter_as = QPushButton("Lưu tên…"); btn_overwrite_saved = QPushButton("Ghi đè"); btn_load_saved = QPushButton("Tải"); btn_delete_saved = QPushButton("Xoá"); btn_rename_saved = QPushButton("Đổi tên"); btn_dup_saved = QPushButton("Nhân bản"); btn_set_default = QPushButton("Mặc định"); btn_clear_default = QPushButton("Bỏ mặc định"); btn_export_current = QPushButton("Export chọn"); btn_copy_current = QPushButton("Copy JSON"); btn_import_clip = QPushButton("Nhập clipboard"); btn_export_saved = QPushButton("Export JSON"); btn_import_saved = QPushButton("Nhập JSON")
-        row_saved = QHBoxLayout(); row_saved.addWidget(QLabel("Bộ lọc đã lưu")); row_saved.addWidget(saved_filters_combo); row_saved.addWidget(btn_apply_saved); row_saved.addWidget(btn_save_filter_as); row_saved.addWidget(btn_overwrite_saved); row_saved.addWidget(btn_load_saved); row_saved.addWidget(btn_delete_saved); row_saved.addWidget(btn_rename_saved); row_saved.addWidget(btn_dup_saved); row_saved.addWidget(btn_set_default); row_saved.addWidget(btn_clear_default); row_saved.addWidget(btn_export_current); row_saved.addWidget(btn_copy_current); row_saved.addWidget(btn_import_clip); row_saved.addWidget(btn_export_saved); row_saved.addWidget(btn_import_saved)
+        btn_save_filter_as = QPushButton("Lưu tên…"); btn_save_and_default = QPushButton("Lưu+Mặc định"); btn_overwrite_saved = QPushButton("Ghi đè"); btn_load_saved = QPushButton("Tải"); btn_delete_saved = QPushButton("Xoá"); btn_rename_saved = QPushButton("Đổi tên"); btn_dup_saved = QPushButton("Nhân bản"); btn_set_default = QPushButton("Mặc định"); btn_clear_default = QPushButton("Bỏ mặc định"); btn_export_current = QPushButton("Export chọn"); btn_copy_current = QPushButton("Copy JSON"); btn_import_clip = QPushButton("Nhập clipboard"); btn_export_saved = QPushButton("Export JSON"); btn_import_saved = QPushButton("Nhập JSON")
+        row_saved = QHBoxLayout(); row_saved.addWidget(QLabel("Bộ lọc đã lưu")); row_saved.addWidget(saved_filters_combo); row_saved.addWidget(btn_apply_saved); row_saved.addWidget(btn_save_filter_as); row_saved.addWidget(btn_save_and_default); row_saved.addWidget(btn_overwrite_saved); row_saved.addWidget(btn_load_saved); row_saved.addWidget(btn_delete_saved); row_saved.addWidget(btn_rename_saved); row_saved.addWidget(btn_dup_saved); row_saved.addWidget(btn_set_default); row_saved.addWidget(btn_clear_default); row_saved.addWidget(btn_export_current); row_saved.addWidget(btn_copy_current); row_saved.addWidget(btn_import_clip); row_saved.addWidget(btn_export_saved); row_saved.addWidget(btn_import_saved)
         # tooltips
         try:
             saved_filters_combo.setToolTip("Chọn một bộ lọc đã lưu")
             btn_apply_saved.setToolTip("Áp dụng bộ lọc đang chọn")
             btn_save_filter_as.setToolTip("Lưu bộ lọc hiện tại với tên mới")
+            btn_save_and_default.setToolTip("Lưu bộ lọc hiện tại với tên mới và đặt làm mặc định")
             btn_overwrite_saved.setToolTip("Ghi đè bộ lọc đang chọn bằng cấu hình hiện tại")
             btn_load_saved.setToolTip("Tải bộ lọc đang chọn vào màn hình")
             btn_delete_saved.setToolTip("Xoá bộ lọc đang chọn")
@@ -1986,7 +1987,8 @@ class MainWindow(QWidget):
             filter_summary_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         except Exception:
             pass
-        f.addRow("Bộ lọc", filter_summary_label)
+        row_summary = QHBoxLayout(); row_summary.addWidget(filter_summary_label); btn_copy_filter_summary = QPushButton("Copy"); row_summary.addWidget(btn_copy_filter_summary)
+        f.addRow("Bộ lọc", row_summary)
         lay.addLayout(f)
         # Bảng kết quả
         table = QTableWidget(0, 9)
@@ -1995,6 +1997,12 @@ class MainWindow(QWidget):
         try:
             hdr = table.horizontalHeader()
             col_map = {0: "Thời gian", 1: "Loại", 2: "Đơn vị", 3: "Subject", 4: "Recipients", 5: "Tệp đính kèm", 6: "Trạng thái", 7: "Lỗi", 8: "Số tệp"}
+            # Ctrl+F tìm nhanh: focus ô tiêu đề
+            try:
+                from PySide6.QtGui import QShortcut, QKeySequence
+                qs_find = QShortcut(QKeySequence("Ctrl+F"), dlg); qs_find.activated.connect(lambda : subject_search.setFocus())
+            except Exception:
+                pass
             def on_header_clicked(ci: int):
                 try:
                     label = col_map.get(ci)
@@ -3460,7 +3468,43 @@ class MainWindow(QWidget):
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_apply_saved.clicked.connect(load_saved_filter)
+        def save_and_set_default():
+            try:
+                from PySide6.QtWidgets import QInputDialog
+                name, ok = QInputDialog.getText(dlg, "Lưu + Mặc định", "Tên bộ lọc:")
+                if not ok or not (name or '').strip():
+                    return
+                name = (name or '').strip()
+                # save current
+                try: save_filter()
+                except Exception: pass
+                from .settings_service import get_setting, set_setting
+                user_name_key = (self.current_user.get('username') or '').strip()
+                key = f"EMAIL_HISTORY_FILTER:{user_name_key}"
+                val = get_setting(key, '') or ''
+                if not val:
+                    return
+                import json as _json
+                set_setting(f"EMAIL_HISTORY_SAVED_FILTER:{user_name_key}:{name}", val)
+                # update list
+                raw = get_setting(f"EMAIL_HISTORY_SAVED_LIST:{user_name_key}", '') or ''
+                names = []
+                if raw.strip():
+                    try: names = _json.loads(raw)
+                    except Exception: names = []
+                if name not in names:
+                    names.append(name)
+                set_setting(f"EMAIL_HISTORY_SAVED_LIST:{user_name_key}", _json.dumps(names, ensure_ascii=False))
+                # set default
+                set_setting(f"EMAIL_HISTORY_SAVED_DEFAULT:{user_name_key}", name)
+                refresh_saved_combo()
+                try: saved_filters_combo.setCurrentText(name)
+                except Exception: pass
+                QMessageBox.information(dlg, "Đã lưu", f"Đã lưu và đặt mặc định: {name}")
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_save_filter_as.clicked.connect(save_filter_as)
+        btn_save_and_default.clicked.connect(save_and_set_default)
         btn_overwrite_saved.clicked.connect(overwrite_saved_filter)
         btn_load_saved.clicked.connect(load_saved_filter)
         btn_delete_saved.clicked.connect(delete_saved_filter)
@@ -3642,6 +3686,13 @@ class MainWindow(QWidget):
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_copy_stats.clicked.connect(copy_stats)
+        def copy_filter_summary():
+            try:
+                QApplication.clipboard().setText(filter_summary_label.text() or '')
+                QMessageBox.information(dlg, "Đã copy", "Đã copy tóm tắt bộ lọc")
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_copy_filter_summary.clicked.connect(copy_filter_summary)
         def show_stats_detail():
             try:
                 from .db import SessionLocal as _SL
@@ -3872,6 +3923,13 @@ class MainWindow(QWidget):
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_export_failed = QPushButton("Export lỗi CSV"); btn_export_failed.clicked.connect(export_failed_csv); f.addRow(btn_export_failed)
+        # Tuỳ chọn export ZIP
+        from PySide6.QtWidgets import QLineEdit as _QLE2
+        zip_group_by_day = QCheckBox("Gom theo ngày")
+        zip_include_manifest = QCheckBox("Kèm manifest CSV")
+        zip_name_tpl = _QLE2(); zip_name_tpl.setPlaceholderText("Tên file ZIP (vd: email_attachments_{ts}.zip)")
+        row_zip_opts = QHBoxLayout(); row_zip_opts.addWidget(zip_group_by_day); row_zip_opts.addWidget(zip_include_manifest); row_zip_opts.addWidget(QLabel("Tên ZIP")); row_zip_opts.addWidget(zip_name_tpl)
+        f.addRow(row_zip_opts)
         def export_attachments_zip():
             try:
                 from .db import SessionLocal
@@ -3939,7 +3997,12 @@ class MainWindow(QWidget):
                                     total_size += fp.stat().st_size
                                 except Exception:
                                     pass
-                                files.append((getattr(r,'unit_name','') or '', getattr(r,'type','') or 'generic', fp))
+                                day_str = ''
+                                try:
+                                    day_str = str(getattr(r,'created_at', None).date()) if getattr(r,'created_at', None) else ''
+                                except Exception:
+                                    day_str = ''
+                                files.append((getattr(r,'unit_name','') or '', getattr(r,'type','') or 'generic', day_str, fp))
                     if not files:
                         QMessageBox.information(dlg, "Không có file", "Không có tệp đính kèm hợp lệ trong kết quả lọc")
                         return
@@ -3958,11 +4021,18 @@ class MainWindow(QWidget):
                         return
                     Path('exports').mkdir(exist_ok=True)
                     ts = _dt.now().strftime('%Y%m%d_%H%M%S')
-                    zip_path = Path('exports')/f"email_attachments_{ts}.zip"
+                    name_tpl = zip_name_tpl.text().strip() or "email_attachments_{ts}.zip"
+                    zip_path = Path('exports')/name_tpl.replace('{ts}', ts)
                     with zipfile.ZipFile(str(zip_path), 'w', compression=zipfile.ZIP_DEFLATED) as zf:
                         added = set()
-                        for unit_name, etype, fp in files:
-                            arcdir = f"{(unit_name or 'NoUnit').replace(' ','_')}/{(etype or 'generic')}"
+                        manifest = []
+                        for unit_name, etype, day_str, fp in files:
+                            parts = []
+                            if zip_group_by_day.isChecked() and day_str:
+                                parts.append(day_str)
+                            parts.append((unit_name or 'NoUnit').replace(' ','_'))
+                            parts.append((etype or 'generic'))
+                            arcdir = "/".join(parts)
                             arcname = f"{arcdir}/{fp.name}"
                             key = (arcname.lower(), fp.resolve())
                             if key in added:
@@ -3970,8 +4040,21 @@ class MainWindow(QWidget):
                             try:
                                 zf.write(str(fp), arcname=arcname)
                                 added.add(key)
+                                if zip_include_manifest.isChecked():
+                                    manifest.append([day_str, unit_name, etype, fp.name])
                             except Exception:
                                 continue
+                        if zip_include_manifest.isChecked() and manifest:
+                            try:
+                                import io, csv
+                                buf = io.StringIO()
+                                w = csv.writer(buf)
+                                w.writerow(["day","unit","type","filename"])
+                                for row in manifest:
+                                    w.writerow(row)
+                                zf.writestr("manifest.csv", buf.getvalue())
+                            except Exception:
+                                pass
                     QMessageBox.information(dlg, "Đã xuất", f"{zip_path}")
                     try:
                         from PySide6.QtWidgets import QMessageBox as _QMB
