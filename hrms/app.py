@@ -1452,6 +1452,7 @@ class MainWindow(QWidget):
             top.addWidget(unit_box); top.addWidget(btn_load); top.addWidget(btn_add); top.addWidget(btn_del); top.addWidget(btn_toggle); top.addWidget(btn_save_note)
             lay.addLayout(top)
             table = QTableWidget(0, 4); table.setHorizontalHeaderLabels(["Email", "Active", "Note", "Created"])
+            table.setEditTriggers(QTableWidget.DoubleClicked | QTableWidget.SelectedClicked)
             lay.addWidget(table)
             email_edit = QLineEdit(); email_note = QLineEdit();
             from PySide6.QtWidgets import QFormLayout as _QF
@@ -1459,10 +1460,13 @@ class MainWindow(QWidget):
             # Import từ settings
             btn_import_settings = QPushButton("Nhập từ settings")
             lay.addWidget(btn_import_settings)
+            guard = {'updating': False}
             def load_rows():
+                guard['updating'] = True
                 table.setRowCount(0)
                 uid = unit_box.currentData();
                 if not uid:
+                    guard['updating'] = False
                     return
                 s2 = _SL()
                 try:
@@ -1475,6 +1479,7 @@ class MainWindow(QWidget):
                         table.setItem(i, 3, QTableWidgetItem(str(r.created_at)))
                 finally:
                     s2.close()
+                guard['updating'] = False
             def do_add():
                 uid = unit_box.currentData();
                 em_raw = (email_edit.text() or '').strip()
@@ -1552,6 +1557,14 @@ class MainWindow(QWidget):
                     s2.rollback(); QMessageBox.critical(md, "Lỗi", str(ex))
                 finally:
                     s2.close(); load_rows()
+            def on_item_changed(it):
+                if guard['updating']:
+                    return
+                # Cột Note (index 2)
+                if it.column() != 2:
+                    return
+                do_save_note()
+            table.itemChanged.connect(on_item_changed)
             btn_load.clicked.connect(load_rows); btn_add.clicked.connect(do_add); btn_del.clicked.connect(do_del); btn_toggle.clicked.connect(do_toggle); btn_save_note.clicked.connect(do_save_note); btn_import_settings.clicked.connect(do_import_settings)
             md.resize(760, 560); md.exec()
                     from .settings_service import get_setting
@@ -1642,7 +1655,7 @@ class MainWindow(QWidget):
         if role not in ('admin','hr'):
             QMessageBox.warning(self, "Không có quyền", "Chỉ admin/HR mới truy cập")
             return
-        from PySide6.QtWidgets import QDialog, QFormLayout, QTableWidget, QTableWidgetItem, QPushButton, QCheckBox, QFileDialog
+        from PySide6.QtWidgets import QDialog, QFormLayout, QTableWidget, QTableWidgetItem, QPushButton, QCheckBox, QFileDialog, QComboBox
         dlg = QDialog(self); dlg.setWindowTitle("Lịch sử Email")
         lay = QVBoxLayout(dlg)
         # Bộ lọc
@@ -1650,6 +1663,16 @@ class MainWindow(QWidget):
         from PySide6.QtWidgets import QLineEdit, QComboBox, QPushButton, QDateEdit, QCheckBox
         type_box = QComboBox(); type_box.addItems(["(Tất cả)", "salary_due", "bhxh_monthly", "contracts_expiring", "quick_report", "retirement", "generic"])
         unit_edit = QLineEdit(); unit_edit.setPlaceholderText("Đơn vị chứa…")
+        unit_box = QComboBox(); unit_box.addItem("(Tất cả)")
+        try:
+            from .db import SessionLocal as _SL
+            from .models import Unit as _Unit
+            _s = _SL();
+            for _u in _s.query(_Unit).order_by(_Unit.name).all():
+                unit_box.addItem(_u.name)
+            _s.close()
+        except Exception:
+            pass
         status_box = QComboBox(); status_box.addItems(["(Tất cả)", "sent", "failed"])
         only_failed = QCheckBox("Chỉ lỗi")
         subject_search = QLineEdit(); subject_search.setPlaceholderText("Tìm tiêu đề…")
@@ -1659,6 +1682,7 @@ class MainWindow(QWidget):
         btn_refresh = QPushButton("Làm mới"); btn_export = QPushButton("Export CSV"); btn_view = QPushButton("Xem chi tiết")
         f.addRow("Loại", type_box)
         f.addRow("Đơn vị", unit_edit)
+        f.addRow("Chọn đơn vị", unit_box)
         f.addRow("Trạng thái", status_box)
         f.addRow("", only_failed)
         f.addRow("Tiêu đề", subject_search)
@@ -1688,9 +1712,13 @@ class MainWindow(QWidget):
                 t = type_box.currentText();
                 if not t.startswith("("):
                     q = q.filter(EmailLog.type == t)
-                u = unit_edit.text().strip();
-                if u:
-                    q = q.filter(EmailLog.unit_name.ilike(f"%{u}%"))
+                u_sel = unit_box.currentText().strip() if unit_box.currentIndex() > -1 else ""
+                if u_sel and not u_sel.startswith("("):
+                    q = q.filter(EmailLog.unit_name == u_sel)
+                else:
+                    u = unit_edit.text().strip();
+                    if u:
+                        q = q.filter(EmailLog.unit_name.ilike(f"%{u}%"))
                 st = status_box.currentText();
                 if only_failed.isChecked():
                     q = q.filter(EmailLog.status == 'failed')
@@ -1945,14 +1973,30 @@ class MainWindow(QWidget):
                     QMessageBox.information(dlg, "Không có dữ liệu", "Không có nhóm hợp lệ để gửi lại")
                     return
                 sent = 0; failed = 0; total = len(groups)
-                from .mailer import get_recipients_for_unit, send_email_with_attachment
+                from .mailer import get_recipients_for_unit, send_email_with_attachment, create_zip
+                zip_when_group = QCheckBox.isChecked
                 for (t, unit_name), files in groups.items():
                     recips = get_recipients_for_unit(unit_name)
                     if not recips:
                         failed += 1; continue
                     subject = f"[HRMS] Resend {t} - {unit_name}"
                     body = f"Gửi lại theo nhóm {t} cho {unit_name}. Đính kèm {len(files)} tệp."
-                    ok = send_email_with_attachment(subject, body, sorted(list(files)), to=recips)
+                    file_list = sorted(list(files))
+                    # ZIP tùy chọn nếu có nhiều tệp
+                    ok = False
+                    try:
+                        if hasattr(resend_grouped_by_unit, '__zip_cb') and resend_grouped_by_unit.__zip_cb.isChecked() and len(file_list) > 1:
+                            from pathlib import Path as _P
+                            _P('exports').mkdir(exist_ok=True)
+                            zip_path = _P('exports')/f"resend_{t}_{unit_name.replace(' ','_')}.zip"
+                            if create_zip(file_list, str(zip_path)):
+                                ok = send_email_with_attachment(subject, body + "\n(Đính kèm ZIP)", [str(zip_path)], to=recips)
+                            else:
+                                ok = send_email_with_attachment(subject, body, file_list, to=recips)
+                        else:
+                            ok = send_email_with_attachment(subject, body, file_list, to=recips)
+                    except Exception:
+                        ok = False
                     # Log lại
                     try:
                         from .db import SessionLocal
@@ -1965,6 +2009,11 @@ class MainWindow(QWidget):
                 QMessageBox.information(dlg, "Kết quả", f"Nhóm: {total}\nThành công: {sent}\nThất bại: {failed}")
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
+        # Thêm checkbox ZIP khi gửi nhóm
+        from PySide6.QtWidgets import QCheckBox as _QCB
+        _zip_cb = _QCB("ZIP khi gửi nhóm")
+        resend_grouped_by_unit.__zip_cb = _zip_cb
+        f.addRow("", _zip_cb)
         btn_resend_group.clicked.connect(resend_grouped_by_unit)
         load()
         dlg.resize(1100, 600)
