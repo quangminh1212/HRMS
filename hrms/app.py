@@ -1782,17 +1782,25 @@ class MainWindow(QWidget):
         f.addRow("Tiêu đề", subject_search)
         subject_regex = QLineEdit(); subject_regex.setPlaceholderText("Subject regex…")
         subject_not = QLineEdit(); subject_not.setPlaceholderText("Subject không chứa…")
+        subject_starts = QLineEdit(); subject_starts.setPlaceholderText("Subject bắt đầu với…")
+        subject_ends = QLineEdit(); subject_ends.setPlaceholderText("Subject kết thúc với…")
         recipients_contains = QLineEdit(); recipients_contains.setPlaceholderText("Recipients chứa…")
         recipients_not = QLineEdit(); recipients_not.setPlaceholderText("Recipients không chứa…")
         body_search = QLineEdit(); body_search.setPlaceholderText("Body chứa…")
         body_not = QLineEdit(); body_not.setPlaceholderText("Body không chứa…")
+        attach_ext = QLineEdit(); attach_ext.setPlaceholderText("Đuôi tệp chứa (vd: .xlsx)")
+        min_attachments = QLineEdit(); min_attachments.setPlaceholderText("Số tệp tối thiểu (vd: 2)")
         error_not = QLineEdit(); error_not.setPlaceholderText("Lỗi không chứa…")
         f.addRow("Subject regex", subject_regex)
         f.addRow("Subject không chứa", subject_not)
+        f.addRow("Subject bắt đầu", subject_starts)
+        f.addRow("Subject kết thúc", subject_ends)
         f.addRow("Recipients chứa", recipients_contains)
         f.addRow("Recipients không chứa", recipients_not)
         f.addRow("Body chứa", body_search)
         f.addRow("Body không chứa", body_not)
+        f.addRow("Đuôi tệp chứa", attach_ext)
+        f.addRow("Số tệp tối thiểu", min_attachments)
         f.addRow("Lỗi chứa", error_search)
         f.addRow("Lỗi không chứa", error_not)
         h = QHBoxLayout(); h.addWidget(QLabel("Từ")); h.addWidget(from_date); h.addWidget(e_from); h.addSpacing(12); h.addWidget(QLabel("Đến")); h.addWidget(to_date); h.addWidget(e_to)
@@ -1925,10 +1933,14 @@ class MainWindow(QWidget):
                 subject_search.setText(obj.get('subject',''))
                 subject_regex.setText(obj.get('subject_regex',''))
                 subject_not.setText(obj.get('subject_not',''))
+                subject_starts.setText(obj.get('subject_starts',''))
+                subject_ends.setText(obj.get('subject_ends',''))
                 recipients_contains.setText(obj.get('recipients_contains',''))
                 recipients_not.setText(obj.get('recipients_not',''))
                 body_search.setText(obj.get('body',''))
                 body_not.setText(obj.get('body_not',''))
+                attach_ext.setText(obj.get('attach_ext',''))
+                min_attachments.setText(str(obj.get('min_attachments','') or ''))
                 error_search.setText(obj.get('error',''))
                 error_not.setText(obj.get('error_not',''))
                 try:
@@ -2014,8 +2026,12 @@ class MainWindow(QWidget):
                     'recipients_not': recipients_not.text().strip(),
                     'body': body_search.text().strip(),
                     'body_not': body_not.text().strip(),
+                    'attach_ext': attach_ext.text().strip(),
+                    'min_attachments': int(min_attachments.text()) if (min_attachments.text() or '').isdigit() else None,
                     'error': error_search.text().strip(),
                     'error_not': error_not.text().strip(),
+                    'subject_starts': subject_starts.text().strip(),
+                    'subject_ends': subject_ends.text().strip(),
                     'has_attachments': has_attach_cb.isChecked(),
                     'from_date': qdate_to_str(from_date.date()) if e_from.isChecked() else None,
                     'to_date': qdate_to_str(to_date.date()) if e_to.isChecked() else None,
@@ -2144,6 +2160,12 @@ class MainWindow(QWidget):
                     q = q.filter(EmailLog.subject.ilike(f"%{subj}%"))
                 if subj_not:
                     q = q.filter(~EmailLog.subject.ilike(f"%{subj_not}%"))
+                # starts/ends with
+                s_st = subject_starts.text().strip(); s_en = subject_ends.text().strip()
+                if s_st:
+                    q = q.filter(EmailLog.subject.ilike(f"{s_st}%"))
+                if s_en:
+                    q = q.filter(EmailLog.subject.ilike(f"%{s_en}"))
                 errtxt = error_search.text().strip(); err_not = error_not.text().strip()
                 if errtxt:
                     q = q.filter(EmailLog.error.ilike(f"%{errtxt}%"))
@@ -2158,6 +2180,14 @@ class MainWindow(QWidget):
                 if has_attach_cb.isChecked():
                     from sqlalchemy import or_
                     q = q.filter(EmailLog.attachments != None).filter(EmailLog.attachments != '')
+                # attachment ext and min count
+                extv = attach_ext.text().strip(); min_att = (int(min_attachments.text()) if (min_attachments.text() or '').isdigit() else 0)
+                if extv:
+                    q = q.filter(EmailLog.attachments.ilike(f"%{extv}%"))
+                if min_att and min_att > 0:
+                    from sqlalchemy import func
+                    q = q.filter(EmailLog.attachments != None).filter(EmailLog.attachments != '')
+                    q = q.filter((func.length(EmailLog.attachments) - func.length(func.replace(EmailLog.attachments, ',', '')) + 1) >= min_att)
                 # recipients filters
                 rc = recipients_contains.text().strip(); rnot = recipients_not.text().strip()
                 if rc:
@@ -2243,8 +2273,16 @@ class MainWindow(QWidget):
                         # Lưu full text ở UserRole để xem chi tiết
                         it3.setData(Qt.UserRole, getattr(r, 'body', '') or '')
                         it4.setData(Qt.UserRole, getattr(r, 'recipients', '') or '')
-                        it5.setData(Qt.UserRole, getattr(r, 'attachments', '') or '')
+                        full_att2 = getattr(r, 'attachments', '') or ''
+                        it5.setData(Qt.UserRole, full_att2)
                         it7.setData(Qt.UserRole, getattr(r, 'error', '') or '')
+                        # Số tệp
+                        try:
+                            att_count2 = sum(1 for p in (full_att2 or '').split(',') if p.strip())
+                        except Exception:
+                            att_count2 = 0
+                        it8 = QTableWidgetItem(str(att_count2))
+                        it8.setData(Qt.UserRole, att_count2)
                         table.setItem(i, 0, it0)
                         table.setItem(i, 1, it1)
                         table.setItem(i, 2, it2)
@@ -2253,6 +2291,7 @@ class MainWindow(QWidget):
                         table.setItem(i, 5, it5)
                         table.setItem(i, 6, it6)
                         table.setItem(i, 7, it7)
+                        table.setItem(i, 8, it8)
                     # Cập nhật pager
                     page_label.setText(f"Trang {state['page']+1}/{max_page} ({state['total']} kết quả)")
                     btn_prev.setEnabled(state['page']>0)
@@ -2443,6 +2482,11 @@ class MainWindow(QWidget):
                         q = q.filter(_EL.subject.ilike(f"%{subj}%"))
                     if subj_not:
                         q = q.filter(~_EL.subject.ilike(f"%{subj_not}%"))
+                    s_st = subject_starts.text().strip(); s_en = subject_ends.text().strip()
+                    if s_st:
+                        q = q.filter(_EL.subject.ilike(f"{s_st}%"))
+                    if s_en:
+                        q = q.filter(_EL.subject.ilike(f"%{s_en}"))
                     errtxt = error_search.text().strip(); err_not = error_not.text().strip()
                     if errtxt:
                         q = q.filter(_EL.error.ilike(f"%{errtxt}%"))
@@ -2456,6 +2500,14 @@ class MainWindow(QWidget):
                         q = q.filter(~_EL.body.ilike(f"%{bnot}%"))
                     if has_attach_cb.isChecked():
                         q = q.filter(_EL.attachments != None).filter(_EL.attachments != '')
+                    # attachment ext and min count
+                    extv = attach_ext.text().strip(); min_att = (int(min_attachments.text()) if (min_attachments.text() or '').isdigit() else 0)
+                    if extv:
+                        q = q.filter(_EL.attachments.ilike(f"%{extv}%"))
+                    if min_att and min_att > 0:
+                        from sqlalchemy import func as _func
+                        q = q.filter(_EL.attachments != None).filter(_EL.attachments != '')
+                        q = q.filter((_func.length(_EL.attachments) - _func.length(_func.replace(_EL.attachments, ',', '')) + 1) >= min_att)
                     # recipients filters
                     rc = recipients_contains.text().strip(); rnot = recipients_not.text().strip()
                     if rc:
@@ -2682,6 +2734,14 @@ class MainWindow(QWidget):
                         q = q.filter(~EmailLog.error.ilike(f"%{err_not}%"))
                     if has_attach_cb.isChecked():
                         q = q.filter(EmailLog.attachments != None).filter(EmailLog.attachments != '')
+                    # attachment ext and min count
+                    extv = attach_ext.text().strip(); min_att = (int(min_attachments.text()) if (min_attachments.text() or '').isdigit() else 0)
+                    if extv:
+                        q = q.filter(EmailLog.attachments.ilike(f"%{extv}%"))
+                    if min_att and min_att > 0:
+                        from sqlalchemy import func
+                        q = q.filter(EmailLog.attachments != None).filter(EmailLog.attachments != '')
+                        q = q.filter((func.length(EmailLog.attachments) - func.length(func.replace(EmailLog.attachments, ',', '')) + 1) >= min_att)
                     # recipients filters
                     rc = recipients_contains.text().strip(); rnot = recipients_not.text().strip()
                     if rc:
@@ -3190,6 +3250,14 @@ class MainWindow(QWidget):
                             q = q.filter(EmailLog.body.ilike(f"%{btxt}%"))
                         if bnot:
                             q = q.filter(~EmailLog.body.ilike(f"%{bnot}%"))
+                        # attachment ext and min count
+                        extv = attach_ext.text().strip(); min_att = (int(min_attachments.text()) if (min_attachments.text() or '').isdigit() else 0)
+                        if extv:
+                            q = q.filter(EmailLog.attachments.ilike(f"%{extv}%"))
+                        if min_att and min_att > 0:
+                            from sqlalchemy import func
+                            q = q.filter(EmailLog.attachments != None).filter(EmailLog.attachments != '')
+                            q = q.filter((func.length(EmailLog.attachments) - func.length(func.replace(EmailLog.attachments, ',', '')) + 1) >= min_att)
                         if has_attach_cb.isChecked():
                             q = q.filter(EmailLog.attachments != None).filter(EmailLog.attachments != '')
                         # recipients filters
