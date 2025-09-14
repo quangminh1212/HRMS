@@ -1876,8 +1876,8 @@ class MainWindow(QWidget):
         # Saved filters UI
         saved_filters_combo = QComboBox(); saved_filters_combo.addItem("(Chưa có)")
         btn_apply_saved = QPushButton("Áp dụng")
-        btn_save_filter_as = QPushButton("Lưu tên…"); btn_overwrite_saved = QPushButton("Ghi đè"); btn_load_saved = QPushButton("Tải"); btn_delete_saved = QPushButton("Xoá"); btn_rename_saved = QPushButton("Đổi tên"); btn_dup_saved = QPushButton("Nhân bản"); btn_set_default = QPushButton("Mặc định"); btn_clear_default = QPushButton("Bỏ mặc định"); btn_export_current = QPushButton("Export chọn"); btn_export_saved = QPushButton("Export JSON"); btn_import_saved = QPushButton("Nhập JSON")
-        row_saved = QHBoxLayout(); row_saved.addWidget(QLabel("Bộ lọc đã lưu")); row_saved.addWidget(saved_filters_combo); row_saved.addWidget(btn_apply_saved); row_saved.addWidget(btn_save_filter_as); row_saved.addWidget(btn_overwrite_saved); row_saved.addWidget(btn_load_saved); row_saved.addWidget(btn_delete_saved); row_saved.addWidget(btn_rename_saved); row_saved.addWidget(btn_dup_saved); row_saved.addWidget(btn_set_default); row_saved.addWidget(btn_clear_default); row_saved.addWidget(btn_export_current); row_saved.addWidget(btn_export_saved); row_saved.addWidget(btn_import_saved)
+        btn_save_filter_as = QPushButton("Lưu tên…"); btn_overwrite_saved = QPushButton("Ghi đè"); btn_load_saved = QPushButton("Tải"); btn_delete_saved = QPushButton("Xoá"); btn_rename_saved = QPushButton("Đổi tên"); btn_dup_saved = QPushButton("Nhân bản"); btn_set_default = QPushButton("Mặc định"); btn_clear_default = QPushButton("Bỏ mặc định"); btn_export_current = QPushButton("Export chọn"); btn_copy_current = QPushButton("Copy JSON"); btn_import_clip = QPushButton("Nhập clipboard"); btn_export_saved = QPushButton("Export JSON"); btn_import_saved = QPushButton("Nhập JSON")
+        row_saved = QHBoxLayout(); row_saved.addWidget(QLabel("Bộ lọc đã lưu")); row_saved.addWidget(saved_filters_combo); row_saved.addWidget(btn_apply_saved); row_saved.addWidget(btn_save_filter_as); row_saved.addWidget(btn_overwrite_saved); row_saved.addWidget(btn_load_saved); row_saved.addWidget(btn_delete_saved); row_saved.addWidget(btn_rename_saved); row_saved.addWidget(btn_dup_saved); row_saved.addWidget(btn_set_default); row_saved.addWidget(btn_clear_default); row_saved.addWidget(btn_export_current); row_saved.addWidget(btn_copy_current); row_saved.addWidget(btn_import_clip); row_saved.addWidget(btn_export_saved); row_saved.addWidget(btn_import_saved)
         # tooltips
         try:
             saved_filters_combo.setToolTip("Chọn một bộ lọc đã lưu")
@@ -1891,6 +1891,8 @@ class MainWindow(QWidget):
             btn_set_default.setToolTip("Đặt bộ lọc đang chọn làm mặc định")
             btn_clear_default.setToolTip("Bỏ thiết lập mặc định")
             btn_export_current.setToolTip("Xuất bộ lọc đang chọn ra JSON")
+            btn_copy_current.setToolTip("Copy JSON của bộ lọc đang chọn vào clipboard")
+            btn_import_clip.setToolTip("Nhập bộ lọc từ JSON trong clipboard")
             btn_export_saved.setToolTip("Xuất tất cả bộ lọc đã lưu ra JSON")
             btn_import_saved.setToolTip("Nhập nhiều bộ lọc từ JSON")
         except Exception:
@@ -2297,6 +2299,13 @@ class MainWindow(QWidget):
         # Tải dữ liệu
         def load():
             nonlocal fast_pager
+            # Busy cursor
+            try:
+                from PySide6.QtWidgets import QApplication as _QA
+                from PySide6.QtCore import Qt as _Qt
+                _QA.setOverrideCursor(_Qt.WaitCursor)
+            except Exception:
+                _QA = None
             try:
                 fast_pager = bool(cb_fast_pager.isChecked())
             except Exception:
@@ -2457,6 +2466,12 @@ class MainWindow(QWidget):
                 # Áp dụng phân trang
                 page_size = int(page_size_box.currentText()) if page_size_box.currentText().isdigit() else 100
                 offset = state['page'] * page_size
+                # Ghi nhớ lựa chọn trước khi refresh
+                try:
+                    prev_row = table.currentRow()
+                    prev_id = table.item(prev_row,0).data(Qt.UserRole) if prev_row >= 0 else None
+                except Exception:
+                    prev_id = None
                 table.setRowCount(0)
                 # Xây dựng order_by theo sort_key
                 from sqlalchemy import func
@@ -2522,6 +2537,18 @@ class MainWindow(QWidget):
                         table.setItem(i, 6, it6)
                         table.setItem(i, 7, it7)
                         table.setItem(i, 8, it8)
+                    # Khôi phục lựa chọn
+                    try:
+                        sel = 0
+                        if prev_id is not None:
+                            for r in range(table.rowCount()):
+                                it = table.item(r,0)
+                                if it and it.data(Qt.UserRole) == prev_id:
+                                    sel = r; break
+                        if table.rowCount() > 0:
+                            table.setCurrentCell(sel, 0)
+                    except Exception:
+                        pass
                     page_label.setText(f"Trang {state['page']+1} (chế độ nhanh)")
                     btn_prev.setEnabled(state['page']>0)
                     btn_next.setEnabled(has_next)
@@ -2567,6 +2594,18 @@ class MainWindow(QWidget):
                         table.setItem(i, 6, it6)
                         table.setItem(i, 7, it7)
                         table.setItem(i, 8, it8)
+                    # Khôi phục lựa chọn
+                    try:
+                        sel = 0
+                        if prev_id is not None:
+                            for r in range(table.rowCount()):
+                                it = table.item(r,0)
+                                if it and it.data(Qt.UserRole) == prev_id:
+                                    sel = r; break
+                        if table.rowCount() > 0:
+                            table.setCurrentCell(sel, 0)
+                    except Exception:
+                        pass
                     # Cập nhật pager
                     page_label.setText(f"Trang {state['page']+1}/{max_page} ({state['total']} kết quả)")
                     btn_prev.setEnabled(state['page']>0)
@@ -2575,6 +2614,12 @@ class MainWindow(QWidget):
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
             finally:
                 db.close()
+                # Restore cursor
+                try:
+                    if _QA is not None:
+                        _QA.restoreOverrideCursor()
+                except Exception:
+                    pass
         def export_csv():
             try:
                 import csv
@@ -2760,6 +2805,13 @@ class MainWindow(QWidget):
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_copy_row.clicked.connect(copy_selected_row)
+        # Phím tắt: Ctrl+C copy dòng, Ctrl+Shift+C copy CSV
+        try:
+            from PySide6.QtGui import QShortcut, QKeySequence
+            qs_copy_row = QShortcut(QKeySequence.Copy, table); qs_copy_row.activated.connect(copy_selected_row)
+            qs_copy_all = QShortcut(QKeySequence("Ctrl+Shift+C"), table); qs_copy_all.activated.connect(copy_current_csv)
+        except Exception:
+            pass
         def go_prev():
             state['page'] = max(0, state['page'] - 1)
             load()
@@ -3162,6 +3214,86 @@ class MainWindow(QWidget):
                 QMessageBox.information(dlg, "Đã xuất", str(p))
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
+        def copy_current_saved_filter_to_clipboard():
+            try:
+                from .settings_service import get_setting
+                from PySide6.QtWidgets import QApplication
+                user_name_key = (self.current_user.get('username') or '').strip()
+                name = saved_filters_combo.currentText()
+                if not name or name.startswith("("):
+                    QMessageBox.information(dlg, "Chưa chọn", "Chọn một bộ lọc để copy")
+                    return
+                raw = get_setting(f"EMAIL_HISTORY_SAVED_FILTER:{user_name_key}:{name}", '') or ''
+                if not raw:
+                    QMessageBox.warning(dlg, "Không có", "Không tìm thấy nội dung bộ lọc")
+                    return
+                import json as _json
+                try:
+                    obj = _json.loads(raw)
+                    text = _json.dumps(obj, ensure_ascii=False, indent=2)
+                except Exception:
+                    text = raw
+                QApplication.clipboard().setText(text)
+                QMessageBox.information(dlg, "Đã copy", "Đã copy JSON bộ lọc vào clipboard")
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        def import_saved_filters_from_clipboard():
+            try:
+                from PySide6.QtWidgets import QApplication, QInputDialog, QMessageBox as _QMB
+                import json as _json
+                from .settings_service import get_setting, set_setting
+                user_name_key = (self.current_user.get('username') or '').strip()
+                txt = QApplication.clipboard().text() or ''
+                if not txt.strip():
+                    QMessageBox.information(dlg, "Clipboard trống", "Không có JSON trong clipboard")
+                    return
+                try:
+                    data = _json.loads(txt)
+                except Exception:
+                    QMessageBox.warning(dlg, "Không hợp lệ", "Clipboard không chứa JSON hợp lệ")
+                    return
+                # Nếu là một filter object, yêu cầu tên; nếu là dict {name:filter}
+                mapping = {}
+                if isinstance(data, dict) and any(k in data for k in ('type','status','sort_field')):
+                    name, ok = QInputDialog.getText(dlg, "Tên bộ lọc", "Nhập tên cho bộ lọc:")
+                    if not ok or not (name or '').strip():
+                        return
+                    mapping[(name or '').strip()] = data
+                elif isinstance(data, dict):
+                    mapping = data
+                else:
+                    QMessageBox.warning(dlg, "Không hỗ trợ", "Định dạng JSON không được hỗ trợ")
+                    return
+                # hỏi ghi đè hay giữ nguyên
+                overwrite = (_QMB.question(dlg, "Trùng tên", "Ghi đè nếu bộ lọc đã tồn tại?", _QMB.Yes|_QMB.No) == _QMB.Yes)
+                names_raw = get_setting(f"EMAIL_HISTORY_SAVED_LIST:{user_name_key}", '') or ''
+                names = []
+                if names_raw.strip():
+                    try:
+                        names = _json.loads(names_raw)
+                    except Exception:
+                        names = []
+                added = 0; updated = 0; skipped = 0
+                for n, val in (mapping or {}).items():
+                    key = f"EMAIL_HISTORY_SAVED_FILTER:{user_name_key}:{n}"
+                    exists = bool((get_setting(key, '') or '').strip())
+                    if exists and not overwrite:
+                        skipped += 1
+                        if n not in names:
+                            names.append(n)
+                        continue
+                    set_setting(key, _json.dumps(val, ensure_ascii=False) if not isinstance(val, str) else val)
+                    if exists:
+                        updated += 1
+                    else:
+                        added += 1
+                    if n not in names:
+                        names.append(n)
+                set_setting(f"EMAIL_HISTORY_SAVED_LIST:{user_name_key}", _json.dumps(names, ensure_ascii=False))
+                refresh_saved_combo()
+                QMessageBox.information(dlg, "Đã nhập", f"Thêm mới: {added}\nCập nhật: {updated}\nBỏ qua: {skipped}")
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_apply_saved.clicked.connect(load_saved_filter)
         btn_save_filter_as.clicked.connect(save_filter_as)
         btn_overwrite_saved.clicked.connect(overwrite_saved_filter)
@@ -3172,6 +3304,8 @@ class MainWindow(QWidget):
         btn_set_default.clicked.connect(set_default_saved_filter)
         btn_clear_default.clicked.connect(clear_default_saved_filter)
         btn_export_current.clicked.connect(export_current_saved_filter)
+        btn_copy_current.clicked.connect(copy_current_saved_filter_to_clipboard)
+        btn_import_clip.clicked.connect(import_saved_filters_from_clipboard)
         btn_export_saved.clicked.connect(export_saved_filters)
         btn_import_saved.clicked.connect(import_saved_filters)
         # chọn trên combobox sẽ tự tải bộ lọc
