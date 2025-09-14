@@ -1799,14 +1799,18 @@ class MainWindow(QWidget):
         subject_not = QLineEdit(); subject_not.setPlaceholderText("Subject không chứa…")
         subject_starts = QLineEdit(); subject_starts.setPlaceholderText("Subject bắt đầu với…")
         subject_ends = QLineEdit(); subject_ends.setPlaceholderText("Subject kết thúc với…")
-        recipients_contains = QLineEdit(); recipients_contains.setPlaceholderText("Recipients chứa…")
+        recipients_contains = QLineEdit(); recipients_contains.setPlaceholderText("Recipients chứa… (các tokens cách nhau bằng dấu phẩy)")
         recipients_eq = QLineEdit(); recipients_eq.setPlaceholderText("Recipients bằng…")
-        recipients_not = QLineEdit(); recipients_not.setPlaceholderText("Recipients không chứa…")
+        recipients_not = QLineEdit(); recipients_not.setPlaceholderText("Recipients không chứa… (các tokens cách nhau bằng dấu phẩy)")
+        recipients_all_tokens = QCheckBox("Recipients chứa tất cả tokens")
         body_search = QLineEdit(); body_search.setPlaceholderText("Body chứa…")
         body_not = QLineEdit(); body_not.setPlaceholderText("Body không chứa…")
+        body_len_min = QLineEdit(); body_len_min.setPlaceholderText("Body length >= (vd: 10)")
+        body_len_max = QLineEdit(); body_len_max.setPlaceholderText("Body length <= (vd: 1000)")
         attach_ext = QLineEdit(); attach_ext.setPlaceholderText("Đuôi tệp chứa (vd: .xlsx)")
-        attach_contains = QLineEdit(); attach_contains.setPlaceholderText("Tệp chứa… (chuỗi)")
-        attach_not = QLineEdit(); attach_not.setPlaceholderText("Tệp không chứa… (chuỗi)")
+        attach_contains = QLineEdit(); attach_contains.setPlaceholderText("Tệp chứa… (tokens cách nhau bằng dấu phẩy)")
+        attach_not = QLineEdit(); attach_not.setPlaceholderText("Tệp không chứa… (tokens cách nhau bằng dấu phẩy)")
+        attach_all_tokens = QCheckBox("Tệp chứa tất cả tokens")
         min_attachments = QLineEdit(); min_attachments.setPlaceholderText("Số tệp tối thiểu (vd: 2)")
         max_attachments = QLineEdit(); max_attachments.setPlaceholderText("Số tệp tối đa (vd: 3)")
         error_not = QLineEdit(); error_not.setPlaceholderText("Lỗi không chứa…")
@@ -1817,11 +1821,15 @@ class MainWindow(QWidget):
         f.addRow("Recipients chứa", recipients_contains)
         f.addRow("Recipients bằng", recipients_eq)
         f.addRow("Recipients không chứa", recipients_not)
+        f.addRow("", recipients_all_tokens)
         f.addRow("Body chứa", body_search)
         f.addRow("Body không chứa", body_not)
+        f.addRow("Body length >=", body_len_min)
+        f.addRow("Body length <=", body_len_max)
         f.addRow("Đuôi tệp chứa", attach_ext)
         f.addRow("Tệp chứa", attach_contains)
         f.addRow("Tệp không chứa", attach_not)
+        f.addRow("", attach_all_tokens)
         f.addRow("Số tệp tối thiểu", min_attachments)
         f.addRow("Số tệp tối đa", max_attachments)
         f.addRow("Lỗi chứa", error_search)
@@ -1860,6 +1868,8 @@ class MainWindow(QWidget):
         sort_asc_cb.toggled.connect(lambda _ : (save_filter(), state.__setitem__('page', 0), load()))
         has_body_cb.toggled.connect(lambda _ : (save_filter(), state.__setitem__('page', 0), load()))
         no_body_cb.toggled.connect(lambda _ : (save_filter(), state.__setitem__('page', 0), load()))
+        recipients_all_tokens.toggled.connect(lambda _ : (save_filter(), state.__setitem__('page', 0), load()))
+        attach_all_tokens.toggled.connect(lambda _ : (save_filter(), state.__setitem__('page', 0), load()))
         no_attach_cb.toggled.connect(lambda _ : (save_filter(), state.__setitem__('page', 0), load()))
         no_error_cb.toggled.connect(lambda _ : (save_filter(), state.__setitem__('page', 0), load()))
         f.addRow("", my_only_cb)
@@ -1975,7 +1985,7 @@ class MainWindow(QWidget):
         btn_view_zip = QPushButton("Xem ZIP")
         btn_open_files = QPushButton("Xem file")
         btn_open_folders = QPushButton("Mở thư mục file")
-        btn_open_exports = QPushButton("Mở exports")
+        btn_open_exports = QPushButton("Mở exports"); last_export_label = QLabel("")
         btn_copy_recip = QPushButton("Copy recipients")
         btn_delete = QPushButton("Xoá")
         btn_delete_all = QPushButton("Xoá tất cả (lọc)")
@@ -1992,6 +2002,16 @@ class MainWindow(QWidget):
         for b in (btn_refresh, btn_save_filter, btn_reset_filter, btn_export, btn_quick_export, btn_copy_csv, btn_copy_row, btn_export_recip, btn_export_att_list, btn_copy_att_paths, btn_export_zip, btn_view, btn_resend, btn_resend_all, btn_resend_group, btn_view_zip, btn_open_files, btn_open_folders, btn_open_exports, btn_open_last, btn_copy_recip, btn_copy_recip_all, btn_delete, btn_delete_all, btn_reset_cols):
             hb.addWidget(b)
         f.addRow(hb)
+        # Last export label
+        def _update_last_export_label():
+            try:
+                from .settings_service import get_setting as _gs
+                p = _gs(f"EMAIL_HISTORY_LAST_EXPORT:{(self.current_user.get('username') or '').strip()}", '') or ''
+                last_export_label.setText(p)
+            except Exception:
+                pass
+        _update_last_export_label()
+        f.addRow("File export gần nhất", last_export_label)
         def reset_columns():
             try:
                 # Đặt lại về mặc định và lưu
@@ -2261,6 +2281,16 @@ class MainWindow(QWidget):
                 attach_not.setText(obj.get('attach_not',''))
                 min_attachments.setText(str(obj.get('min_attachments','') or ''))
                 try:
+                    body_len_min.setText(str(obj.get('body_len_min','') or ''))
+                    body_len_max.setText(str(obj.get('body_len_max','') or ''))
+                except Exception:
+                    pass
+                try:
+                    recipients_all_tokens.setChecked(bool(obj.get('recipients_all_tokens', False)))
+                    attach_all_tokens.setChecked(bool(obj.get('attach_all_tokens', False)))
+                except Exception:
+                    pass
+                try:
                     max_attachments.setText(str(obj.get('max_attachments','') or ''))
                 except Exception:
                     pass
@@ -2370,8 +2400,12 @@ class MainWindow(QWidget):
                     'body_not': body_not.text().strip(),
                     'attach_ext': attach_ext.text().strip(),
                     'attach_contains': attach_contains.text().strip(),
-                    'attach_not': attach_not.text().strip(),
-'min_attachments': int(min_attachments.text()) if (min_attachments.text() or '').isdigit() else None,
+'attach_not': attach_not.text().strip(),
+                    'min_attachments': int(min_attachments.text()) if (min_attachments.text() or '').isdigit() else None,
+                    'body_len_min': int(body_len_min.text()) if (body_len_min.text() or '').isdigit() else None,
+                    'body_len_max': int(body_len_max.text()) if (body_len_max.text() or '').isdigit() else None,
+                    'recipients_all_tokens': recipients_all_tokens.isChecked(),
+                    'attach_all_tokens': attach_all_tokens.isChecked(),
                     'max_attachments': int(max_attachments.text()) if (max_attachments.text() or '').isdigit() else None,
                     'error': error_search.text().strip(),
                     'error_not': error_not.text().strip(),
@@ -2526,6 +2560,13 @@ class MainWindow(QWidget):
                 b = body_search.text().strip(); bn = body_not.text().strip()
                 if b: parts.append(f"Body chứa={b}")
                 if bn: parts.append(f"Body không chứa={bn}")
+                try:
+                    blmin = int(body_len_min.text()) if (body_len_min.text() or '').isdigit() else 0
+                    blmax = int(body_len_max.text()) if (body_len_max.text() or '').isdigit() else 0
+                except Exception:
+                    blmin = blmax = 0
+                if blmin: parts.append(f"Body>= {blmin}")
+                if blmax: parts.append(f"Body<= {blmax}")
                 if has_body_cb.isChecked(): parts.append("Có body")
                 if no_body_cb.isChecked(): parts.append("Không body")
                 if no_attach_cb.isChecked(): parts.append("Không tệp")
@@ -2641,6 +2682,15 @@ class MainWindow(QWidget):
                 if no_body_cb.isChecked():
                     from sqlalchemy import or_
                     q = q.filter(or_(EmailLog.body == None, EmailLog.body == ''))
+                # body length filters
+                try:
+                    from sqlalchemy import func as _func
+                    if (body_len_min.text() or '').isdigit():
+                        q = q.filter(_func.length(EmailLog.body) >= int(body_len_min.text()))
+                    if (body_len_max.text() or '').isdigit():
+                        q = q.filter(_func.length(EmailLog.body) <= int(body_len_max.text()))
+                except Exception:
+                    pass
                 if has_attach_cb.isChecked():
                     from sqlalchemy import or_
                     q = q.filter(EmailLog.attachments != None).filter(EmailLog.attachments != '')
@@ -2656,8 +2706,12 @@ class MainWindow(QWidget):
                     from sqlalchemy import or_ as _or
                     tokens = [t.strip() for t in ac.split(',') if t.strip()]
                     if tokens:
-                        cond = _or(*[EmailLog.attachments.ilike(f"%{t}%") for t in tokens])
-                        q = q.filter(cond)
+                        if attach_all_tokens.isChecked():
+                            for t in tokens:
+                                q = q.filter(EmailLog.attachments.ilike(f"%{t}%"))
+                        else:
+                            cond = _or(*[EmailLog.attachments.ilike(f"%{t}%") for t in tokens])
+                            q = q.filter(cond)
                     else:
                         q = q.filter(EmailLog.attachments.ilike(f"%{ac}%"))
                 if anot:
@@ -2688,8 +2742,12 @@ class MainWindow(QWidget):
                     from sqlalchemy import or_ as _or
                     tokens = [t.strip() for t in rc.split(',') if t.strip()]
                     if tokens:
-                        cond = _or(*[EmailLog.recipients.ilike(f"%{t}%") for t in tokens])
-                        q = q.filter(cond)
+                        if recipients_all_tokens.isChecked():
+                            for t in tokens:
+                                q = q.filter(EmailLog.recipients.ilike(f"%{t}%"))
+                        else:
+                            cond = _or(*[EmailLog.recipients.ilike(f"%{t}%") for t in tokens])
+                            q = q.filter(cond)
                     else:
                         q = q.filter(EmailLog.recipients.ilike(f"%{rc}%"))
                 if rnot:
@@ -2928,6 +2986,8 @@ class MainWindow(QWidget):
                     pass
                 QMessageBox.information(dlg, "Đã xuất", f"{outp}")
                 try: _set_last_export(outp)
+                except Exception: pass
+                try: _update_last_export_label()
                 except Exception: pass
                 try:
                     from PySide6.QtWidgets import QMessageBox as _QMB
@@ -4354,6 +4414,8 @@ class MainWindow(QWidget):
                                 pass
                     QMessageBox.information(dlg, "Đã xuất", f"{zip_path}")
                     try: _set_last_export(zip_path)
+                    except Exception: pass
+                    try: _update_last_export_label()
                     except Exception: pass
                     try:
                         from PySide6.QtWidgets import QMessageBox as _QMB
