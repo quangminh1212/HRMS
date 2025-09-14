@@ -1711,10 +1711,16 @@ class MainWindow(QWidget):
         btn_resend = QPushButton("Gửi lại")
         btn_resend_all = QPushButton("Gửi lại tất cả (lọc)")
         btn_resend_group = QPushButton("Gửi lại theo nhóm (đơn vị)")
+        btn_open_files = QPushButton("Xem file")
+        btn_open_folders = QPushButton("Mở thư mục file")
         btn_open_exports = QPushButton("Mở exports")
+        btn_copy_recip = QPushButton("Copy recipients")
         btn_delete = QPushButton("Xoá")
         btn_delete_all = QPushButton("Xoá tất cả (lọc)")
-        hb = QHBoxLayout(); hb.addWidget(btn_refresh); hb.addWidget(btn_export); hb.addWidget(btn_view); hb.addWidget(btn_resend); hb.addWidget(btn_resend_all); hb.addWidget(btn_resend_group); hb.addWidget(btn_open_exports); hb.addWidget(btn_delete); hb.addWidget(btn_delete_all); f.addRow(hb)
+        hb = QHBoxLayout();
+        for b in (btn_refresh, btn_export, btn_view, btn_resend, btn_resend_all, btn_resend_group, btn_open_files, btn_open_folders, btn_open_exports, btn_copy_recip, btn_delete, btn_delete_all):
+            hb.addWidget(b)
+        f.addRow(hb)
         lay.addLayout(f)
         # Bảng kết quả
         table = QTableWidget(0, 8)
@@ -1870,6 +1876,75 @@ class MainWindow(QWidget):
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_resend.clicked.connect(resend_selected)
+        def open_selected_files():
+            try:
+                i = table.currentRow()
+                if i < 0:
+                    QMessageBox.information(dlg, "Chưa chọn", "Chọn một dòng để mở file")
+                    return
+                import os, sys, subprocess
+                from pathlib import Path
+                attach_disp = table.item(i,5).data(Qt.UserRole) if table.item(i,5) else (table.item(i,5).text() if table.item(i,5) else '')
+                files = []
+                for part in (attach_disp or '').split(','):
+                    p = part.strip()
+                    if p and Path(p).exists():
+                        files.append(str(Path(p)))
+                if not files:
+                    QMessageBox.information(dlg, "Không có file", "Không có file hợp lệ để mở")
+                    return
+                for p in files:
+                    if sys.platform.startswith('win'):
+                        os.startfile(p)
+                    elif sys.platform == 'darwin':
+                        subprocess.Popen(['open', p])
+                    else:
+                        subprocess.Popen(['xdg-open', p])
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_open_files.clicked.connect(open_selected_files)
+        def open_selected_folders():
+            try:
+                i = table.currentRow()
+                if i < 0:
+                    QMessageBox.information(dlg, "Chưa chọn", "Chọn một dòng để mở thư mục")
+                    return
+                import os, sys, subprocess
+                from pathlib import Path
+                attach_disp = table.item(i,5).data(Qt.UserRole) if table.item(i,5) else (table.item(i,5).text() if table.item(i,5) else '')
+                folders = set()
+                for part in (attach_disp or '').split(','):
+                    p = part.strip()
+                    if p:
+                        fp = Path(p)
+                        if fp.exists():
+                            folders.add(str(fp.parent))
+                if not folders:
+                    QMessageBox.information(dlg, "Không có thư mục", "Không có thư mục hợp lệ để mở")
+                    return
+                for d in folders:
+                    if sys.platform.startswith('win'):
+                        os.startfile(d)
+                    elif sys.platform == 'darwin':
+                        subprocess.Popen(['open', d])
+                    else:
+                        subprocess.Popen(['xdg-open', d])
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_open_folders.clicked.connect(open_selected_folders)
+        def copy_recipients():
+            try:
+                i = table.currentRow()
+                if i < 0:
+                    QMessageBox.information(dlg, "Chưa chọn", "Chọn một dòng để copy recipients")
+                    return
+                from PySide6.QtWidgets import QApplication
+                txt = table.item(i,4).data(Qt.UserRole) if table.item(i,4) else (table.item(i,4).text() if table.item(i,4) else '')
+                QApplication.clipboard().setText(txt or '')
+                QMessageBox.information(dlg, "Đã copy", "Recipients đã được copy vào clipboard")
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_copy_recip.clicked.connect(copy_recipients)
         def open_exports():
             try:
                 import os, sys, subprocess

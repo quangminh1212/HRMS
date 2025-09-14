@@ -220,12 +220,6 @@ def schedule_jobs():
         finally:
             db.close()
 
-                export_contracts_expiring_to_excel(db, today, end, str(outu), unit_id=u.id)
-                send_email_with_attachment('[HRMS] HĐ sắp hết hạn theo đơn vị', f'Đính kèm HĐ sắp hết hạn trong {days} ngày tới - {u.name}', [str(outu)], to=recips)
-        except Exception:
-            pass
-        finally:
-            db.close()
 
 
     # Hợp đồng hết hạn trong N ngày tới
