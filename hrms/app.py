@@ -1733,7 +1733,9 @@ class MainWindow(QWidget):
         f = QFormLayout();
         from PySide6.QtWidgets import QLineEdit, QComboBox, QPushButton, QDateEdit, QCheckBox
         type_box = QComboBox(); type_box.addItems(["(Tất cả)", "salary_due", "bhxh_monthly", "contracts_expiring", "quick_report", "retirement", "generic"])
+        type_not_box = QComboBox(); type_not_box.addItems(["(Không)", "salary_due", "bhxh_monthly", "contracts_expiring", "quick_report", "retirement", "generic"])
         unit_edit = QLineEdit(); unit_edit.setPlaceholderText("Đơn vị chứa…")
+        unit_not_edit = QLineEdit(); unit_not_edit.setPlaceholderText("Đơn vị không chứa…")
         unit_box = QComboBox(); unit_box.addItem("(Tất cả)")
         def reload_units():
             try:
@@ -1779,7 +1781,9 @@ class MainWindow(QWidget):
         # Preset nhanh cho khoảng thời gian
         date_preset = QComboBox(); date_preset.addItems(["(Tuỳ chỉnh)", "Hôm nay", "Hôm qua", "7 ngày", "30 ngày", "90 ngày", "7 ngày qua", "30 ngày qua", "Tuần này", "Tuần trước", "Tháng đến nay", "Tháng này", "Tháng trước", "Quý đến nay", "Quý này", "Quý trước", "Năm đến nay", "Năm nay", "Năm trước"])
         f.addRow("Loại", type_box)
+        f.addRow("Loại khác", type_not_box)
         f.addRow("Đơn vị", unit_edit)
+        f.addRow("Đơn vị không chứa", unit_not_edit)
         from PySide6.QtWidgets import QHBoxLayout as _HB, QPushButton as _PB
         _unit_row = _HB(); _unit_row.addWidget(unit_box); _btn_reload_units = _PB("Tải lại")
         _btn_reload_units.clicked.connect(reload_units)
@@ -1955,7 +1959,7 @@ class MainWindow(QWidget):
         saved_filters_combo = QComboBox(); saved_filters_combo.addItem("(Chưa có)")
         btn_apply_saved = QPushButton("Áp dụng")
         btn_save_filter_as = QPushButton("Lưu tên…"); btn_save_and_default = QPushButton("Lưu+Mặc định"); btn_overwrite_saved = QPushButton("Ghi đè"); btn_load_saved = QPushButton("Tải"); btn_delete_saved = QPushButton("Xoá"); btn_rename_saved = QPushButton("Đổi tên"); btn_dup_saved = QPushButton("Nhân bản"); btn_set_default = QPushButton("Mặc định"); btn_clear_default = QPushButton("Bỏ mặc định"); btn_export_current = QPushButton("Export chọn"); btn_copy_current = QPushButton("Copy JSON"); btn_import_clip = QPushButton("Nhập clipboard"); btn_export_saved = QPushButton("Export JSON"); btn_import_saved = QPushButton("Nhập JSON"); btn_load_current_json = QPushButton("Tải JSON")
-        row_saved = QHBoxLayout(); row_saved.addWidget(QLabel("Bộ lọc đã lưu")); row_saved.addWidget(saved_filters_combo); row_saved.addWidget(btn_apply_saved); row_saved.addWidget(btn_save_filter_as); row_saved.addWidget(btn_save_and_default); row_saved.addWidget(btn_overwrite_saved); row_saved.addWidget(btn_load_saved); row_saved.addWidget(btn_delete_saved); row_saved.addWidget(btn_rename_saved); row_saved.addWidget(btn_dup_saved); row_saved.addWidget(btn_set_default); row_saved.addWidget(btn_clear_default); row_saved.addWidget(btn_export_current); row_saved.addWidget(btn_copy_current); row_saved.addWidget(btn_import_clip); row_saved.addWidget(btn_export_saved); row_saved.addWidget(btn_import_saved); row_saved.addWidget(btn_load_current_json)
+        row_saved = QHBoxLayout(); row_saved.addWidget(QLabel("Bộ lọc đã lưu")); row_saved.addWidget(saved_filters_combo); row_saved.addWidget(btn_apply_saved); row_saved.addWidget(btn_save_filter_as); row_saved.addWidget(btn_save_and_default); row_saved.addWidget(btn_overwrite_saved); row_saved.addWidget(btn_load_saved); row_saved.addWidget(btn_delete_saved); row_saved.addWidget(btn_rename_saved); row_saved.addWidget(btn_dup_saved); row_saved.addWidget(btn_set_default); row_saved.addWidget(btn_clear_default); row_saved.addWidget(btn_export_current); row_saved.addWidget(btn_copy_current); row_saved.addWidget(btn_import_clip); row_saved.addWidget(btn_export_saved); row_saved.addWidget(btn_import_saved); row_saved.addWidget(btn_load_current_json); btn_save_type_default = QPushButton("Mặc định loại"); row_saved.addWidget(btn_save_type_default)
         # tooltips
         try:
             saved_filters_combo.setToolTip("Chọn một bộ lọc đã lưu")
@@ -1975,6 +1979,7 @@ class MainWindow(QWidget):
             btn_export_saved.setToolTip("Xuất tất cả bộ lọc đã lưu ra JSON")
             btn_import_saved.setToolTip("Nhập nhiều bộ lọc từ JSON")
             btn_load_current_json.setToolTip("Tải JSON làm bộ lọc hiện tại (không lưu)")
+            btn_save_type_default.setToolTip("Lưu bộ lọc hiện tại làm mặc định cho loại đang chọn")
         except Exception:
             pass
         f.addRow(row_saved)
@@ -2224,6 +2229,12 @@ class MainWindow(QWidget):
                 t = obj.get('type')
                 if t and t in [type_box.itemText(i) for i in range(type_box.count())]:
                     type_box.setCurrentText(t)
+                try:
+                    tnot = obj.get('type_not')
+                    if tnot and tnot in [type_not_box.itemText(i) for i in range(type_not_box.count())]:
+                        type_not_box.setCurrentText(tnot)
+                except Exception:
+                    pass
                 # sort field
                 try:
                     sf = obj.get('sort_field')
@@ -2256,6 +2267,10 @@ class MainWindow(QWidget):
                     unit_box.setCurrentText(usel)
                 # unit contains
                 unit_edit.setText(obj.get('unit_contains',''))
+                try:
+                    unit_not_edit.setText(obj.get('unit_not_contains',''))
+                except Exception:
+                    pass
                 # status
                 st = obj.get('status')
                 if st and st in [status_box.itemText(i) for i in range(status_box.count())]:
@@ -2383,9 +2398,11 @@ class MainWindow(QWidget):
                     except Exception:
                         return None
                 obj = {
-                    'type': type_box.currentText(),
+'type': type_box.currentText(),
+                    'type_not': type_not_box.currentText(),
                     'unit_selected': unit_box.currentText() if unit_box.currentIndex()>0 else '',
                     'unit_contains': unit_edit.text().strip(),
+                    'unit_not_contains': unit_not_edit.text().strip(),
                     'status': status_box.currentText(),
 'only_failed': only_failed.isChecked(),
                     'only_success': only_success.isChecked(),
@@ -2516,6 +2533,28 @@ class MainWindow(QWidget):
             date_preset.currentTextChanged.connect(lambda _ : (apply_preset(date_preset.currentText()), save_filter(), state.__setitem__('page', 0), load()))
         except Exception:
             pass
+        # Debounce auto-refresh for text inputs
+        refresh_timer = QTimer(dlg); refresh_timer.setSingleShot(True)
+        def _do_refresh():
+            try:
+                save_filter()
+            except Exception:
+                pass
+            state['page'] = 0; load()
+        try:
+            refresh_timer.timeout.connect(_do_refresh)
+        except Exception:
+            pass
+        def schedule_refresh():
+            try:
+                refresh_timer.start(400)
+            except Exception:
+                pass
+        for _inp in (unit_edit, unit_not_edit, subject_search, subject_eq, subject_regex, subject_not, subject_starts, subject_ends, recipients_contains, recipients_eq, recipients_not, body_search, body_not, attach_ext, attach_contains, attach_not, min_attachments, max_attachments, body_len_min, body_len_max, error_search, error_not):
+            try:
+                _inp.textChanged.connect(lambda _ : schedule_refresh())
+            except Exception:
+                pass
         load_filter()
         # Tải dữ liệu
         def load():
@@ -2628,6 +2667,12 @@ class MainWindow(QWidget):
                 t = type_box.currentText();
                 if not t.startswith("("):
                     q = q.filter(EmailLog.type == t)
+                try:
+                    tnot = type_not_box.currentText()
+                    if tnot and not tnot.startswith('('):
+                        q = q.filter(EmailLog.type != tnot)
+                except Exception:
+                    pass
                 u_sel = unit_box.currentText().strip() if unit_box.currentIndex() > -1 else ""
                 if u_sel and not u_sel.startswith("("):
                     q = q.filter(EmailLog.unit_name == u_sel)
@@ -2635,6 +2680,13 @@ class MainWindow(QWidget):
                     u = unit_edit.text().strip();
                     if u:
                         q = q.filter(EmailLog.unit_name.ilike(f"%{u}%"))
+                # unit not contains
+                try:
+                    unot = unit_not_edit.text().strip()
+                    if unot:
+                        q = q.filter(~EmailLog.unit_name.ilike(f"%{unot}%"))
+                except Exception:
+                    pass
                 st = status_box.currentText();
                 if only_failed.isChecked():
                     q = q.filter(EmailLog.status == 'failed')
@@ -3676,6 +3728,45 @@ class MainWindow(QWidget):
         btn_save_filter_as.clicked.connect(save_filter_as)
         btn_save_and_default.clicked.connect(save_and_set_default)
         btn_overwrite_saved.clicked.connect(overwrite_saved_filter)
+        def save_type_default():
+            try:
+                # ensure saved
+                try: save_filter()
+                except Exception: pass
+                from .settings_service import get_setting, set_setting
+                import json as _json
+                ukey = (self.current_user.get('username') or '').strip()
+                tval = type_box.currentText().strip()
+                if not tval or tval.startswith('('):
+                    QMessageBox.information(dlg, "Chưa chọn loại", "Chọn một loại cụ thể để lưu mặc định")
+                    return
+                val = get_setting(f"EMAIL_HISTORY_FILTER:{ukey}", '') or ''
+                if not val:
+                    return
+                set_setting(f"EMAIL_HISTORY_TYPE_DEFAULT:{ukey}:{tval}", val)
+                QMessageBox.information(dlg, "Đã lưu", f"Đã lưu mặc định cho loại: {tval}")
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_save_type_default.clicked.connect(save_type_default)
+        def _apply_type_default():
+            try:
+                from .settings_service import get_setting, set_setting
+                import json as _json
+                ukey = (self.current_user.get('username') or '').strip()
+                tval = type_box.currentText().strip()
+                if not tval or tval.startswith('('):
+                    return
+                raw = get_setting(f"EMAIL_HISTORY_TYPE_DEFAULT:{ukey}:{tval}", '') or ''
+                if not raw:
+                    return
+                set_setting(f"EMAIL_HISTORY_FILTER:{ukey}", raw)
+                load_filter(); state['page'] = 0; load()
+            except Exception:
+                pass
+        try:
+            type_box.currentTextChanged.connect(lambda _ : _apply_type_default())
+        except Exception:
+            pass
         btn_load_saved.clicked.connect(load_saved_filter)
         btn_delete_saved.clicked.connect(delete_saved_filter)
         btn_rename_saved.clicked.connect(rename_saved_filter)
