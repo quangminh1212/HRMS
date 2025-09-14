@@ -1655,7 +1655,7 @@ class MainWindow(QWidget):
         if role not in ('admin','hr'):
             QMessageBox.warning(self, "Không có quyền", "Chỉ admin/HR mới truy cập")
             return
-        from PySide6.QtWidgets import QDialog, QFormLayout, QTableWidget, QTableWidgetItem, QPushButton, QCheckBox, QFileDialog, QComboBox
+        from PySide6.QtWidgets import QDialog, QFormLayout, QTableWidget, QTableWidgetItem, QPushButton, QCheckBox, QFileDialog, QComboBox, QLabel, QHBoxLayout
         dlg = QDialog(self); dlg.setWindowTitle("Lịch sử Email")
         lay = QVBoxLayout(dlg)
         # Bộ lọc
@@ -1708,9 +1708,16 @@ class MainWindow(QWidget):
         f.addRow("Thời gian", h)
         user_id_edit = QLineEdit(); user_id_edit.setPlaceholderText("User ID")
         f.addRow("User ID", user_id_edit)
+        # Phân trang
+        pager_bar = QHBoxLayout()
+        page_size_box = QComboBox(); page_size_box.addItems(["100","200","500"]) ; page_size_box.setCurrentText("100")
+        btn_prev = QPushButton("◀ Trước"); btn_next = QPushButton("Sau ▶"); page_label = QLabel("Trang 1/1")
+        pager_bar.addWidget(QLabel("Kích thước trang")); pager_bar.addWidget(page_size_box); pager_bar.addWidget(btn_prev); pager_bar.addWidget(btn_next); pager_bar.addWidget(page_label)
+        f.addRow(pager_bar)
         btn_resend = QPushButton("Gửi lại")
         btn_resend_all = QPushButton("Gửi lại tất cả (lọc)")
         btn_resend_group = QPushButton("Gửi lại theo nhóm (đơn vị)")
+        btn_view_zip = QPushButton("Xem ZIP")
         btn_open_files = QPushButton("Xem file")
         btn_open_folders = QPushButton("Mở thư mục file")
         btn_open_exports = QPushButton("Mở exports")
@@ -1718,7 +1725,7 @@ class MainWindow(QWidget):
         btn_delete = QPushButton("Xoá")
         btn_delete_all = QPushButton("Xoá tất cả (lọc)")
         hb = QHBoxLayout();
-        for b in (btn_refresh, btn_save_filter, btn_export, btn_view, btn_resend, btn_resend_all, btn_resend_group, btn_open_files, btn_open_folders, btn_open_exports, btn_copy_recip, btn_delete, btn_delete_all):
+        for b in (btn_refresh, btn_save_filter, btn_export, btn_view, btn_resend, btn_resend_all, btn_resend_group, btn_view_zip, btn_open_files, btn_open_folders, btn_open_exports, btn_copy_recip, btn_delete, btn_delete_all):
             hb.addWidget(b)
         f.addRow(hb)
         lay.addLayout(f)
@@ -1726,6 +1733,8 @@ class MainWindow(QWidget):
         table = QTableWidget(0, 8)
         table.setHorizontalHeaderLabels(["Thời gian", "Loại", "Đơn vị", "Subject", "Recipients", "Tệp đính kèm", "Trạng thái", "Lỗi"])
         lay.addWidget(table)
+        # Trạng thái phân trang
+        state = {'page': 0, 'total': 0}
         # Khôi phục bộ lọc theo user
         def load_filter():
             try:
@@ -1828,10 +1837,23 @@ class MainWindow(QWidget):
                     td = to_date.date()
                     from datetime import datetime as _dt
                     q = q.filter(EmailLog.created_at <= _dt(td.year(), td.month(), td.day(), 23, 59, 59))
-                rows = q.limit(1000).all()
+                # Áp dụng phân trang
+                page_size = int(page_size_box.currentText()) if page_size_box.currentText().isdigit() else 100
+                state['total'] = q.count()
+                max_page = max(1, (state['total'] - 1)//page_size + 1)
+                if state['page'] >= max_page:
+                    state['page'] = max_page - 1
+                if state['page'] < 0:
+                    state['page'] = 0
+                offset = state['page'] * page_size
+                rows = q.order_by(EmailLog.created_at.desc()).limit(page_size).offset(offset).all()
                 table.setRowCount(0)
                 for r in rows:
                     i = table.rowCount(); table.insertRow(i)
+                # Cập nhật pager
+                page_label.setText(f"Trang {state['page']+1}/{max_page} ({state['total']} kết quả)")
+                btn_prev.setEnabled(state['page']>0)
+                btn_next.setEnabled(state['page']<max_page-1)
                     it0 = QTableWidgetItem(str(getattr(r, 'created_at', '')))
                     it0.setData(Qt.UserRole, getattr(r, 'id', None))
                     it1 = QTableWidgetItem(getattr(r, 'type', '') or '')
@@ -1874,7 +1896,17 @@ class MainWindow(QWidget):
                 QMessageBox.information(dlg, "Đã xuất", f"{outp}")
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
-        btn_refresh.clicked.connect(lambda: (save_filter(), load()))
+        def go_prev():
+            state['page'] = max(0, state['page'] - 1)
+            load()
+        def go_next():
+            # sẽ được giới hạn trong load
+            state['page'] += 1
+            load()
+        btn_prev.clicked.connect(go_prev)
+        btn_next.clicked.connect(go_next)
+        page_size_box.currentTextChanged.connect(lambda _ : (state.__setitem__('page', 0), load()))
+        btn_refresh.clicked.connect(lambda: (save_filter(), state.__setitem__('page', 0), load()))
         btn_save_filter.clicked.connect(save_filter)
         btn_export.clicked.connect(export_csv)
         def view_detail():
@@ -1968,6 +2000,39 @@ class MainWindow(QWidget):
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_open_files.clicked.connect(open_selected_files)
+        def view_zip_contents():
+            try:
+                i = table.currentRow()
+                if i < 0:
+                    QMessageBox.information(dlg, "Chưa chọn", "Chọn một dòng để xem ZIP")
+                    return
+                from pathlib import Path
+                attach_disp = table.item(i,5).data(Qt.UserRole) if table.item(i,5) else (table.item(i,5).text() if table.item(i,5) else '')
+                zips = []
+                for part in (attach_disp or '').split(','):
+                    p = part.strip()
+                    if p and p.lower().endswith('.zip') and Path(p).exists():
+                        zips.append(Path(p))
+                if not zips:
+                    QMessageBox.information(dlg, "Không có ZIP", "Không có file ZIP hợp lệ trong đính kèm")
+                    return
+                # Hiển thị nội dung của ZIP đầu tiên
+                import zipfile
+                with zipfile.ZipFile(str(zips[0]), 'r') as zf:
+                    infos = zf.infolist()
+                from PySide6.QtWidgets import QDialog as _QD, QVBoxLayout as _QV, QTableWidget as _QT, QTableWidgetItem as _QTI
+                d = _QD(dlg); d.setWindowTitle(f"Nội dung ZIP: {zips[0].name}")
+                lay2 = _QV(d)
+                t = _QT(0, 3); t.setHorizontalHeaderLabels(["Tên", "Kích thước", "Nén"]) ; lay2.addWidget(t)
+                for inf in infos:
+                    j = t.rowCount(); t.insertRow(j)
+                    t.setItem(j, 0, _QTI(inf.filename))
+                    t.setItem(j, 1, _QTI(str(inf.file_size)))
+                    t.setItem(j, 2, _QTI(str(inf.compress_size)))
+                d.resize(600, 400); d.exec()
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_view_zip.clicked.connect(view_zip_contents)
         def open_selected_folders():
             try:
                 i = table.currentRow()
