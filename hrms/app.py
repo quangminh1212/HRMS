@@ -1785,8 +1785,12 @@ class MainWindow(QWidget):
             hb.addWidget(b)
         f.addRow(hb)
         # Thanh thống kê
-        stats_bar = QHBoxLayout(); btn_stats = QPushButton("Thống kê"); stats_label = QLabel("")
-        stats_bar.addWidget(btn_stats); stats_bar.addWidget(stats_label)
+        stats_bar = QHBoxLayout(); btn_stats = QPushButton("Thống kê"); btn_stats_detail = QPushButton("Thống kê chi tiết"); btn_copy_stats = QPushButton("Copy"); stats_label = QLabel("")
+        try:
+            stats_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        except Exception:
+            pass
+        stats_bar.addWidget(btn_stats); stats_bar.addWidget(btn_stats_detail); stats_bar.addWidget(btn_copy_stats); stats_bar.addWidget(stats_label)
         f.addRow(stats_bar)
         lay.addLayout(f)
         # Bảng kết quả
@@ -2178,6 +2182,118 @@ class MainWindow(QWidget):
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_stats.clicked.connect(compute_stats)
+        def copy_stats():
+            try:
+                QApplication.clipboard().setText(stats_label.text() or '')
+                # Audit
+                try:
+                    from .db import SessionLocal as _SL
+                    log_action(_SL(), self.current_user.get('id'), 'ui_email_history_copy_stats', 'EmailLog', None, '')
+                except Exception:
+                    pass
+                QMessageBox.information(dlg, "Đã copy", "Đã copy thống kê vào clipboard")
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_copy_stats.clicked.connect(copy_stats)
+        def show_stats_detail():
+            try:
+                from .db import SessionLocal as _SL
+                from .models import EmailLog as _EL
+                from sqlalchemy import func
+                s = _SL()
+                try:
+                    # Xây dựng điều kiện lọc giống compute_stats
+                    conds = []
+                    t = type_box.currentText()
+                    if not t.startswith("("):
+                        conds.append(_EL.type == t)
+                    u_sel = unit_box.currentText().strip() if unit_box.currentIndex() > -1 else ""
+                    if u_sel and not u_sel.startswith("("):
+                        conds.append(_EL.unit_name == u_sel)
+                    else:
+                        u = unit_edit.text().strip()
+                        if u:
+                            conds.append(_EL.unit_name.ilike(f"%{u}%"))
+                    st = status_box.currentText()
+                    if only_failed.isChecked():
+                        conds.append(_EL.status == 'failed')
+                    elif not st.startswith("("):
+                        conds.append(_EL.status == st)
+                    subj = subject_search.text().strip()
+                    if subj:
+                        conds.append(_EL.subject.ilike(f"%{subj}%"))
+                    uidtxt = user_id_edit.text().strip()
+                    if uidtxt.isdigit():
+                        conds.append(_EL.user_id == int(uidtxt))
+                    from datetime import datetime as _dt2
+                    if e_from.isChecked():
+                        fd = from_date.date(); conds.append(_EL.created_at >= _dt2(fd.year(), fd.month(), fd.day(), 0, 0, 0))
+                    if e_to.isChecked():
+                        td = to_date.date(); conds.append(_EL.created_at <= _dt2(td.year(), td.month(), td.day(), 23, 59, 59))
+                    # Truy vấn nhóm theo đơn vị
+                    q_unit = s.query(_EL.unit_name, _EL.type, _EL.status, func.count(1)).filter(*conds).group_by(_EL.unit_name, _EL.type, _EL.status).order_by(func.count(1).desc())
+                    # Truy vấn nhóm theo ngày
+                    day_col = func.date(_EL.created_at)
+                    q_day = s.query(day_col, _EL.type, _EL.status, func.count(1)).filter(*conds).group_by(day_col, _EL.type, _EL.status).order_by(day_col.desc())
+                    # Hiển thị dialog bảng
+                    from PySide6.QtWidgets import QDialog as _QD, QVBoxLayout as _QV, QTabWidget as _QTW, QTableWidget as _QT, QTableWidgetItem as _QTI, QPushButton as _QP, QHBoxLayout as _QH
+                    d = _QD(dlg); d.setWindowTitle("Thống kê chi tiết")
+                    lay2 = _QV(d)
+                    tabs = _QTW(d)
+                    lay2.addWidget(tabs)
+                    tbl1 = _QT(0,4); tbl1.setHorizontalHeaderLabels(["Đơn vị", "Loại", "Trạng thái", "Số lượng"])
+                    for unit_name, typ, stt, cnt in q_unit.all():
+                        r = tbl1.rowCount(); tbl1.insertRow(r)
+                        tbl1.setItem(r,0,_QTI(str(unit_name or '')))
+                        tbl1.setItem(r,1,_QTI(str(typ or '')))
+                        tbl1.setItem(r,2,_QTI(str(stt or '')))
+                        tbl1.setItem(r,3,_QTI(str(cnt or 0)))
+                    tbl2 = _QT(0,4); tbl2.setHorizontalHeaderLabels(["Ngày", "Loại", "Trạng thái", "Số lượng"])
+                    for day, typ, stt, cnt in q_day.all():
+                        r = tbl2.rowCount(); tbl2.insertRow(r)
+                        tbl2.setItem(r,0,_QTI(str(day or '')))
+                        tbl2.setItem(r,1,_QTI(str(typ or '')))
+                        tbl2.setItem(r,2,_QTI(str(stt or '')))
+                        tbl2.setItem(r,3,_QTI(str(cnt or 0)))
+                    tabs.addTab(tbl1, "Theo đơn vị")
+                    tabs.addTab(tbl2, "Theo ngày")
+                    # Nút copy CSV
+                    bar = _QH(); btn_copy = _QP("Copy CSV"); bar.addWidget(btn_copy)
+                    lay2.addLayout(bar)
+                    def do_copy_csv():
+                        try:
+                            cur = tabs.currentWidget()
+                            if not isinstance(cur, _QT):
+                                return
+                            import csv
+                            import io
+                            buf = io.StringIO()
+                            w = csv.writer(buf)
+                            # header
+                            headers = [cur.horizontalHeaderItem(c).text() if cur.horizontalHeaderItem(c) else '' for c in range(cur.columnCount())]
+                            w.writerow(headers)
+                            for r in range(cur.rowCount()):
+                                row = []
+                                for c in range(cur.columnCount()):
+                                    it = cur.item(r,c)
+                                    row.append(it.text() if it else '')
+                                w.writerow(row)
+                            QApplication.clipboard().setText(buf.getvalue())
+                            QMessageBox.information(d, "Đã copy", "Đã copy CSV vào clipboard")
+                        except Exception as ex2:
+                            QMessageBox.critical(d, "Lỗi", str(ex2))
+                    btn_copy.clicked.connect(do_copy_csv)
+                    # Audit
+                    try:
+                        log_action(_SL(), self.current_user.get('id'), 'ui_email_history_stats_detail', 'EmailLog', None, '')
+                    except Exception:
+                        pass
+                    d.resize(800, 500); d.exec()
+                finally:
+                    s.close()
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_stats_detail.clicked.connect(show_stats_detail)
         def export_failed_csv():
             try:
                 import csv
