@@ -1768,7 +1768,7 @@ class MainWindow(QWidget):
         e_from = QCheckBox("Áp dụng"); e_to = QCheckBox("Áp dụng")
         btn_refresh = QPushButton("Làm mới"); btn_export = QPushButton("Export CSV"); btn_view = QPushButton("Xem chi tiết"); btn_save_filter = QPushButton("Lưu bộ lọc"); btn_reset_filter = QPushButton("Reset bộ lọc"); btn_export_zip = QPushButton("Export ZIP")
         # Preset nhanh cho khoảng thời gian
-        date_preset = QComboBox(); date_preset.addItems(["(Tuỳ chỉnh)", "7 ngày", "30 ngày", "90 ngày", "7 ngày qua", "30 ngày qua", "Tuần này", "Tuần trước", "Tháng này", "Tháng trước", "Quý này", "Quý trước", "Năm nay", "Năm trước"])
+        date_preset = QComboBox(); date_preset.addItems(["(Tuỳ chỉnh)", "7 ngày", "30 ngày", "90 ngày", "7 ngày qua", "30 ngày qua", "Tuần này", "Tuần trước", "Tháng này", "Tháng trước", "Quý đến nay", "Quý này", "Quý trước", "Năm đến nay", "Năm nay", "Năm trước"])
         f.addRow("Loại", type_box)
         f.addRow("Đơn vị", unit_edit)
         from PySide6.QtWidgets import QHBoxLayout as _HB, QPushButton as _PB
@@ -1789,6 +1789,8 @@ class MainWindow(QWidget):
         body_search = QLineEdit(); body_search.setPlaceholderText("Body chứa…")
         body_not = QLineEdit(); body_not.setPlaceholderText("Body không chứa…")
         attach_ext = QLineEdit(); attach_ext.setPlaceholderText("Đuôi tệp chứa (vd: .xlsx)")
+        attach_contains = QLineEdit(); attach_contains.setPlaceholderText("Tệp chứa… (chuỗi)")
+        attach_not = QLineEdit(); attach_not.setPlaceholderText("Tệp không chứa… (chuỗi)")
         min_attachments = QLineEdit(); min_attachments.setPlaceholderText("Số tệp tối thiểu (vd: 2)")
         error_not = QLineEdit(); error_not.setPlaceholderText("Lỗi không chứa…")
         f.addRow("Subject regex", subject_regex)
@@ -1800,6 +1802,8 @@ class MainWindow(QWidget):
         f.addRow("Body chứa", body_search)
         f.addRow("Body không chứa", body_not)
         f.addRow("Đuôi tệp chứa", attach_ext)
+        f.addRow("Tệp chứa", attach_contains)
+        f.addRow("Tệp không chứa", attach_not)
         f.addRow("Số tệp tối thiểu", min_attachments)
         f.addRow("Lỗi chứa", error_search)
         f.addRow("Lỗi không chứa", error_not)
@@ -1888,6 +1892,13 @@ class MainWindow(QWidget):
             pass
         stats_bar.addWidget(btn_stats); stats_bar.addWidget(btn_stats_detail); stats_bar.addWidget(btn_copy_stats); stats_bar.addWidget(stats_label)
         f.addRow(stats_bar)
+        # Nhãn tóm tắt bộ lọc
+        filter_summary_label = QLabel("")
+        try:
+            filter_summary_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        except Exception:
+            pass
+        f.addRow("Bộ lọc", filter_summary_label)
         lay.addLayout(f)
         # Bảng kết quả
         table = QTableWidget(0, 9)
@@ -1951,6 +1962,8 @@ class MainWindow(QWidget):
                 body_search.setText(obj.get('body',''))
                 body_not.setText(obj.get('body_not',''))
                 attach_ext.setText(obj.get('attach_ext',''))
+                attach_contains.setText(obj.get('attach_contains',''))
+                attach_not.setText(obj.get('attach_not',''))
                 min_attachments.setText(str(obj.get('min_attachments','') or ''))
                 error_search.setText(obj.get('error',''))
                 error_not.setText(obj.get('error_not',''))
@@ -2038,6 +2051,8 @@ class MainWindow(QWidget):
                     'body': body_search.text().strip(),
                     'body_not': body_not.text().strip(),
                     'attach_ext': attach_ext.text().strip(),
+                    'attach_contains': attach_contains.text().strip(),
+                    'attach_not': attach_not.text().strip(),
                     'min_attachments': int(min_attachments.text()) if (min_attachments.text() or '').isdigit() else None,
                     'error': error_search.text().strip(),
                     'error_not': error_not.text().strip(),
@@ -2095,6 +2110,12 @@ class MainWindow(QWidget):
                     start = _date(year, month, 1)
                     from calendar import monthrange as _mr
                     end = _date(year, month, _mr(year, month)[1])
+                elif name == 'Quý đến nay':
+                    try:
+                        s, e = quarter_window(today)
+                        start, end = s, today
+                    except Exception:
+                        return
                 elif name == 'Quý này':
                     try:
                         s, e = quarter_window(today)
@@ -2111,6 +2132,8 @@ class MainWindow(QWidget):
                     from calendar import monthrange as _mr2
                     start = _date(year, sm, 1)
                     end = _date(year, sm+2, _mr2(year, sm+2)[1])
+                elif name == 'Năm đến nay':
+                    start = _date(today.year, 1, 1); end = today
                 elif name == 'Năm nay':
                     start = _date(today.year, 1, 1); end = _date(today.year, 12, 31)
                 elif name == 'Năm trước':
@@ -2132,6 +2155,56 @@ class MainWindow(QWidget):
             nonlocal fast_pager
             try:
                 fast_pager = bool(cb_fast_pager.isChecked())
+            except Exception:
+                pass
+            # Cập nhật tóm tắt bộ lọc
+            try:
+                parts = []
+                t0 = type_box.currentText();
+                if not (t0 or '').startswith('('): parts.append(f"Loại={t0}")
+                u_sel = unit_box.currentText().strip() if unit_box.currentIndex() > -1 else ""
+                if u_sel and not u_sel.startswith('('): parts.append(f"Đơn vị={u_sel}")
+                else:
+                    u = unit_edit.text().strip()
+                    if u: parts.append(f"Đơn vị chứa={u}")
+                st0 = status_box.currentText();
+                if only_failed.isChecked(): parts.append("Chỉ lỗi")
+                elif not st0.startswith('('): parts.append(f"Trạng thái={st0}")
+                subj0 = subject_search.text().strip()
+                if subj0: parts.append(f"Tiêu đề chứa={subj0}")
+                sr = subject_regex.text().strip()
+                if sr: parts.append("Tiêu đề=regex")
+                sn = subject_not.text().strip()
+                if sn: parts.append(f"Tiêu đề không chứa={sn}")
+                rc = recipients_contains.text().strip(); rn = recipients_not.text().strip()
+                if rc: parts.append(f"Recipients chứa={rc}")
+                if rn: parts.append(f"Recipients không chứa={rn}")
+                b = body_search.text().strip(); bn = body_not.text().strip()
+                if b: parts.append(f"Body chứa={b}")
+                if bn: parts.append(f"Body không chứa={bn}")
+                ax = attach_ext.text().strip(); ac = attach_contains.text().strip(); an = attach_not.text().strip()
+                if ax: parts.append(f"Đuôi tệp={ax}")
+                if ac: parts.append(f"Tệp chứa={ac}")
+                if an: parts.append(f"Tệp không chứa={an}")
+                ma = (int(min_attachments.text()) if (min_attachments.text() or '').isdigit() else 0)
+                if ma: parts.append(f"Số tệp>={ma}")
+                # date
+                from PySide6.QtCore import QDate
+                if e_from.isChecked() or e_to.isChecked():
+                    try:
+                        fd = from_date.date() if e_from.isChecked() else None
+                        td = to_date.date() if e_to.isChecked() else None
+                        if fd and td: parts.append(f"{fd.toString('dd/MM/yyyy')}→{td.toString('dd/MM/yyyy')}")
+                        elif fd: parts.append(f"{fd.toString('dd/MM/yyyy')}→")
+                        elif td: parts.append(f"→{td.toString('dd/MM/yyyy')}")
+                    except Exception:
+                        pass
+                else:
+                    pn = date_preset.currentText()
+                    if pn and not pn.startswith('('): parts.append(f"Preset={pn}")
+                # sort
+                parts.append(f"Sort={sort_field.currentText()} {'ASC' if sort_asc_cb.isChecked() else 'DESC'}")
+                filter_summary_label.setText(' | '.join(parts))
             except Exception:
                 pass
             from .db import SessionLocal
@@ -2200,6 +2273,11 @@ class MainWindow(QWidget):
                 extv = attach_ext.text().strip(); min_att = (int(min_attachments.text()) if (min_attachments.text() or '').isdigit() else 0)
                 if extv:
                     q = q.filter(EmailLog.attachments.ilike(f"%{extv}%"))
+                ac = attach_contains.text().strip(); anot = attach_not.text().strip()
+                if ac:
+                    q = q.filter(EmailLog.attachments.ilike(f"%{ac}%"))
+                if anot:
+                    q = q.filter(~EmailLog.attachments.ilike(f"%{anot}%"))
                 if min_att and min_att > 0:
                     from sqlalchemy import func
                     q = q.filter(EmailLog.attachments != None).filter(EmailLog.attachments != '')
@@ -2249,7 +2327,7 @@ class MainWindow(QWidget):
                 else:
                     order_expr = EmailLog.created_at.desc()
                 if fast_pager:
-                    rows2 = q.order_by(order_expr).limit(page_size+1).offset(offset).all()
+                    rows2 = q.order_by(order_expr, EmailLog.created_at.desc()).limit(page_size+1).offset(offset).all()
                     has_next = len(rows2) > page_size
                     rows = rows2[:page_size]
                     for r in rows:
@@ -2296,7 +2374,7 @@ class MainWindow(QWidget):
                     if state['page'] < 0:
                         state['page'] = 0
                     offset = state['page'] * page_size
-                    rows = q.order_by(order_expr).limit(page_size).offset(offset).all()
+                    rows = q.order_by(order_expr, EmailLog.created_at.desc()).limit(page_size).offset(offset).all()
                     for r in rows:
                         i = table.rowCount(); table.insertRow(i)
                         it0 = QTableWidgetItem(str(getattr(r, 'created_at', '')))
@@ -2544,6 +2622,11 @@ class MainWindow(QWidget):
                     extv = attach_ext.text().strip(); min_att = (int(min_attachments.text()) if (min_attachments.text() or '').isdigit() else 0)
                     if extv:
                         q = q.filter(_EL.attachments.ilike(f"%{extv}%"))
+                    ac = attach_contains.text().strip(); anot = attach_not.text().strip()
+                    if ac:
+                        q = q.filter(_EL.attachments.ilike(f"%{ac}%"))
+                    if anot:
+                        q = q.filter(~_EL.attachments.ilike(f"%{anot}%"))
                     if min_att and min_att > 0:
                         from sqlalchemy import func as _func
                         q = q.filter(_EL.attachments != None).filter(_EL.attachments != '')
@@ -2703,8 +2786,8 @@ class MainWindow(QWidget):
                         tbl2.setItem(r,4,_QTI(str(att_by_day.get((day_str, str(typ or ''), str(stt or '')), 0))))
                     tabs.addTab(tbl1, "Theo đơn vị")
                     tabs.addTab(tbl2, "Theo ngày")
-                    # Nút copy CSV
-                    bar = _QH(); btn_copy = _QP("Copy CSV"); bar.addWidget(btn_copy)
+                    # Nút copy CSV và Export CSV
+                    bar = _QH(); btn_copy = _QP("Copy CSV"); btn_export = _QP("Export CSV"); bar.addWidget(btn_copy); bar.addWidget(btn_export)
                     lay2.addLayout(bar)
                     def do_copy_csv():
                         try:
@@ -2729,6 +2812,29 @@ class MainWindow(QWidget):
                         except Exception as ex2:
                             QMessageBox.critical(d, "Lỗi", str(ex2))
                     btn_copy.clicked.connect(do_copy_csv)
+                    def do_export_csv():
+                        try:
+                            import csv
+                            from datetime import datetime as _dt
+                            from pathlib import Path
+                            Path('exports').mkdir(exist_ok=True)
+                            cur = tabs.currentWidget()
+                            fname = 'email_stats_units' if cur is tbl1 else 'email_stats_days'
+                            outp = Path('exports')/f"{fname}_{_dt.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                            with open(outp, 'w', encoding='utf-8', newline='') as fcsv:
+                                w = csv.writer(fcsv)
+                                headers = [cur.horizontalHeaderItem(c).text() if cur.horizontalHeaderItem(c) else '' for c in range(cur.columnCount())]
+                                w.writerow(headers)
+                                for r in range(cur.rowCount()):
+                                    row = []
+                                    for c in range(cur.columnCount()):
+                                        it = cur.item(r,c)
+                                        row.append(it.text() if it else '')
+                                    w.writerow(row)
+                            QMessageBox.information(d, "Đã xuất", str(outp))
+                        except Exception as ex2:
+                            QMessageBox.critical(d, "Lỗi", str(ex2))
+                    btn_export.clicked.connect(do_export_csv)
                     # Audit
                     try:
                         log_action(_SL(), self.current_user.get('id'), 'ui_email_history_stats_detail', 'EmailLog', None, '')
@@ -2778,6 +2884,11 @@ class MainWindow(QWidget):
                     extv = attach_ext.text().strip(); min_att = (int(min_attachments.text()) if (min_attachments.text() or '').isdigit() else 0)
                     if extv:
                         q = q.filter(EmailLog.attachments.ilike(f"%{extv}%"))
+                    ac = attach_contains.text().strip(); anot = attach_not.text().strip()
+                    if ac:
+                        q = q.filter(EmailLog.attachments.ilike(f"%{ac}%"))
+                    if anot:
+                        q = q.filter(~EmailLog.attachments.ilike(f"%{anot}%"))
                     if min_att and min_att > 0:
                         from sqlalchemy import func
                         q = q.filter(EmailLog.attachments != None).filter(EmailLog.attachments != '')
@@ -3294,6 +3405,11 @@ class MainWindow(QWidget):
                         extv = attach_ext.text().strip(); min_att = (int(min_attachments.text()) if (min_attachments.text() or '').isdigit() else 0)
                         if extv:
                             q = q.filter(EmailLog.attachments.ilike(f"%{extv}%"))
+                        ac = attach_contains.text().strip(); anot = attach_not.text().strip()
+                        if ac:
+                            q = q.filter(EmailLog.attachments.ilike(f"%{ac}%"))
+                        if anot:
+                            q = q.filter(~EmailLog.attachments.ilike(f"%{anot}%"))
                         if min_att and min_att > 0:
                             from sqlalchemy import func
                             q = q.filter(EmailLog.attachments != None).filter(EmailLog.attachments != '')
