@@ -1760,6 +1760,7 @@ class MainWindow(QWidget):
         reload_units()
         status_box = QComboBox(); status_box.addItems(["(Tất cả)", "sent", "failed"])
         only_failed = QCheckBox("Chỉ lỗi")
+        only_success = QCheckBox("Chỉ thành công")
         has_attach_cb = QCheckBox("Chỉ có đính kèm")
         has_body_cb = QCheckBox("Chỉ có body")
         no_attach_cb = QCheckBox("Không có đính kèm")
@@ -1781,6 +1782,7 @@ class MainWindow(QWidget):
         f.addRow("Chọn đơn vị", _unit_row)
         f.addRow("Trạng thái", status_box)
         f.addRow("", only_failed)
+        f.addRow("", only_success)
         f.addRow("", has_attach_cb)
         f.addRow("", has_body_cb)
         f.addRow("", no_attach_cb)
@@ -1851,6 +1853,26 @@ class MainWindow(QWidget):
         no_attach_cb.toggled.connect(lambda _ : (save_filter(), state.__setitem__('page', 0), load()))
         no_error_cb.toggled.connect(lambda _ : (save_filter(), state.__setitem__('page', 0), load()))
         f.addRow("", my_only_cb)
+        # đồng bộ hai toggle thành công/thất bại
+        def _sync_status_toggles():
+            try:
+                if only_success.isChecked():
+                    only_failed.setChecked(False)
+                    try: status_box.setCurrentIndex(0)
+                    except Exception: pass
+                if only_failed.isChecked():
+                    only_success.setChecked(False)
+                    try: status_box.setCurrentIndex(0)
+                    except Exception: pass
+            except Exception:
+                pass
+            try:
+                save_filter()
+            except Exception:
+                pass
+            state['page'] = 0; load()
+        only_success.toggled.connect(lambda _ : _sync_status_toggles())
+        only_failed.toggled.connect(lambda _ : _sync_status_toggles())
         f.addRow("Sắp xếp theo", sort_field)
         f.addRow("Sắp xếp 2", sort_field2)
         f.addRow("", sort_asc_cb)
@@ -2172,6 +2194,10 @@ class MainWindow(QWidget):
                 if st and st in [status_box.itemText(i) for i in range(status_box.count())]:
                     status_box.setCurrentText(st)
                 only_failed.setChecked(bool(obj.get('only_failed', False)))
+                try:
+                    only_success.setChecked(bool(obj.get('only_success', False)))
+                except Exception:
+                    pass
                 subject_search.setText(obj.get('subject',''))
                 subject_regex.setText(obj.get('subject_regex',''))
                 subject_not.setText(obj.get('subject_not',''))
@@ -2278,7 +2304,8 @@ class MainWindow(QWidget):
                     'unit_selected': unit_box.currentText() if unit_box.currentIndex()>0 else '',
                     'unit_contains': unit_edit.text().strip(),
                     'status': status_box.currentText(),
-                    'only_failed': only_failed.isChecked(),
+'only_failed': only_failed.isChecked(),
+                    'only_success': only_success.isChecked(),
                     'subject': subject_search.text().strip(),
                     'subject_regex': subject_regex.text().strip(),
                     'subject_not': subject_not.text().strip(),
@@ -2426,6 +2453,7 @@ class MainWindow(QWidget):
                     if u: parts.append(f"Đơn vị chứa={u}")
                 st0 = status_box.currentText();
                 if only_failed.isChecked(): parts.append("Chỉ lỗi")
+                elif only_success.isChecked(): parts.append("Chỉ thành công")
                 elif not st0.startswith('('): parts.append(f"Trạng thái={st0}")
                 subj0 = subject_search.text().strip()
                 if subj0: parts.append(f"Tiêu đề chứa={subj0}")
@@ -2509,6 +2537,8 @@ class MainWindow(QWidget):
                 st = status_box.currentText();
                 if only_failed.isChecked():
                     q = q.filter(EmailLog.status == 'failed')
+                elif only_success.isChecked():
+                    q = q.filter(EmailLog.status == 'sent')
                 elif not st.startswith("("):
                     q = q.filter(EmailLog.status == st)
                 subj = subject_search.text().strip(); subj_rx = subject_regex.text().strip(); subj_not = subject_not.text().strip()
@@ -2782,10 +2812,11 @@ class MainWindow(QWidget):
                 outp = Path('exports')/name
                 with open(outp, 'w', encoding='utf-8', newline='') as fcsv:
                     w = csv.writer(fcsv)
-                    w.writerow(["created_at","type","unit_name","subject","recipients","attachments","status","error"])
+                    w.writerow(["created_at","type","unit_name","subject","recipients","attachments","status","error","attachments_count"])
                     for i in range(table.rowCount()):
                         it = lambda r,c: (table.item(r,c).text() if table.item(r,c) else '')
-                        w.writerow([it(i,0), it(i,1), it(i,2), it(i,3), it(i,4), it(i,5), it(i,6), it(i,7)])
+                        cnt = (table.item(i,8).text() if table.item(i,8) else '')
+                        w.writerow([it(i,0), it(i,1), it(i,2), it(i,3), it(i,4), it(i,5), it(i,6), it(i,7), cnt])
                 # Audit
                 try:
                     from .db import SessionLocal as _SL
@@ -2814,10 +2845,11 @@ class MainWindow(QWidget):
                 from PySide6.QtWidgets import QApplication
                 buf = io.StringIO()
                 w = csv.writer(buf)
-                w.writerow(["created_at","type","unit_name","subject","recipients","attachments","status","error"])
+                w.writerow(["created_at","type","unit_name","subject","recipients","attachments","status","error","attachments_count"])
                 for i in range(table.rowCount()):
                     it = lambda r,c: (table.item(r,c).text() if table.item(r,c) else '')
-                    w.writerow([it(i,0), it(i,1), it(i,2), it(i,3), it(i,4), it(i,5), it(i,6), it(i,7)])
+                    cnt = (table.item(i,8).text() if table.item(i,8) else '')
+                    w.writerow([it(i,0), it(i,1), it(i,2), it(i,3), it(i,4), it(i,5), it(i,6), it(i,7), cnt])
                 QApplication.clipboard().setText(buf.getvalue())
                 # Audit
                 try:
