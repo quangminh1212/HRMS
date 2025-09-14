@@ -1986,9 +1986,10 @@ class MainWindow(QWidget):
         btn_export_recip = QPushButton("Export recipients CSV")
         btn_copy_att_paths = QPushButton("Copy paths (lọc)")
         btn_export_att_list = QPushButton("Export attach list CSV")
+        btn_open_last = QPushButton("Mở file gần nhất")
         btn_reset_cols = QPushButton("Reset cột")
         btn_copy_recip_all = QPushButton("Copy recipients (lọc)")
-        for b in (btn_refresh, btn_save_filter, btn_reset_filter, btn_export, btn_quick_export, btn_copy_csv, btn_copy_row, btn_export_recip, btn_export_att_list, btn_copy_att_paths, btn_export_zip, btn_view, btn_resend, btn_resend_all, btn_resend_group, btn_view_zip, btn_open_files, btn_open_folders, btn_open_exports, btn_copy_recip, btn_copy_recip_all, btn_delete, btn_delete_all, btn_reset_cols):
+        for b in (btn_refresh, btn_save_filter, btn_reset_filter, btn_export, btn_quick_export, btn_copy_csv, btn_copy_row, btn_export_recip, btn_export_att_list, btn_copy_att_paths, btn_export_zip, btn_view, btn_resend, btn_resend_all, btn_resend_group, btn_view_zip, btn_open_files, btn_open_folders, btn_open_exports, btn_open_last, btn_copy_recip, btn_copy_recip_all, btn_delete, btn_delete_all, btn_reset_cols):
             hb.addWidget(b)
         f.addRow(hb)
         def reset_columns():
@@ -2652,9 +2653,20 @@ class MainWindow(QWidget):
                     q = q.filter(EmailLog.attachments.ilike(f"%{extv}%"))
                 ac = attach_contains.text().strip(); anot = attach_not.text().strip()
                 if ac:
-                    q = q.filter(EmailLog.attachments.ilike(f"%{ac}%"))
+                    from sqlalchemy import or_ as _or
+                    tokens = [t.strip() for t in ac.split(',') if t.strip()]
+                    if tokens:
+                        cond = _or(*[EmailLog.attachments.ilike(f"%{t}%") for t in tokens])
+                        q = q.filter(cond)
+                    else:
+                        q = q.filter(EmailLog.attachments.ilike(f"%{ac}%"))
                 if anot:
-                    q = q.filter(~EmailLog.attachments.ilike(f"%{anot}%"))
+                    tokens_not = [t.strip() for t in anot.split(',') if t.strip()]
+                    if tokens_not:
+                        for t in tokens_not:
+                            q = q.filter(~EmailLog.attachments.ilike(f"%{t}%"))
+                    else:
+                        q = q.filter(~EmailLog.attachments.ilike(f"%{anot}%"))
                 if min_att and min_att > 0:
                     from sqlalchemy import func
                     q = q.filter(EmailLog.attachments != None).filter(EmailLog.attachments != '')
@@ -2673,9 +2685,20 @@ class MainWindow(QWidget):
                 if req:
                     q = q.filter(EmailLog.recipients == req)
                 elif rc:
-                    q = q.filter(EmailLog.recipients.ilike(f"%{rc}%"))
+                    from sqlalchemy import or_ as _or
+                    tokens = [t.strip() for t in rc.split(',') if t.strip()]
+                    if tokens:
+                        cond = _or(*[EmailLog.recipients.ilike(f"%{t}%") for t in tokens])
+                        q = q.filter(cond)
+                    else:
+                        q = q.filter(EmailLog.recipients.ilike(f"%{rc}%"))
                 if rnot:
-                    q = q.filter(~EmailLog.recipients.ilike(f"%{rnot}%"))
+                    tokens_rn = [t.strip() for t in rnot.split(',') if t.strip()]
+                    if tokens_rn:
+                        for t in tokens_rn:
+                            q = q.filter(~EmailLog.recipients.ilike(f"%{t}%"))
+                    else:
+                        q = q.filter(~EmailLog.recipients.ilike(f"%{rnot}%"))
                 uidtxt = user_id_edit.text().strip();
                 if uidtxt.isdigit():
                     q = q.filter(EmailLog.user_id == int(uidtxt))
@@ -2904,6 +2927,8 @@ class MainWindow(QWidget):
                 except Exception:
                     pass
                 QMessageBox.information(dlg, "Đã xuất", f"{outp}")
+                try: _set_last_export(outp)
+                except Exception: pass
                 try:
                     from PySide6.QtWidgets import QMessageBox as _QMB
                     import os, sys, subprocess
@@ -2938,7 +2963,8 @@ class MainWindow(QWidget):
                     log_action(_SL(), self.current_user.get('id'), 'ui_email_history_copy_csv', 'EmailLog', None, '')
                 except Exception:
                     pass
-                QMessageBox.information(dlg, "Đã copy", "Đã copy CSV vào clipboard")
+                    QMessageBox.information(dlg, "Đã copy", "Đã copy CSV vào clipboard")
+                    # no last export for clipboard
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_copy_csv.clicked.connect(copy_current_csv)
@@ -3047,7 +3073,14 @@ class MainWindow(QWidget):
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_copy_row.clicked.connect(copy_selected_row)
-        # Phím tắt: Ctrl+C copy dòng, Ctrl+Shift+C copy CSV; PgUp/PgDn và Alt+Left/Right chuyển trang
+        # Phím tắt: Ctrl+C copy dòng, Ctrl+Shift+C copy CSV; PgUp/PgDn và Alt+Left/Right chuyển trang; Ctrl+S save filter; Ctrl+L load saved
+        try:
+            from PySide6.QtGui import QShortcut, QKeySequence
+            qs_save = QShortcut(QKeySequence("Ctrl+S"), dlg); qs_save.activated.connect(save_filter)
+            qs_load = QShortcut(QKeySequence("Ctrl+L"), dlg); qs_load.activated.connect(load_saved_filter)
+        except Exception:
+            pass
+        # Phím tắt bảng
         try:
             from PySide6.QtGui import QShortcut, QKeySequence
             qs_copy_row = QShortcut(QKeySequence.Copy, table); qs_copy_row.activated.connect(copy_selected_row)
@@ -3267,6 +3300,8 @@ class MainWindow(QWidget):
                 with open(p, 'w', encoding='utf-8') as f:
                     _json.dump(obj, f, ensure_ascii=False, indent=2)
                 QMessageBox.information(dlg, "Đã xuất", str(p))
+                try: _set_last_export(p)
+                except Exception: pass
             
                 try:
                     from PySide6.QtWidgets import QMessageBox as _QMB
@@ -3639,7 +3674,13 @@ class MainWindow(QWidget):
                 pass
         btn_reset_filter.clicked.connect(reset_filter)
         btn_export.clicked.connect(export_csv)
-        def compute_stats():
+        def _set_last_export(path_obj):
+            try:
+                from .settings_service import set_setting as _ss
+                _ss(f"EMAIL_HISTORY_LAST_EXPORT:{(self.current_user.get('username') or '').strip()}", str(path_obj))
+            except Exception:
+                pass
+        def export_stats_csv():
             try:
                 from .db import SessionLocal as _SL
                 from .models import EmailLog as _EL
@@ -3930,10 +3971,12 @@ class MainWindow(QWidget):
                                 try: fcsv.write('\ufeff')
                                 except Exception: pass
                                 w = csv.writer(fcsv)
-                                w.writerow([cur.horizontalHeaderItem(0).text(), cur.horizontalHeaderItem(1).text()] + statuses)
-                                for (k0,k1), d in data.items():
-                                    w.writerow([k0,k1] + [d.get(s,0) for s in statuses])
+                            w.writerow([cur.horizontalHeaderItem(0).text(), cur.horizontalHeaderItem(1).text()] + statuses)
+                            for (k0,k1), d in data.items():
+                                w.writerow([k0,k1] + [d.get(s,0) for s in statuses])
                             QMessageBox.information(d, "Đã xuất", str(outp))
+                            try: _set_last_export(outp)
+                            except Exception: pass
                         except Exception as ex2:
                             QMessageBox.critical(d, "Lỗi", str(ex2))
                     btn_export_pivot = _QP("Export Pivot"); btn_copy_pivot = _QP("Copy Pivot"); bar.addWidget(btn_copy_pivot); bar.addWidget(btn_export_pivot)
@@ -4004,6 +4047,8 @@ class MainWindow(QWidget):
                                         row.append(it.text() if it else '')
                                     w.writerow(row)
                             QMessageBox.information(d, "Đã xuất", str(outp))
+                            try: _set_last_export(outp)
+                            except Exception: pass
                         except Exception as ex2:
                             QMessageBox.critical(d, "Lỗi", str(ex2))
                     btn_export.clicked.connect(do_export_csv)
@@ -4113,6 +4158,8 @@ class MainWindow(QWidget):
                     except Exception:
                         pass
                     QMessageBox.information(dlg, "Đã xuất", f"{outp}")
+                    try: _set_last_export(outp)
+                    except Exception: pass
                     try:
                         from PySide6.QtWidgets import QMessageBox as _QMB
                         import os, sys, subprocess
@@ -4306,6 +4353,8 @@ class MainWindow(QWidget):
                             except Exception:
                                 pass
                     QMessageBox.information(dlg, "Đã xuất", f"{zip_path}")
+                    try: _set_last_export(zip_path)
+                    except Exception: pass
                     try:
                         from PySide6.QtWidgets import QMessageBox as _QMB
                         import os, sys, subprocess
@@ -4836,11 +4885,30 @@ class MainWindow(QWidget):
                     except Exception:
                         pass
                     QMessageBox.information(dlg, "Đã xuất", str(p))
+                    try: _set_last_export(p)
+                    except Exception: pass
                 finally:
                     s.close()
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_export_recip.clicked.connect(export_recipients_csv)
+        def open_last_export():
+            try:
+                from .settings_service import get_setting as _gs
+                import os, sys, subprocess
+                p = _gs(f"EMAIL_HISTORY_LAST_EXPORT:{(self.current_user.get('username') or '').strip()}", '') or ''
+                if not p:
+                    QMessageBox.information(dlg, "Chưa có", "Chưa có file export gần đây")
+                    return
+                if sys.platform.startswith('win'):
+                    os.startfile(p)
+                elif sys.platform == 'darwin':
+                    subprocess.Popen(['open', p])
+                else:
+                    subprocess.Popen(['xdg-open', p])
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_open_last.clicked.connect(open_last_export)
         def export_attachment_list_csv():
             try:
                 from .db import SessionLocal as _SL
@@ -4921,6 +4989,8 @@ class MainWindow(QWidget):
                     except Exception:
                         pass
                     QMessageBox.information(dlg, "Đã xuất", str(outp))
+                    try: _set_last_export(outp)
+                    except Exception: pass
                 finally:
                     s.close()
             except Exception as ex:
