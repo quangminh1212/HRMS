@@ -1784,6 +1784,10 @@ class MainWindow(QWidget):
         for b in (btn_refresh, btn_save_filter, btn_reset_filter, btn_export, btn_export_zip, btn_view, btn_resend, btn_resend_all, btn_resend_group, btn_view_zip, btn_open_files, btn_open_folders, btn_open_exports, btn_copy_recip, btn_delete, btn_delete_all):
             hb.addWidget(b)
         f.addRow(hb)
+        # Thanh thống kê
+        stats_bar = QHBoxLayout(); btn_stats = QPushButton("Thống kê"); stats_label = QLabel("")
+        stats_bar.addWidget(btn_stats); stats_bar.addWidget(stats_label)
+        f.addRow(stats_bar)
         lay.addLayout(f)
         # Bảng kết quả
         table = QTableWidget(0, 8)
@@ -2095,6 +2099,85 @@ class MainWindow(QWidget):
                 pass
         btn_reset_filter.clicked.connect(reset_filter)
         btn_export.clicked.connect(export_csv)
+        def compute_stats():
+            try:
+                from .db import SessionLocal as _SL
+                from .models import EmailLog as _EL
+                from sqlalchemy import func
+                s = _SL()
+                try:
+                    q = s.query(_EL)
+                    t = type_box.currentText()
+                    if not t.startswith("("):
+                        q = q.filter(_EL.type == t)
+                    u_sel = unit_box.currentText().strip() if unit_box.currentIndex() > -1 else ""
+                    if u_sel and not u_sel.startswith("("):
+                        q = q.filter(_EL.unit_name == u_sel)
+                    else:
+                        u = unit_edit.text().strip()
+                        if u:
+                            q = q.filter(_EL.unit_name.ilike(f"%{u}%"))
+                    st = status_box.currentText()
+                    if only_failed.isChecked():
+                        q = q.filter(_EL.status == 'failed')
+                    elif not st.startswith("("):
+                        q = q.filter(_EL.status == st)
+                    subj = subject_search.text().strip()
+                    if subj:
+                        q = q.filter(_EL.subject.ilike(f"%{subj}%"))
+                    uidtxt = user_id_edit.text().strip()
+                    if uidtxt.isdigit():
+                        q = q.filter(_EL.user_id == int(uidtxt))
+                    # Date range
+                    from datetime import datetime as _dt2
+                    if e_from.isChecked():
+                        fd = from_date.date(); q = q.filter(_EL.created_at >= _dt2(fd.year(), fd.month(), fd.day(), 0, 0, 0))
+                    if e_to.isChecked():
+                        td = to_date.date(); q = q.filter(_EL.created_at <= _dt2(td.year(), td.month(), td.day(), 23, 59, 59))
+                    total = q.count()
+                    # Theo trạng thái
+                    by_status = {r[0] or '': r[1] for r in s.query(_EL.status, func.count(1)).filter(q._criterion if getattr(q, '_criterion', None) is not None else True).group_by(_EL.status).all()}
+                    # Theo loại
+                    by_type = {r[0] or '': r[1] for r in s.query(_EL.type, func.count(1)).filter(q._criterion if getattr(q, '_criterion', None) is not None else True).group_by(_EL.type).all()}
+                    # Đính kèm: đếm và size ước lượng
+                    attach_count = 0; total_bytes = 0
+                    from pathlib import Path as _P
+                    rows = q.with_entities(_EL.attachments).all()
+                    for (att,) in rows:
+                        for part in (att or '').split(','):
+                            p = (part or '').strip()
+                            if not p:
+                                continue
+                            attach_count += 1
+                            try:
+                                fp = _P(p)
+                                if fp.exists():
+                                    total_bytes += fp.stat().st_size
+                            except Exception:
+                                pass
+                    def _hsz(n):
+                        try:
+                            for unit in ['B','KB','MB','GB','TB']:
+                                if n < 1024.0:
+                                    return f"{n:0.1f} {unit}"
+                                n /= 1024.0
+                            return f"{n:0.1f} PB"
+                        except Exception:
+                            return str(n)
+                    # Cập nhật UI
+                    types_str = ", ".join([f"{k}:{v}" for k,v in sorted(by_type.items())])
+                    st_str = ", ".join([f"{k}:{v}" for k,v in sorted(by_status.items())])
+                    stats_label.setText(f"Tổng {total}; Trạng thái: {st_str}; Loại: {types_str}; Đính kèm: {attach_count} (~{_hsz(total_bytes)})")
+                    # Audit
+                    try:
+                        log_action(_SL(), self.current_user.get('id'), 'ui_email_history_stats', 'EmailLog', None, f"total={total}; attach={attach_count}")
+                    except Exception:
+                        pass
+                finally:
+                    s.close()
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_stats.clicked.connect(compute_stats)
         def export_failed_csv():
             try:
                 import csv
