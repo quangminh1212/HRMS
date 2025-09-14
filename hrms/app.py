@@ -894,7 +894,13 @@ class MainWindow(QWidget):
                 v.addWidget(cb)
                 checks.append(cb)
                 data.append((cb, u.name, u.id, len(arr), recips))
-            row = QHBoxLayout(); btn_ok = QPushButton("Gửi"); btn_cancel = QPushButton("Hủy"); row.addWidget(btn_ok); row.addWidget(btn_cancel)
+            row = QHBoxLayout(); btn_ok = QPushButton("Gửi"); btn_cancel = QPushButton("Hủy"); btn_all = QPushButton("Chọn tất cả"); btn_none = QPushButton("Bỏ chọn")
+            def sel_all():
+                for c in checks: c.setChecked(True)
+            def sel_none():
+                for c in checks: c.setChecked(False)
+            btn_all.clicked.connect(sel_all); btn_none.clicked.connect(sel_none)
+            row.addWidget(btn_all); row.addWidget(btn_none); row.addWidget(btn_ok); row.addWidget(btn_cancel)
             v.addLayout(row)
             zip_cb = QCheckBox("Gửi kèm ZIP tổng hợp");
             try:
@@ -983,13 +989,21 @@ class MainWindow(QWidget):
             v = QVBoxLayout(dlg)
             v.addWidget(QLabel(f"Tháng: {prev_month:02d}/{prev_year}"))
             data = []
+            checks = []
             for u in units:
                 recips = get_recipients_for_unit(u.name)
                 text = f"{u.name} - {len(recips)} email"
                 cb = QCheckBox(text); cb.setChecked(bool(recips))
                 v.addWidget(cb)
+                checks.append(cb)
                 data.append((cb, u.name, u.id, recips))
-            row = QHBoxLayout(); btn_ok = QPushButton("Gửi"); btn_cancel = QPushButton("Hủy"); row.addWidget(btn_ok); row.addWidget(btn_cancel)
+            row = QHBoxLayout(); btn_ok = QPushButton("Gửi"); btn_cancel = QPushButton("Hủy"); btn_all = QPushButton("Chọn tất cả"); btn_none = QPushButton("Bỏ chọn")
+            def sel_all():
+                for c in checks: c.setChecked(True)
+            def sel_none():
+                for c in checks: c.setChecked(False)
+            btn_all.clicked.connect(sel_all); btn_none.clicked.connect(sel_none)
+            row.addWidget(btn_all); row.addWidget(btn_none); row.addWidget(btn_ok); row.addWidget(btn_cancel)
             v.addLayout(row)
             zip_cb = QCheckBox("Gửi kèm ZIP tổng hợp");
             try:
@@ -1066,13 +1080,21 @@ class MainWindow(QWidget):
             v = QVBoxLayout(dlg)
             v.addWidget(QLabel(f"Trong {days} ngày tới"))
             data = []
+            checks = []
             for u in units:
                 recips = get_recipients_for_unit(u.name)
                 text = f"{u.name} - {len(recips)} email"
                 cb = QCheckBox(text); cb.setChecked(bool(recips))
                 v.addWidget(cb)
+                checks.append(cb)
                 data.append((cb, u.name, u.id, recips))
-            row = QHBoxLayout(); btn_ok = QPushButton("Gửi"); btn_cancel = QPushButton("Hủy"); row.addWidget(btn_ok); row.addWidget(btn_cancel)
+            row = QHBoxLayout(); btn_ok = QPushButton("Gửi"); btn_cancel = QPushButton("Hủy"); btn_all = QPushButton("Chọn tất cả"); btn_none = QPushButton("Bỏ chọn")
+            def sel_all():
+                for c in checks: c.setChecked(True)
+            def sel_none():
+                for c in checks: c.setChecked(False)
+            btn_all.clicked.connect(sel_all); btn_none.clicked.connect(sel_none)
+            row.addWidget(btn_all); row.addWidget(btn_none); row.addWidget(btn_ok); row.addWidget(btn_cancel)
             v.addLayout(row)
             zip_cb = QCheckBox("Gửi kèm ZIP tổng hợp");
             try:
@@ -1948,6 +1970,13 @@ class MainWindow(QWidget):
             try:
                 val = int(page_input.text()) if page_input.text().isdigit() else 1
                 val = max(1, val)
+                # Clamp to max page
+                page_size = int(page_size_box.currentText()) if page_size_box.currentText().isdigit() else 100
+                max_page = max(1, (state.get('total', 0) - 1)//page_size + 1)
+                if val > max_page:
+                    from PySide6.QtWidgets import QMessageBox as _QMB
+                    _QMB.information(dlg, "Vượt phạm vi", f"Số trang tối đa hiện tại: {max_page}")
+                    val = max_page
                 state['page'] = val - 1
                 load()
             except Exception:
@@ -2392,34 +2421,39 @@ class MainWindow(QWidget):
                             fd = from_date.date(); q = q.filter(EmailLog.created_at >= _dt2(fd.year(), fd.month(), fd.day(), 0, 0, 0))
                         if e_to.isChecked():
                             td = to_date.date(); q = q.filter(EmailLog.created_at <= _dt2(td.year(), td.month(), td.day(), 23, 59, 59))
-                        rows = q.order_by(EmailLog.created_at.desc()).all()
-                        for r in rows:
-                            try:
-                                t = getattr(r,'type','') or ''
-                                unit_name = getattr(r,'unit_name','') or ''
-                                subject = getattr(r,'subject','') or ''
-                                body = getattr(r,'body','') or ''
-                                paths = []
-                                from pathlib import Path
-                                for part in (getattr(r,'attachments','') or '').split(','):
-                                    p = part.strip()
-                                    if p:
-                                        pp = Path(p)
-                                        if pp.exists():
-                                            paths.append(str(pp))
-                                from .mailer import send_email_with_attachment, get_recipients_for_unit
-                                recips = get_recipients_for_unit(unit_name) if t in ('salary_due','bhxh_monthly','contracts_expiring') and unit_name else None
-                                ok = send_email_with_attachment(subject or '[HRMS] Resend', body or '', paths, to=recips)
-                                # Log lại
-                                try:
-                                    s = _SL(); from .models import EmailLog as _EL
-                                    s.add(_EL(type=t or 'generic', unit_name=(unit_name or None), recipients='', subject=subject or '[HRMS] Resend', body=(body or '')[:1000], attachments=', '.join(paths), status='sent' if ok else 'failed', user_id=self.current_user.get('id'))); s.commit(); s.close()
-                                except Exception:
-                                    pass
-                                if ok: sent += 1
-                                else: failed += 1
-                            except Exception:
-                                failed += 1
+                # Xác nhận số lượng
+                from PySide6.QtWidgets import QMessageBox as _QMB
+                cnt = q.count()
+                if _QMB.question(dlg, "Xác nhận", f"Sẽ gửi lại {cnt} bản ghi phù hợp. Tiếp tục?", _QMB.Yes|_QMB.No) != _QMB.Yes:
+                    s3.close(); return
+                rows = q.order_by(EmailLog.created_at.desc()).all()
+                for r in rows:
+                    try:
+                        t = getattr(r,'type','') or ''
+                        unit_name = getattr(r,'unit_name','') or ''
+                        subject = getattr(r,'subject','') or ''
+                        body = getattr(r,'body','') or ''
+                        paths = []
+                        from pathlib import Path
+                        for part in (getattr(r,'attachments','') or '').split(','):
+                            p = part.strip()
+                            if p:
+                                pp = Path(p)
+                                if pp.exists():
+                                    paths.append(str(pp))
+                        from .mailer import send_email_with_attachment, get_recipients_for_unit
+                        recips = get_recipients_for_unit(unit_name) if t in ('salary_due','bhxh_monthly','contracts_expiring') and unit_name else None
+                        ok = send_email_with_attachment(subject or '[HRMS] Resend', body or '', paths, to=recips)
+                        # Log lại
+                        try:
+                            s = _SL(); from .models import EmailLog as _EL
+                            s.add(_EL(type=t or 'generic', unit_name=(unit_name or None), recipients='', subject=subject or '[HRMS] Resend', body=(body or '')[:1000], attachments=', '.join(paths), status='sent' if ok else 'failed', user_id=self.current_user.get('id'))); s.commit(); s.close()
+                        except Exception:
+                            pass
+                        if ok: sent += 1
+                        else: failed += 1
+                    except Exception:
+                        failed += 1
                     finally:
                         try: s3.close()
                         except Exception: pass
@@ -2535,6 +2569,10 @@ class MainWindow(QWidget):
                             groups[key].add(p)
                 if not groups:
                     QMessageBox.information(dlg, "Không có dữ liệu", "Không có nhóm hợp lệ để gửi lại")
+                    return
+                # Xác nhận số nhóm
+                from PySide6.QtWidgets import QMessageBox as _QMB
+                if _QMB.question(dlg, "Xác nhận", f"Sẽ gửi lại {len(groups)} nhóm. Tiếp tục?", _QMB.Yes|_QMB.No) != _QMB.Yes:
                     return
                 sent = 0; failed = 0; total = len(groups)
                 from .mailer import get_recipients_for_unit, send_email_with_attachment, create_zip
