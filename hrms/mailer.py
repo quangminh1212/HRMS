@@ -62,7 +62,8 @@ def _shorten_recipients(recipients: List[str]) -> str:
 
 def get_recipients_for_unit(unit_name: str) -> List[str]:
     """Trả về danh sách email cho đơn vị.
-    Ưu tiên DB (unit_email_recipients.active=True), fallback settings. Lọc trùng và định dạng cơ bản.
+    Ưu tiên DB (unit_email_recipients.active=True). Có thể bật/tắt fallback settings bằng cờ UNIT_EMAILS_FALLBACK_ENABLED (mặc định tắt nếu không thấy).
+    Lọc trùng và định dạng cơ bản.
     """
     def _normalize(emails: List[str]) -> List[str]:
         seen = set(); out = []
@@ -93,9 +94,12 @@ def get_recipients_for_unit(unit_name: str) -> List[str]:
             s.close()
     except Exception:
         pass
-    # Fallback settings
+    # Fallback settings (conditional)
     try:
         if not _get_setting:
+            return []
+        flag = str(_get_setting('UNIT_EMAILS_FALLBACK_ENABLED', '0') or '0').strip().lower() in ('1','true','yes')
+        if not flag:
             return []
         raw = _get_setting('UNIT_EMAILS', '') or ''
         if not raw.strip():

@@ -1312,6 +1312,7 @@ class MainWindow(QWidget):
         smtp_pass = QLineEdit(get_setting('SMTP_PASSWORD','') or ''); smtp_pass.setEchoMode(QLineEdit.Password)
         alert_emails = QLineEdit(get_setting('ALERT_EMAILS','') or '')
         org_name = QLineEdit(get_setting('ORG_NAME','') or '')
+        unit_emails_fallback = QLineEdit(get_setting('UNIT_EMAILS_FALLBACK_ENABLED','0') or '0')
         date_fmt = QLineEdit(get_setting('XLSX_DATE_FORMAT','DD/MM/YYYY') or 'DD/MM/YYYY')
         coef_fmt = QLineEdit(get_setting('XLSX_NUMBER_FORMAT_COEF','0.00') or '0.00')
         freeze_global = QLineEdit(get_setting('XLSX_FREEZE_COL:GLOBAL','A') or 'A')
@@ -1335,6 +1336,7 @@ class MainWindow(QWidget):
         email_log_ttl = QLineEdit(get_setting('EMAIL_LOG_TTL_DAYS','365') or '365')
         f.addRow("EMAIL_SUBJECT_PREFIX", subject_prefix)
         f.addRow("UNIT_EMAILS", unit_emails)
+        f.addRow("UNIT_EMAILS_FALLBACK_ENABLED (1/0)", unit_emails_fallback)
         f.addRow("SEND_SUMMARY_ZIP (1/0)", summary_zip)
         f.addRow("CONTRACT_ALERT_DAYS", contract_alert_days)
         f.addRow("RETRY_COUNT", QLineEdit(get_setting('RETRY_COUNT','2') or '2'))
@@ -1362,6 +1364,7 @@ class MainWindow(QWidget):
             set_setting('ORG_NAME', org_name.text())
             set_setting('EMAIL_SUBJECT_PREFIX', subject_prefix.text())
             set_setting('UNIT_EMAILS', unit_emails.text())
+            set_setting('UNIT_EMAILS_FALLBACK_ENABLED', (unit_emails_fallback.text() or '0'))
             set_setting('SEND_SUMMARY_ZIP', (summary_zip.text() or '0'))
             set_setting('CONTRACT_ALERT_DAYS', (contract_alert_days.text() or '30'))
             # RETRY_COUNT/DELAY: đọc từ form theo label
