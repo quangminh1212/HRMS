@@ -1893,9 +1893,30 @@ class MainWindow(QWidget):
         btn_copy_csv = QPushButton("Copy CSV")
         btn_copy_row = QPushButton("Copy dòng")
         btn_quick_export = QPushButton("Xuất nhanh")
-        for b in (btn_refresh, btn_save_filter, btn_reset_filter, btn_export, btn_quick_export, btn_copy_csv, btn_copy_row, btn_export_zip, btn_view, btn_resend, btn_resend_all, btn_resend_group, btn_view_zip, btn_open_files, btn_open_folders, btn_open_exports, btn_copy_recip, btn_delete, btn_delete_all):
+        btn_reset_cols = QPushButton("Reset cột")
+        for b in (btn_refresh, btn_save_filter, btn_reset_filter, btn_export, btn_quick_export, btn_copy_csv, btn_copy_row, btn_export_zip, btn_view, btn_resend, btn_resend_all, btn_resend_group, btn_view_zip, btn_open_files, btn_open_folders, btn_open_exports, btn_copy_recip, btn_delete, btn_delete_all, btn_reset_cols):
             hb.addWidget(b)
         f.addRow(hb)
+        def reset_columns():
+            try:
+                # Đặt lại về mặc định và lưu
+                for i in range(table.columnCount()):
+                    try:
+                        table.resizeColumnToContents(i)
+                    except Exception:
+                        pass
+                # sau khi resize theo nội dung, lưu lại
+                try:
+                    from .settings_service import set_setting
+                    import json as _json
+                    arr = [int(table.columnWidth(i)) for i in range(table.columnCount())]
+                    set_setting(f"EMAIL_HISTORY_TABLE_WIDTHS:{(self.current_user.get('username') or '').strip()}", _json.dumps(arr))
+                except Exception:
+                    pass
+                QMessageBox.information(dlg, "Đã đặt lại", "Đã reset độ rộng cột theo nội dung")
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_reset_cols.clicked.connect(reset_columns)
         # Thanh thống kê
         stats_bar = QHBoxLayout(); btn_stats = QPushButton("Thống kê"); btn_stats_detail = QPushButton("Thống kê chi tiết"); btn_copy_stats = QPushButton("Copy"); btn_export_stats = QPushButton("Export TK"); stats_label = QLabel("")
         try:
@@ -1915,6 +1936,43 @@ class MainWindow(QWidget):
         # Bảng kết quả
         table = QTableWidget(0, 9)
         table.setHorizontalHeaderLabels(["Thời gian", "Loại", "Đơn vị", "Subject", "Recipients", "Tệp đính kèm", "Trạng thái", "Lỗi", "Số tệp"])
+        # Lưu/khôi phục độ rộng cột
+        try:
+            from PySide6.QtWidgets import QHeaderView as _QHV
+            header = table.horizontalHeader()
+            header.setSectionResizeMode(_QHV.Interactive)
+            default_widths = [table.columnWidth(i) for i in range(table.columnCount())]
+            def _widths_key():
+                return f"EMAIL_HISTORY_TABLE_WIDTHS:{(self.current_user.get('username') or '').strip()}"
+            def load_table_widths():
+                try:
+                    from .settings_service import get_setting
+                    import json as _json
+                    raw = get_setting(_widths_key(), '') or ''
+                    if not raw:
+                        return
+                    arr = _json.loads(raw)
+                    if isinstance(arr, list) and len(arr) == table.columnCount():
+                        for i, w in enumerate(arr):
+                            try:
+                                wv = int(w) if int(w) > 10 else default_widths[i]
+                            except Exception:
+                                wv = default_widths[i]
+                            table.setColumnWidth(i, wv)
+                except Exception:
+                    pass
+            def save_table_widths():
+                try:
+                    from .settings_service import set_setting
+                    import json as _json
+                    arr = [int(table.columnWidth(i)) for i in range(table.columnCount())]
+                    set_setting(_widths_key(), _json.dumps(arr))
+                except Exception:
+                    pass
+            header.sectionResized.connect(lambda *_: save_table_widths())
+            load_table_widths()
+        except Exception:
+            pass
         lay.addWidget(table)
         # Trạng thái phân trang
         state = {'page': 0, 'total': 0}
@@ -2704,6 +2762,14 @@ class MainWindow(QWidget):
         page_size_box.currentTextChanged.connect(lambda _ : (state.__setitem__('page', 0), load()))
         btn_refresh.clicked.connect(lambda: (save_filter(), state.__setitem__('page', 0), load()))
         btn_save_filter.clicked.connect(save_filter)
+        # Enter để refresh nhanh ở một số input
+        def _bind_enter(w):
+            try:
+                w.returnPressed.connect(lambda: (save_filter(), state.__setitem__('page', 0), load()))
+            except Exception:
+                pass
+        for _w in (unit_edit, subject_search, subject_regex, subject_not, subject_starts, subject_ends, recipients_contains, recipients_not, body_search, body_not, attach_ext, attach_contains, attach_not, min_attachments, error_search, error_not):
+            _bind_enter(_w)
         # Saved filters handlers
         def refresh_saved_combo():
             try:
