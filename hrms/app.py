@@ -1712,7 +1712,9 @@ class MainWindow(QWidget):
         pager_bar = QHBoxLayout()
         page_size_box = QComboBox(); page_size_box.addItems(["100","200","500"]) ; page_size_box.setCurrentText("100")
         btn_prev = QPushButton("◀ Trước"); btn_next = QPushButton("Sau ▶"); page_label = QLabel("Trang 1/1")
-        pager_bar.addWidget(QLabel("Kích thước trang")); pager_bar.addWidget(page_size_box); pager_bar.addWidget(btn_prev); pager_bar.addWidget(btn_next); pager_bar.addWidget(page_label)
+        from PySide6.QtWidgets import QLineEdit as _QLE
+        page_input = _QLE(); page_input.setPlaceholderText("Trang..."); btn_go = QPushButton("Đi")
+        pager_bar.addWidget(QLabel("Kích thước trang")); pager_bar.addWidget(page_size_box); pager_bar.addWidget(btn_prev); pager_bar.addWidget(btn_next); pager_bar.addWidget(page_label); pager_bar.addWidget(page_input); pager_bar.addWidget(btn_go)
         f.addRow(pager_bar)
         # Áp dụng trên toàn bộ (bỏ qua phân trang)
         cb_all_scope = QCheckBox("Toàn bộ (bỏ qua phân trang)")
@@ -1788,6 +1790,12 @@ class MainWindow(QWidget):
                 # all scope
                 try:
                     cb_all_scope.setChecked(bool(obj.get('all_scope', False)))
+                except Exception:
+                    pass
+                # group zip checkbox
+                try:
+                    if hasattr(resend_grouped_by_unit, '__zip_cb'):
+                        resend_grouped_by_unit.__zip_cb.setChecked(bool(obj.get('zip_when_group', False)))
                 except Exception:
                     pass
                 # page size
@@ -1936,6 +1944,15 @@ class MainWindow(QWidget):
             load()
         btn_prev.clicked.connect(go_prev)
         btn_next.clicked.connect(go_next)
+        def go_to_page():
+            try:
+                val = int(page_input.text()) if page_input.text().isdigit() else 1
+                val = max(1, val)
+                state['page'] = val - 1
+                load()
+            except Exception:
+                pass
+        btn_go.clicked.connect(go_to_page)
         page_size_box.currentTextChanged.connect(lambda _ : (state.__setitem__('page', 0), load()))
         btn_refresh.clicked.connect(lambda: (save_filter(), state.__setitem__('page', 0), load()))
         btn_save_filter.clicked.connect(save_filter)
@@ -1963,6 +1980,47 @@ class MainWindow(QWidget):
                 pass
         btn_reset_filter.clicked.connect(reset_filter)
         btn_export.clicked.connect(export_csv)
+        def export_failed_csv():
+            try:
+                import csv
+                from datetime import datetime as _dt
+                from pathlib import Path
+                from .db import SessionLocal
+                from .models import EmailLog
+                Path('exports').mkdir(exist_ok=True)
+                outp = Path('exports')/f"email_logs_failed_{_dt.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                dbf = SessionLocal()
+                try:
+                    q = dbf.query(EmailLog).filter(EmailLog.status=='failed')
+                    # reuse basic filters except status
+                    t = type_box.currentText()
+                    if not t.startswith("("):
+                        q = q.filter(EmailLog.type == t)
+                    u_sel = unit_box.currentText().strip() if unit_box.currentIndex() > -1 else ""
+                    if u_sel and not u_sel.startswith("("):
+                        q = q.filter(EmailLog.unit_name == u_sel)
+                    else:
+                        u = unit_edit.text().strip()
+                        if u:
+                            q = q.filter(EmailLog.unit_name.ilike(f"%{u}%"))
+                    subj = subject_search.text().strip()
+                    if subj:
+                        q = q.filter(EmailLog.subject.ilike(f"%{subj}%"))
+                    uidtxt = user_id_edit.text().strip()
+                    if uidtxt.isdigit():
+                        q = q.filter(EmailLog.user_id == int(uidtxt))
+                    rows = q.order_by(EmailLog.created_at.desc()).all()
+                    with open(outp, 'w', encoding='utf-8', newline='') as fcsv:
+                        w = csv.writer(fcsv)
+                        w.writerow(["created_at","type","unit_name","subject","recipients","attachments","status","error"])
+                        for r in rows:
+                            w.writerow([str(getattr(r,'created_at','')), getattr(r,'type','') or '', getattr(r,'unit_name','') or '', getattr(r,'subject','') or '', getattr(r,'recipients','') or '', getattr(r,'attachments','') or '', getattr(r,'status','') or '', getattr(r,'error','') or ''])
+                    QMessageBox.information(dlg, "Đã xuất", f"{outp}")
+                finally:
+                    dbf.close()
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_export_failed = QPushButton("Export lỗi CSV"); btn_export_failed.clicked.connect(export_failed_csv); f.addRow(btn_export_failed)
         def export_attachments_zip():
             try:
                 from .db import SessionLocal
@@ -2492,7 +2550,13 @@ class MainWindow(QWidget):
                     except Exception:
                         subj_prefix = subj_suffix = ''
                     base = f"[HRMS] Resend {t} - {unit_name}"
-                    subject = f"{subj_prefix}{base}{subj_suffix}"
+                    tmpl = getattr(resend_grouped_by_unit, '__subj_template').text().strip() if hasattr(resend_grouped_by_unit, '__subj_template') else ''
+                    if tmpl:
+                        from datetime import date as _date
+                        today = _date.today().isoformat()
+                        subject = tmpl.replace('{type}', t).replace('{unit}', unit_name).replace('{count}', str(len(files))).replace('{date}', today)
+                    else:
+                        subject = f"{subj_prefix}{base}{subj_suffix}"
                     body = f"Gửi lại theo nhóm {t} cho {unit_name}. Đính kèm {len(files)} tệp."
                     file_list = sorted(list(files))
                     # ZIP tùy chọn nếu có nhiều tệp
@@ -2537,11 +2601,13 @@ class MainWindow(QWidget):
         from PySide6.QtWidgets import QLineEdit as _QLE
         _zip_pattern = _QLE("resend_{type}_{unit}_{ts}.zip")
         resend_grouped_by_unit.__zip_pattern = _zip_pattern
-        subj_prefix = _QLE(""); subj_suffix = _QLE("")
+        subj_prefix = _QLE(""); subj_suffix = _QLE(""); subj_template = _QLE("")
         resend_grouped_by_unit.__subj_prefix = subj_prefix
         resend_grouped_by_unit.__subj_suffix = subj_suffix
+        resend_grouped_by_unit.__subj_template = subj_template
         f.addRow("", _zip_cb)
         f.addRow("Tên ZIP", _zip_pattern)
+        f.addRow("Subject template", subj_template)
         f.addRow("Subject prefix", subj_prefix)
         f.addRow("Subject suffix", subj_suffix)
         btn_resend_group.clicked.connect(resend_grouped_by_unit)
