@@ -1768,7 +1768,7 @@ class MainWindow(QWidget):
         e_from = QCheckBox("Áp dụng"); e_to = QCheckBox("Áp dụng")
         btn_refresh = QPushButton("Làm mới"); btn_export = QPushButton("Export CSV"); btn_view = QPushButton("Xem chi tiết"); btn_save_filter = QPushButton("Lưu bộ lọc"); btn_reset_filter = QPushButton("Reset bộ lọc"); btn_export_zip = QPushButton("Export ZIP")
         # Preset nhanh cho khoảng thời gian
-        date_preset = QComboBox(); date_preset.addItems(["(Tuỳ chỉnh)", "7 ngày", "30 ngày", "90 ngày", "7 ngày qua", "30 ngày qua", "Tuần này", "Tuần trước", "Tháng này", "Tháng trước", "Quý đến nay", "Quý này", "Quý trước", "Năm đến nay", "Năm nay", "Năm trước"])
+        date_preset = QComboBox(); date_preset.addItems(["(Tuỳ chỉnh)", "Hôm nay", "Hôm qua", "7 ngày", "30 ngày", "90 ngày", "7 ngày qua", "30 ngày qua", "Tuần này", "Tuần trước", "Tháng đến nay", "Tháng này", "Tháng trước", "Quý đến nay", "Quý này", "Quý trước", "Năm đến nay", "Năm nay", "Năm trước"])
         f.addRow("Loại", type_box)
         f.addRow("Đơn vị", unit_edit)
         from PySide6.QtWidgets import QHBoxLayout as _HB, QPushButton as _PB
@@ -1875,8 +1875,8 @@ class MainWindow(QWidget):
         f.addRow("", cb_all_scope)
         # Saved filters UI
         saved_filters_combo = QComboBox(); saved_filters_combo.addItem("(Chưa có)")
-        btn_save_filter_as = QPushButton("Lưu tên…"); btn_overwrite_saved = QPushButton("Ghi đè"); btn_load_saved = QPushButton("Tải"); btn_delete_saved = QPushButton("Xoá"); btn_export_saved = QPushButton("Export JSON"); btn_import_saved = QPushButton("Nhập JSON")
-        row_saved = QHBoxLayout(); row_saved.addWidget(QLabel("Bộ lọc đã lưu")); row_saved.addWidget(saved_filters_combo); row_saved.addWidget(btn_save_filter_as); row_saved.addWidget(btn_overwrite_saved); row_saved.addWidget(btn_load_saved); row_saved.addWidget(btn_delete_saved); row_saved.addWidget(btn_export_saved); row_saved.addWidget(btn_import_saved)
+        btn_save_filter_as = QPushButton("Lưu tên…"); btn_overwrite_saved = QPushButton("Ghi đè"); btn_load_saved = QPushButton("Tải"); btn_delete_saved = QPushButton("Xoá"); btn_rename_saved = QPushButton("Đổi tên"); btn_dup_saved = QPushButton("Nhân bản"); btn_export_saved = QPushButton("Export JSON"); btn_import_saved = QPushButton("Nhập JSON")
+        row_saved = QHBoxLayout(); row_saved.addWidget(QLabel("Bộ lọc đã lưu")); row_saved.addWidget(saved_filters_combo); row_saved.addWidget(btn_save_filter_as); row_saved.addWidget(btn_overwrite_saved); row_saved.addWidget(btn_load_saved); row_saved.addWidget(btn_delete_saved); row_saved.addWidget(btn_rename_saved); row_saved.addWidget(btn_dup_saved); row_saved.addWidget(btn_export_saved); row_saved.addWidget(btn_import_saved)
         f.addRow(row_saved)
 
         btn_resend = QPushButton("Gửi lại")
@@ -2129,6 +2129,11 @@ class MainWindow(QWidget):
                 today = _date.today()
                 if name == '7 ngày':
                     start = today - _td(days=6); end = today
+                elif name == 'Hôm nay':
+                    start = today; end = today
+                elif name == 'Hôm qua':
+                    from datetime import timedelta as _td2
+                    end = today - _td2(days=1); start = end
                 elif name == '30 ngày':
                     start = today - _td(days=29); end = today
                 elif name == '90 ngày':
@@ -2142,6 +2147,9 @@ class MainWindow(QWidget):
                 elif name == 'Tuần trước':
                     end = (today - _td(days=today.weekday() + 1))
                     start = end - _td(days=6)
+                elif name == 'Tháng đến nay':
+                    start = _date(today.year, today.month, 1)
+                    end = today
                 elif name == 'Tháng này':
                     start = _date(today.year, today.month, 1)
                     from calendar import monthrange
@@ -2246,6 +2254,8 @@ class MainWindow(QWidget):
                     if pn and not pn.startswith('('): parts.append(f"Preset={pn}")
                 # sort
                 parts.append(f"Sort={sort_field.currentText()} {'ASC' if sort_asc_cb.isChecked() else 'DESC'}")
+                if sort_field2.currentText().strip() and sort_field2.currentText().strip() != '(Không)':
+                    parts.append(f"Sort2={sort_field2.currentText().strip()} {'ASC' if sort_asc_cb2.isChecked() else 'DESC'}")
                 filter_summary_label.setText(' | '.join(parts))
             except Exception:
                 pass
@@ -2846,10 +2856,94 @@ class MainWindow(QWidget):
                 QMessageBox.information(dlg, "Đã nhập", f"Đã nhập {len(data or {})} bộ lọc")
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
+        def rename_saved_filter():
+            try:
+                name = saved_filters_combo.currentText()
+                if not name or name.startswith("("):
+                    QMessageBox.information(dlg, "Chưa chọn", "Chọn một bộ lọc để đổi tên")
+                    return
+                from PySide6.QtWidgets import QInputDialog
+                new_name, ok = QInputDialog.getText(dlg, "Đổi tên bộ lọc", "Tên mới:", text=name)
+                if not ok:
+                    return
+                new_name = (new_name or '').strip()
+                if not new_name:
+                    QMessageBox.warning(dlg, "Không hợp lệ", "Tên mới không được trống")
+                    return
+                from .settings_service import get_setting, set_setting
+                import json as _json
+                user_name_key = (self.current_user.get('username') or '').strip()
+                old_key = f"EMAIL_HISTORY_SAVED_FILTER:{user_name_key}:{name}"
+                new_key = f"EMAIL_HISTORY_SAVED_FILTER:{user_name_key}:{new_name}"
+                raw = get_setting(old_key, '') or ''
+                if not raw:
+                    QMessageBox.warning(dlg, "Không có", "Không tìm thấy nội dung bộ lọc")
+                    return
+                # ghi key mới và xoá cũ
+                set_setting(new_key, raw)
+                set_setting(old_key, '')
+                # cập nhật danh sách
+                list_key = f"EMAIL_HISTORY_SAVED_LIST:{user_name_key}"
+                raw_list = get_setting(list_key, '') or ''
+                names = []
+                if raw_list.strip():
+                    try: names = _json.loads(raw_list)
+                    except Exception: names = []
+                names = [new_name if str(x) == name else x for x in names]
+                if new_name not in names:
+                    names.append(new_name)
+                set_setting(list_key, _json.dumps(names, ensure_ascii=False))
+                refresh_saved_combo()
+                try:
+                    saved_filters_combo.setCurrentText(new_name)
+                except Exception:
+                    pass
+                QMessageBox.information(dlg, "Đã đổi tên", f"{name} → {new_name}")
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        def duplicate_saved_filter():
+            try:
+                name = saved_filters_combo.currentText()
+                if not name or name.startswith("("):
+                    QMessageBox.information(dlg, "Chưa chọn", "Chọn một bộ lọc để nhân bản")
+                    return
+                from PySide6.QtWidgets import QInputDialog
+                new_name, ok = QInputDialog.getText(dlg, "Nhân bản bộ lọc", "Tên bản sao:", text=f"{name} copy")
+                if not ok:
+                    return
+                new_name = (new_name or '').strip()
+                if not new_name:
+                    QMessageBox.warning(dlg, "Không hợp lệ", "Tên bản sao không được trống")
+                    return
+                from .settings_service import get_setting, set_setting
+                import json as _json
+                user_name_key = (self.current_user.get('username') or '').strip()
+                old_key = f"EMAIL_HISTORY_SAVED_FILTER:{user_name_key}:{name}"
+                new_key = f"EMAIL_HISTORY_SAVED_FILTER:{user_name_key}:{new_name}"
+                raw = get_setting(old_key, '') or ''
+                if not raw:
+                    QMessageBox.warning(dlg, "Không có", "Không tìm thấy nội dung bộ lọc")
+                    return
+                set_setting(new_key, raw)
+                list_key = f"EMAIL_HISTORY_SAVED_LIST:{user_name_key}"
+                raw_list = get_setting(list_key, '') or ''
+                names = []
+                if raw_list.strip():
+                    try: names = _json.loads(raw_list)
+                    except Exception: names = []
+                if new_name not in names:
+                    names.append(new_name)
+                set_setting(list_key, _json.dumps(names, ensure_ascii=False))
+                refresh_saved_combo()
+                QMessageBox.information(dlg, "Đã nhân bản", f"Đã tạo: {new_name}")
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_save_filter_as.clicked.connect(save_filter_as)
         btn_overwrite_saved.clicked.connect(overwrite_saved_filter)
         btn_load_saved.clicked.connect(load_saved_filter)
         btn_delete_saved.clicked.connect(delete_saved_filter)
+        btn_rename_saved.clicked.connect(rename_saved_filter)
+        btn_dup_saved.clicked.connect(duplicate_saved_filter)
         btn_export_saved.clicked.connect(export_saved_filters)
         btn_import_saved.clicked.connect(import_saved_filters)
         refresh_saved_combo()
