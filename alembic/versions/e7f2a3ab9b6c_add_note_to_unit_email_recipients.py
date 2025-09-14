@@ -19,8 +19,28 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column('unit_email_recipients', sa.Column('note', sa.String(length=255), nullable=True))
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    try:
+        cols = {c['name'] for c in inspector.get_columns('unit_email_recipients')}
+    except Exception:
+        cols = set()
+    if 'note' not in cols:
+        try:
+            op.add_column('unit_email_recipients', sa.Column('note', sa.String(length=255), nullable=True))
+        except Exception:
+            pass
 
 
 def downgrade() -> None:
-    op.drop_column('unit_email_recipients', 'note')
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    try:
+        cols = {c['name'] for c in inspector.get_columns('unit_email_recipients')}
+    except Exception:
+        cols = set()
+    if 'note' in cols:
+        try:
+            op.drop_column('unit_email_recipients', 'note')
+        except Exception:
+            pass

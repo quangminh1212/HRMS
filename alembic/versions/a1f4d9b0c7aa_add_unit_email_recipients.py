@@ -19,6 +19,39 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    """
+    Tạo bảng nếu chưa tồn tại. Nếu đã tồn tại (do khởi tạo thủ công trước đó),
+    đảm bảo các cột/unique constraint cần thiết đã có để bảo toàn logic ứng dụng.
+    """
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+
+    tables = set(inspector.get_table_names())
+    if 'unit_email_recipients' in tables:
+        # Đảm bảo các cột bắt buộc tồn tại
+        try:
+            cols = {c['name'] for c in inspector.get_columns('unit_email_recipients')}
+        except Exception:
+            cols = set()
+        if 'active' not in cols:
+            try:
+                op.add_column('unit_email_recipients', sa.Column('active', sa.Boolean(), nullable=False, server_default=sa.text('1')))
+            except Exception:
+                pass
+        if 'created_at' not in cols:
+            try:
+                op.add_column('unit_email_recipients', sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()))
+            except Exception:
+                pass
+        # Đảm bảo unique constraint (unit_id, email)
+        try:
+            uqs = [uc.get('name') for uc in inspector.get_unique_constraints('unit_email_recipients')]
+            if 'uq_unit_email' not in set(uqs):
+                op.create_unique_constraint('uq_unit_email', 'unit_email_recipients', ['unit_id', 'email'])
+        except Exception:
+            pass
+        return
+
     op.create_table(
         'unit_email_recipients',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -33,4 +66,11 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_table('unit_email_recipients')
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    try:
+        if 'unit_email_recipients' in set(inspector.get_table_names()):
+            op.drop_table('unit_email_recipients')
+    except Exception:
+        # Bỏ qua nếu đã bị xóa/không tồn tại
+        pass
