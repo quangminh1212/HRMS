@@ -2561,9 +2561,11 @@ class MainWindow(QWidget):
                         fd = from_date.date(); q = q.filter(_EL.created_at >= _dt2(fd.year(), fd.month(), fd.day(), 0, 0, 0))
                     if e_to.isChecked():
                         td = to_date.date(); q = q.filter(_EL.created_at <= _dt2(td.year(), td.month(), td.day(), 23, 59, 59))
-                    # Build summary
-                    by_status = s.query(_EL.status, func.count(1)).filter(q._criterion if getattr(q, '_criterion', None) is not None else True).group_by(_EL.status).all()
-                    by_type = s.query(_EL.type, func.count(1)).filter(q._criterion if getattr(q, '_criterion', None) is not None else True).group_by(_EL.type).all()
+                    # Build summary via reporting helper
+                    from .reporting import compute_email_summary
+                    summary = compute_email_summary(s, q)
+                    by_status = summary.get('by_status', [])
+                    by_type = summary.get('by_type', [])
                     # Write CSV
                     import csv
                     from datetime import datetime as _dt
@@ -3141,16 +3143,23 @@ class MainWindow(QWidget):
             if i < 0:
                 QMessageBox.information(dlg, "Chưa chọn", "Chọn một dòng trong bảng")
                 return
-                from PySide6.QtWidgets import QDialog, QFormLayout, QTextEdit
-                dd = QDialog(dlg); dd.setWindowTitle("Chi tiết Email")
-                # Audit
-                try:
-                    from .db import SessionLocal as _SL
-                    eid = table.item(i,0).data(Qt.UserRole) if table.item(i,0) else None
-                    log_action(_SL(), self.current_user.get('id'), 'ui_email_history_view_detail', 'EmailLog', int(eid) if eid else None, '')
-                except Exception:
-                    pass
+            from PySide6.QtWidgets import QDialog, QFormLayout, QTextEdit, QPushButton, QHBoxLayout
+            dd = QDialog(dlg); dd.setWindowTitle("Chi tiết Email")
+            # Khu vực nút thêm vào bộ lọc
+            btn_apply_subject = QPushButton("Lọc theo Subject")
+            btn_apply_unit = QPushButton("Lọc theo Đơn vị")
+            btn_apply_type = QPushButton("Lọc theo Loại")
+            bar = QHBoxLayout()
+            bar.addWidget(btn_apply_subject); bar.addWidget(btn_apply_unit); bar.addWidget(btn_apply_type)
+            # Audit
+            try:
+                from .db import SessionLocal as _SL
+                eid = table.item(i,0).data(Qt.UserRole) if table.item(i,0) else None
+                log_action(_SL(), self.current_user.get('id'), 'ui_email_history_view_detail', 'EmailLog', int(eid) if eid else None, '')
+            except Exception:
+                pass
             ff = QFormLayout(dd)
+            ff.addRow(bar)
             get = lambda c: (table.item(i,c).data(Qt.UserRole) if table.item(i,c) else '') or (table.item(i,c).text() if table.item(i,c) else '')
             ff.addRow("Thời gian", QLabel(table.item(i,0).text() if table.item(i,0) else ''))
             ff.addRow("Loại", QLabel(table.item(i,1).text() if table.item(i,1) else ''))
@@ -3162,6 +3171,33 @@ class MainWindow(QWidget):
             ff.addRow("Attachments", QLabel(get(5)))
             ff.addRow("Trạng thái", QLabel(table.item(i,6).text() if table.item(i,6) else ''))
             ff.addRow("Lỗi", QLabel(get(7)))
+            # Hook nút áp dụng
+            def _apply_subject():
+                try:
+                    subject_search.setText(table.item(i,3).text() if table.item(i,3) else '')
+                    state['page'] = 0; save_filter(); load(); dd.accept()
+                except Exception:
+                    pass
+            def _apply_unit():
+                try:
+                    unit = table.item(i,2).text() if table.item(i,2) else ''
+                    if unit:
+                        unit_box.setCurrentText(unit)
+                        unit_edit.clear()
+                    state['page'] = 0; save_filter(); load(); dd.accept()
+                except Exception:
+                    pass
+            def _apply_type():
+                try:
+                    t = table.item(i,1).text() if table.item(i,1) else ''
+                    if t and t in [type_box.itemText(k) for k in range(type_box.count())]:
+                        type_box.setCurrentText(t)
+                    state['page'] = 0; save_filter(); load(); dd.accept()
+                except Exception:
+                    pass
+            btn_apply_subject.clicked.connect(_apply_subject)
+            btn_apply_unit.clicked.connect(_apply_unit)
+            btn_apply_type.clicked.connect(_apply_type)
             dd.resize(700, 500)
             dd.exec()
         btn_view.clicked.connect(view_detail)

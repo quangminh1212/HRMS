@@ -3,8 +3,9 @@ from collections import Counter
 from typing import Dict, Any, List, Tuple
 
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
-from .models import Person, SalaryHistory, RetirementNotice, Appointment
+from .models import Person, SalaryHistory, RetirementNotice, Appointment, EmailLog
 
 
 def age_on(dob: date, as_of: date) -> int:
@@ -123,6 +124,25 @@ def export_report_to_excel(summary: Dict[str, Any], demo: Dict[str, Any], path: 
     write_counter("Professional", demo["professional"])
 
     wb.save(path)
+
+
+def compute_email_summary(db: Session, base_query) -> Dict[str, Any]:
+    """Tính thống kê gọn cho EmailLog dựa trên base_query đã áp dụng filter.
+    base_query là một sqlalchemy Query trên EmailLog.
+    """
+    q = base_query
+    # status
+    by_status = db.query(EmailLog.status, func.count(1)).filter(
+        q._criterion if getattr(q, '_criterion', None) is not None else True
+    ).group_by(EmailLog.status).all()
+    # type
+    by_type = db.query(EmailLog.type, func.count(1)).filter(
+        q._criterion if getattr(q, '_criterion', None) is not None else True
+    ).group_by(EmailLog.type).all()
+    return {
+        'by_status': [(k or '', v) for k, v in by_status],
+        'by_type': [(k or '', v) for k, v in by_type],
+    }
 
 
 def export_retirement_alerts_to_excel(db: Session, persons_six: List[Person], persons_three: List[Person], path: str) -> None:
