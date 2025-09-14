@@ -1870,6 +1870,12 @@ class MainWindow(QWidget):
         # Áp dụng trên toàn bộ (bỏ qua phân trang)
         cb_all_scope = QCheckBox("Toàn bộ (bỏ qua phân trang)")
         f.addRow("", cb_all_scope)
+        # Saved filters UI
+        saved_filters_combo = QComboBox(); saved_filters_combo.addItem("(Chưa có)")
+        btn_save_filter_as = QPushButton("Lưu tên…"); btn_load_saved = QPushButton("Tải"); btn_delete_saved = QPushButton("Xoá")
+        row_saved = QHBoxLayout(); row_saved.addWidget(QLabel("Bộ lọc đã lưu")); row_saved.addWidget(saved_filters_combo); row_saved.addWidget(btn_save_filter_as); row_saved.addWidget(btn_load_saved); row_saved.addWidget(btn_delete_saved)
+        f.addRow(row_saved)
+
         btn_resend = QPushButton("Gửi lại")
         btn_resend_all = QPushButton("Gửi lại tất cả (lọc)")
         btn_resend_group = QPushButton("Gửi lại theo nhóm (đơn vị)")
@@ -1913,8 +1919,26 @@ class MainWindow(QWidget):
         def load_filter():
             try:
                 from .settings_service import get_setting
-                key = f"EMAIL_HISTORY_FILTER:{(self.current_user.get('username') or '').strip()}"
+                user_name_key = (self.current_user.get('username') or '').strip()
+                key = f"EMAIL_HISTORY_FILTER:{user_name_key}"
                 raw = get_setting(key, '') or ''
+                # Load saved filters list
+                try:
+                    saved_list_raw = get_setting(f"EMAIL_HISTORY_SAVED_LIST:{user_name_key}", '') or ''
+                    import json as _json
+                    names = []
+                    if saved_list_raw.strip():
+                        names = _json.loads(saved_list_raw) if isinstance(saved_list_raw, str) else []
+                    saved_filters_combo.blockSignals(True)
+                    saved_filters_combo.clear(); saved_filters_combo.addItem("(Chưa có)")
+                    for n in names:
+                        saved_filters_combo.addItem(str(n))
+                except Exception:
+                    pass
+                try:
+                    saved_filters_combo.blockSignals(False)
+                except Exception:
+                    pass
                 if not raw:
                     # nếu không có filter đã lưu, giữ mặc định từ settings cho fast pager
                     try:
@@ -2640,6 +2664,110 @@ class MainWindow(QWidget):
         page_size_box.currentTextChanged.connect(lambda _ : (state.__setitem__('page', 0), load()))
         btn_refresh.clicked.connect(lambda: (save_filter(), state.__setitem__('page', 0), load()))
         btn_save_filter.clicked.connect(save_filter)
+        # Saved filters handlers
+        def refresh_saved_combo():
+            try:
+                from .settings_service import get_setting
+                user_name_key = (self.current_user.get('username') or '').strip()
+                saved_list_raw = get_setting(f"EMAIL_HISTORY_SAVED_LIST:{user_name_key}", '') or ''
+                import json as _json
+                names = []
+                if saved_list_raw.strip():
+                    names = _json.loads(saved_list_raw) if isinstance(saved_list_raw, str) else []
+                saved_filters_combo.blockSignals(True)
+                saved_filters_combo.clear(); saved_filters_combo.addItem("(Chưa có)")
+                for n in names:
+                    saved_filters_combo.addItem(str(n))
+            except Exception:
+                pass
+            finally:
+                try: saved_filters_combo.blockSignals(False)
+                except Exception: pass
+        def save_filter_as():
+            try:
+                from PySide6.QtWidgets import QInputDialog
+                name, ok = QInputDialog.getText(dlg, "Lưu bộ lọc", "Tên bộ lọc:")
+                if not ok or not name.strip():
+                    return
+                name = name.strip()
+                # Build current filter object (reuse save_filter logic)
+                try:
+                    save_filter()
+                except Exception:
+                    pass
+                from .settings_service import get_setting, set_setting
+                user_name_key = (self.current_user.get('username') or '').strip()
+                # Copy current saved filter JSON from key
+                key = f"EMAIL_HISTORY_FILTER:{user_name_key}"
+                val = get_setting(key, '') or ''
+                if not val:
+                    return
+                import json as _json
+                # Save under named key
+                set_setting(f"EMAIL_HISTORY_SAVED_FILTER:{user_name_key}:{name}", val)
+                # Update names list
+                raw = get_setting(f"EMAIL_HISTORY_SAVED_LIST:{user_name_key}", '') or ''
+                names = []
+                if raw.strip():
+                    try:
+                        names = _json.loads(raw)
+                    except Exception:
+                        names = []
+                if name not in names:
+                    names.append(name)
+                set_setting(f"EMAIL_HISTORY_SAVED_LIST:{user_name_key}", _json.dumps(names, ensure_ascii=False))
+                refresh_saved_combo()
+                QMessageBox.information(dlg, "Đã lưu", f"Đã lưu bộ lọc: {name}")
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        def load_saved_filter():
+            try:
+                name = saved_filters_combo.currentText()
+                if not name or name.startswith("("):
+                    return
+                from .settings_service import get_setting
+                user_name_key = (self.current_user.get('username') or '').strip()
+                key = f"EMAIL_HISTORY_SAVED_FILTER:{user_name_key}:{name}"
+                raw = get_setting(key, '') or ''
+                if not raw:
+                    QMessageBox.warning(dlg, "Không có", "Không tìm thấy bộ lọc đã lưu")
+                    return
+                import json as _json
+                obj = _json.loads(raw)
+                # Write back as current filter
+                from .settings_service import set_setting
+                set_setting(f"EMAIL_HISTORY_FILTER:{user_name_key}", raw)
+                # Reload UI from saved object
+                # Use existing load logic by setting raw local variable? Simplest: set UI fields similar to load_filter parsing
+                # Reuse code path by calling load_filter after writing setting
+                load_filter(); state['page'] = 0; load()
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        def delete_saved_filter():
+            try:
+                name = saved_filters_combo.currentText()
+                if not name or name.startswith("("):
+                    return
+                from .settings_service import get_setting, set_setting
+                user_name_key = (self.current_user.get('username') or '').strip()
+                import json as _json
+                raw = get_setting(f"EMAIL_HISTORY_SAVED_LIST:{user_name_key}", '') or ''
+                names = []
+                if raw.strip():
+                    try: names = _json.loads(raw)
+                    except Exception: names = []
+                names = [n for n in names if str(n) != name]
+                set_setting(f"EMAIL_HISTORY_SAVED_LIST:{user_name_key}", _json.dumps(names, ensure_ascii=False))
+                # Clear saved body under key (optional)
+                set_setting(f"EMAIL_HISTORY_SAVED_FILTER:{user_name_key}:{name}", '')
+                refresh_saved_combo()
+                QMessageBox.information(dlg, "Đã xoá", f"Đã xoá bộ lọc: {name}")
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_save_filter_as.clicked.connect(save_filter_as)
+        btn_load_saved.clicked.connect(load_saved_filter)
+        btn_delete_saved.clicked.connect(delete_saved_filter)
+        refresh_saved_combo()
         def reset_filter():
             try:
                 # Clear saved filter and UI fields
