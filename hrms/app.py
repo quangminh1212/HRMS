@@ -1737,27 +1737,33 @@ class MainWindow(QWidget):
         unit_edit = QLineEdit(); unit_edit.setPlaceholderText("Đơn vị chứa…")
         unit_not_edit = QLineEdit(); unit_not_edit.setPlaceholderText("Đơn vị không chứa…")
         unit_box = QComboBox(); unit_box.addItem("(Tất cả)")
+        unit_not_box = QComboBox(); unit_not_box.addItem("(Không)")
         def reload_units():
             try:
-                unit_box.blockSignals(True)
-                cur = unit_box.currentText()
+                unit_box.blockSignals(True); unit_not_box.blockSignals(True)
+                cur = unit_box.currentText(); cur2 = unit_not_box.currentText()
                 unit_box.clear(); unit_box.addItem("(Tất cả)")
+                unit_not_box.clear(); unit_not_box.addItem("(Không)")
                 from .db import SessionLocal as _SL
                 from .models import Unit as _Unit
                 _s = _SL();
                 try:
                     for _u in _s.query(_Unit).order_by(_Unit.name).all():
                         unit_box.addItem(_u.name)
+                        unit_not_box.addItem(_u.name)
                 finally:
                     _s.close()
                 # cố gắng chọn lại mục cũ
                 for i in range(unit_box.count()):
                     if unit_box.itemText(i) == cur:
                         unit_box.setCurrentIndex(i); break
+                for i in range(unit_not_box.count()):
+                    if unit_not_box.itemText(i) == cur2:
+                        unit_not_box.setCurrentIndex(i); break
             except Exception:
                 pass
             finally:
-                try: unit_box.blockSignals(False)
+                try: unit_box.blockSignals(False); unit_not_box.blockSignals(False)
                 except Exception: pass
         reload_units()
         status_box = QComboBox(); status_box.addItems(["(Tất cả)", "sent", "failed"])
@@ -1785,7 +1791,7 @@ class MainWindow(QWidget):
         f.addRow("Đơn vị", unit_edit)
         f.addRow("Đơn vị không chứa", unit_not_edit)
         from PySide6.QtWidgets import QHBoxLayout as _HB, QPushButton as _PB
-        _unit_row = _HB(); _unit_row.addWidget(unit_box); _btn_reload_units = _PB("Tải lại")
+        _unit_row = _HB(); _unit_row.addWidget(unit_box); _unit_row.addWidget(QLabel("Đơn vị khác")); _unit_row.addWidget(unit_not_box); _btn_reload_units = _PB("Tải lại")
         _btn_reload_units.clicked.connect(reload_units)
         _unit_row.addWidget(_btn_reload_units)
         f.addRow("Chọn đơn vị", _unit_row)
@@ -2271,6 +2277,12 @@ class MainWindow(QWidget):
                     unit_not_edit.setText(obj.get('unit_not_contains',''))
                 except Exception:
                     pass
+                try:
+                    unotsel = obj.get('unit_not_selected','')
+                    if unotsel:
+                        unit_not_box.setCurrentText(unotsel)
+                except Exception:
+                    pass
                 # status
                 st = obj.get('status')
                 if st and st in [status_box.itemText(i) for i in range(status_box.count())]:
@@ -2401,8 +2413,9 @@ class MainWindow(QWidget):
 'type': type_box.currentText(),
                     'type_not': type_not_box.currentText(),
                     'unit_selected': unit_box.currentText() if unit_box.currentIndex()>0 else '',
-                    'unit_contains': unit_edit.text().strip(),
+'unit_contains': unit_edit.text().strip(),
                     'unit_not_contains': unit_not_edit.text().strip(),
+                    'unit_not_selected': unit_not_box.currentText() if unit_not_box.currentIndex()>0 else '',
                     'status': status_box.currentText(),
 'only_failed': only_failed.isChecked(),
                     'only_success': only_success.isChecked(),
@@ -2680,11 +2693,17 @@ class MainWindow(QWidget):
                     u = unit_edit.text().strip();
                     if u:
                         q = q.filter(EmailLog.unit_name.ilike(f"%{u}%"))
-                # unit not contains
+                # unit not contains or not selected
                 try:
                     unot = unit_not_edit.text().strip()
                     if unot:
                         q = q.filter(~EmailLog.unit_name.ilike(f"%{unot}%"))
+                except Exception:
+                    pass
+                try:
+                    unotsel = unit_not_box.currentText().strip() if unit_not_box.currentIndex() > -1 else ''
+                    if unotsel and not unotsel.startswith('('):
+                        q = q.filter(EmailLog.unit_name != unotsel)
                 except Exception:
                     pass
                 st = status_box.currentText();
@@ -3778,6 +3797,53 @@ class MainWindow(QWidget):
         btn_import_clip.clicked.connect(import_saved_filters_from_clipboard)
         btn_export_saved.clicked.connect(export_saved_filters)
         btn_import_saved.clicked.connect(import_saved_filters)
+        # Export/Import mặc định theo loại
+        def export_type_defaults():
+            try:
+                from .settings_service import get_setting
+                import json as _json
+                ukey = (self.current_user.get('username') or '').strip()
+                types = [type_box.itemText(i) for i in range(type_box.count()) if not type_box.itemText(i).startswith('(')]
+                data = {}
+                for t in types:
+                    raw = get_setting(f"EMAIL_HISTORY_TYPE_DEFAULT:{ukey}:{t}", '') or ''
+                    if raw:
+                        try: data[t] = _json.loads(raw)
+                        except Exception: data[t] = raw
+                from pathlib import Path
+                from datetime import datetime as _dt
+                Path('exports').mkdir(exist_ok=True)
+                p = Path('exports')/f"email_history_type_defaults_{ukey}_{_dt.now().strftime('%Y%m%d_%H%M%S')}.json"
+                with open(p, 'w', encoding='utf-8') as f:
+                    _json.dump(data, f, ensure_ascii=False, indent=2)
+                QMessageBox.information(dlg, "Đã xuất", str(p))
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        def import_type_defaults():
+            try:
+                from PySide6.QtWidgets import QFileDialog
+                import json as _json
+                from .settings_service import set_setting
+                ukey = (self.current_user.get('username') or '').strip()
+                file_path, _ = QFileDialog.getOpenFileName(dlg, "Chọn file JSON", "", "JSON Files (*.json)")
+                if not file_path:
+                    return
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    data = _json.load(f)
+                for t, obj in (data or {}).items():
+                    set_setting(f"EMAIL_HISTORY_TYPE_DEFAULT:{ukey}:{t}", _json.dumps(obj, ensure_ascii=False) if not isinstance(obj, str) else obj)
+                QMessageBox.information(dlg, "Đã nhập", f"Đã nhập {len(data or {})} mặc định loại")
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        # Thêm nút vào hàng saved filters
+        try:
+            btn_export_type_defaults = QPushButton("Export mặc định loại")
+            btn_import_type_defaults = QPushButton("Nhập mặc định loại")
+            row_saved.addWidget(btn_export_type_defaults); row_saved.addWidget(btn_import_type_defaults)
+            btn_export_type_defaults.clicked.connect(export_type_defaults)
+            btn_import_type_defaults.clicked.connect(import_type_defaults)
+        except Exception:
+            pass
         def load_current_filter_from_json():
             try:
                 from PySide6.QtWidgets import QFileDialog
@@ -4375,7 +4441,7 @@ class MainWindow(QWidget):
             _load_zip_opts()
         try:
             zip_per_type.toggled.connect(lambda _ : _on_zip_config_changed())
-            type_box.currentTextChanged.connect(lambda _ : (zip_per_type.isChecked() and _on_zip_config_changed()))
+            type_box.currentTextChanged.connect(lambda _ : (_on_zip_config_changed()))
         except Exception:
             pass
         def export_attachments_zip():
