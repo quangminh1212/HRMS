@@ -1763,6 +1763,7 @@ class MainWindow(QWidget):
         only_success = QCheckBox("Chỉ thành công")
         has_attach_cb = QCheckBox("Chỉ có đính kèm")
         has_body_cb = QCheckBox("Chỉ có body")
+        no_body_cb = QCheckBox("Không có body")
         no_attach_cb = QCheckBox("Không có đính kèm")
         no_error_cb = QCheckBox("Không có lỗi")
         subject_search = QLineEdit(); subject_search.setPlaceholderText("Tìm tiêu đề…")
@@ -1785,6 +1786,7 @@ class MainWindow(QWidget):
         f.addRow("", only_success)
         f.addRow("", has_attach_cb)
         f.addRow("", has_body_cb)
+        f.addRow("", no_body_cb)
         f.addRow("", no_attach_cb)
         f.addRow("", no_error_cb)
         f.addRow("Tiêu đề", subject_search)
@@ -1850,6 +1852,7 @@ class MainWindow(QWidget):
         my_only_cb.toggled.connect(lambda _ : _on_my_only())
         sort_asc_cb.toggled.connect(lambda _ : (save_filter(), state.__setitem__('page', 0), load()))
         has_body_cb.toggled.connect(lambda _ : (save_filter(), state.__setitem__('page', 0), load()))
+        no_body_cb.toggled.connect(lambda _ : (save_filter(), state.__setitem__('page', 0), load()))
         no_attach_cb.toggled.connect(lambda _ : (save_filter(), state.__setitem__('page', 0), load()))
         no_error_cb.toggled.connect(lambda _ : (save_filter(), state.__setitem__('page', 0), load()))
         f.addRow("", my_only_cb)
@@ -1948,9 +1951,11 @@ class MainWindow(QWidget):
         btn_copy_row = QPushButton("Copy dòng")
         btn_quick_export = QPushButton("Xuất nhanh")
         btn_export_recip = QPushButton("Export recipients CSV")
+        btn_copy_att_paths = QPushButton("Copy paths (lọc)")
+        btn_export_att_list = QPushButton("Export attach list CSV")
         btn_reset_cols = QPushButton("Reset cột")
         btn_copy_recip_all = QPushButton("Copy recipients (lọc)")
-        for b in (btn_refresh, btn_save_filter, btn_reset_filter, btn_export, btn_quick_export, btn_copy_csv, btn_copy_row, btn_export_recip, btn_export_zip, btn_view, btn_resend, btn_resend_all, btn_resend_group, btn_view_zip, btn_open_files, btn_open_folders, btn_open_exports, btn_copy_recip, btn_copy_recip_all, btn_delete, btn_delete_all, btn_reset_cols):
+        for b in (btn_refresh, btn_save_filter, btn_reset_filter, btn_export, btn_quick_export, btn_copy_csv, btn_copy_row, btn_export_recip, btn_export_att_list, btn_copy_att_paths, btn_export_zip, btn_view, btn_resend, btn_resend_all, btn_resend_group, btn_view_zip, btn_open_files, btn_open_folders, btn_open_exports, btn_copy_recip, btn_copy_recip_all, btn_delete, btn_delete_all, btn_reset_cols):
             hb.addWidget(b)
         f.addRow(hb)
         def reset_columns():
@@ -2234,6 +2239,10 @@ class MainWindow(QWidget):
                 except Exception:
                     pass
                 try:
+                    no_body_cb.setChecked(bool(obj.get('no_body', False)))
+                except Exception:
+                    pass
+                try:
                     no_attach_cb.setChecked(bool(obj.get('no_attachments', False)))
                 except Exception:
                     pass
@@ -2331,7 +2340,8 @@ class MainWindow(QWidget):
                     'subject_starts': subject_starts.text().strip(),
                     'subject_ends': subject_ends.text().strip(),
 'has_attachments': has_attach_cb.isChecked(),
-                    'has_body': has_body_cb.isChecked(),
+'has_body': has_body_cb.isChecked(),
+                    'no_body': no_body_cb.isChecked(),
                     'no_attachments': no_attach_cb.isChecked(),
                     'no_error': no_error_cb.isChecked(),
                     'from_date': qdate_to_str(from_date.date()) if e_from.isChecked() else None,
@@ -2476,6 +2486,7 @@ class MainWindow(QWidget):
                 if b: parts.append(f"Body chứa={b}")
                 if bn: parts.append(f"Body không chứa={bn}")
                 if has_body_cb.isChecked(): parts.append("Có body")
+                if no_body_cb.isChecked(): parts.append("Không body")
                 if no_attach_cb.isChecked(): parts.append("Không tệp")
                 if no_error_cb.isChecked(): parts.append("Không lỗi")
                 ax = attach_ext.text().strip(); ac = attach_contains.text().strip(); an = attach_not.text().strip()
@@ -2584,6 +2595,9 @@ class MainWindow(QWidget):
                     q = q.filter(~EmailLog.body.ilike(f"%{bnot}%"))
                 if has_body_cb.isChecked():
                     q = q.filter(EmailLog.body != None).filter(EmailLog.body != '')
+                if no_body_cb.isChecked():
+                    from sqlalchemy import or_
+                    q = q.filter(or_(EmailLog.body == None, EmailLog.body == ''))
                 if has_attach_cb.isChecked():
                     from sqlalchemy import or_
                     q = q.filter(EmailLog.attachments != None).filter(EmailLog.attachments != '')
@@ -2983,6 +2997,8 @@ class MainWindow(QWidget):
             qs_next = QShortcut(QKeySequence("PgDown"), table); qs_next.activated.connect(go_next)
             qs_prev2 = QShortcut(QKeySequence("Alt+Left"), table); qs_prev2.activated.connect(go_prev)
             qs_next2 = QShortcut(QKeySequence("Alt+Right"), table); qs_next2.activated.connect(go_next)
+            qs_enter = QShortcut(QKeySequence("Return"), table); qs_enter.activated.connect(view_detail)
+            qs_export = QShortcut(QKeySequence("Ctrl+E"), table); qs_export.activated.connect(export_csv)
         except Exception:
             pass
         def go_prev():
@@ -4458,6 +4474,57 @@ class MainWindow(QWidget):
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_copy_recip_all.clicked.connect(copy_recipients_filtered)
+        def copy_attachment_paths_filtered():
+            try:
+                from .db import SessionLocal as _SL
+                from .models import EmailLog as _EL
+                from sqlalchemy import func
+                s = _SL()
+                try:
+                    q = s.query(_EL)
+                    t = type_box.currentText()
+                    if not t.startswith("("):
+                        q = q.filter(_EL.type == t)
+                    u_sel = unit_box.currentText().strip() if unit_box.currentIndex() > -1 else ""
+                    if u_sel and not u_sel.startswith("("):
+                        q = q.filter(_EL.unit_name == u_sel)
+                    else:
+                        u = unit_edit.text().strip()
+                        if u:
+                            q = q.filter(_EL.unit_name.ilike(f"%{u}%"))
+                    st = status_box.currentText()
+                    if only_failed.isChecked():
+                        q = q.filter(_EL.status == 'failed')
+                    elif only_success.isChecked():
+                        q = q.filter(_EL.status == 'sent')
+                    elif not st.startswith("("):
+                        q = q.filter(_EL.status == st)
+                    # date range
+                    from datetime import datetime as _dt2
+                    if e_from.isChecked():
+                        fd = from_date.date(); q = q.filter(_EL.created_at >= _dt2(fd.year(), fd.month(), fd.day(), 0, 0, 0))
+                    if e_to.isChecked():
+                        td = to_date.date(); q = q.filter(_EL.created_at <= _dt2(td.year(), td.month(), td.day(), 23, 59, 59))
+                    rows = q.with_entities(_EL.attachments).all()
+                    paths = []
+                    for (att,) in rows:
+                        for part in (att or '').split(','):
+                            p = (part or '').strip()
+                            if p:
+                                paths.append(p)
+                    # unique while preserving order
+                    seen = set(); out = []
+                    for p in paths:
+                        if p not in seen:
+                            seen.add(p); out.append(p)
+                    from PySide6.QtWidgets import QApplication
+                    QApplication.clipboard().setText("\n".join(out))
+                    QMessageBox.information(dlg, "Đã copy", f"Đã copy {len(out)} đường dẫn")
+                finally:
+                    s.close()
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_copy_att_paths.clicked.connect(copy_attachment_paths_filtered)
         def export_recipients_csv():
             try:
                 from .db import SessionLocal as _SL
@@ -4540,6 +4607,88 @@ class MainWindow(QWidget):
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_export_recip.clicked.connect(export_recipients_csv)
+        def export_attachment_list_csv():
+            try:
+                from .db import SessionLocal as _SL
+                from .models import EmailLog as _EL
+                from sqlalchemy import func
+                from pathlib import Path
+                s = _SL()
+                try:
+                    q = s.query(_EL)
+                    t = type_box.currentText()
+                    if not t.startswith("("):
+                        q = q.filter(_EL.type == t)
+                    u_sel = unit_box.currentText().strip() if unit_box.currentIndex() > -1 else ""
+                    if u_sel and not u_sel.startswith("("):
+                        q = q.filter(_EL.unit_name == u_sel)
+                    else:
+                        u = unit_edit.text().strip()
+                        if u:
+                            q = q.filter(_EL.unit_name.ilike(f"%{u}%"))
+                    st = status_box.currentText()
+                    if only_failed.isChecked():
+                        q = q.filter(_EL.status == 'failed')
+                    elif only_success.isChecked():
+                        q = q.filter(_EL.status == 'sent')
+                    elif not st.startswith("("):
+                        q = q.filter(_EL.status == st)
+                    # date range
+                    from datetime import datetime as _dt2
+                    if e_from.isChecked():
+                        fd = from_date.date(); q = q.filter(_EL.created_at >= _dt2(fd.year(), fd.month(), fd.day(), 0, 0, 0))
+                    if e_to.isChecked():
+                        td = to_date.date(); q = q.filter(_EL.created_at <= _dt2(td.year(), td.month(), td.day(), 23, 59, 59))
+                    rows = q.order_by(_EL.created_at.desc()).all()
+                    # build rows list
+                    data = []
+                    for r in rows:
+                        day_str = ''
+                        try:
+                            day_str = str(getattr(r,'created_at', None).date()) if getattr(r,'created_at', None) else ''
+                        except Exception:
+                            day_str = ''
+                        for part in (getattr(r,'attachments','') or '').split(','):
+                            p = (part or '').strip()
+                            if not p:
+                                continue
+                            size = 0
+                            try:
+                                fp = Path(p)
+                                if fp.exists():
+                                    size = fp.stat().st_size
+                            except Exception:
+                                pass
+                            data.append([day_str, getattr(r,'unit_name','') or '', getattr(r,'type','') or 'generic', p, size])
+                    # write csv
+                    import csv
+                    from datetime import datetime as _dt
+                    Path('exports').mkdir(exist_ok=True)
+                    outp = Path('exports')/f"attachment_list_{_dt.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                    with open(outp, 'w', encoding='utf-8', newline='') as fcsv:
+                        w = csv.writer(fcsv)
+                        w.writerow(["day","unit","type","path","size_bytes"])
+                        for row in data:
+                            w.writerow(row)
+                    # Audit open folder prompt
+                    try:
+                        from PySide6.QtWidgets import QMessageBox as _QMB
+                        import os, sys, subprocess
+                        if _QMB.question(dlg, "Mở thư mục", "Mở thư mục chứa file?", _QMB.Yes|_QMB.No) == _QMB.Yes:
+                            if sys.platform.startswith('win'):
+                                os.startfile(str(outp.parent))
+                            elif sys.platform == 'darwin':
+                                subprocess.Popen(['open', str(outp.parent)])
+                            else:
+                                subprocess.Popen(['xdg-open', str(outp.parent)])
+                    except Exception:
+                        pass
+                    QMessageBox.information(dlg, "Đã xuất", str(outp))
+                finally:
+                    s.close()
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_export_att_list.clicked.connect(export_attachment_list_csv)
         def open_exports():
             try:
                 import os, sys, subprocess
