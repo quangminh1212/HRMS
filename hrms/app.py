@@ -3029,27 +3029,169 @@ class MainWindow(QWidget):
                 if st.startswith('('): st = 'all'
                 name = f"email_logs_{sanitize(t)}_{sanitize(st)}_{base}.csv"
                 outp = Path('exports')/name
-                def _slugify(s: str) -> str:
-                    try:
-                        import unicodedata, re
-                        s2 = unicodedata.normalize('NFKD', s)
-                        s2 = ''.join(c for c in s2 if not unicodedata.combining(c))
-                        s2 = s2.lower()
-                        s2 = re.sub(r"[^a-z0-9]+", "_", s2).strip('_')
-                        return s2
-                    except Exception:
-                        return (s or '').strip().lower().replace(' ', '_')
                 with open(outp, 'w', encoding='utf-8', newline='') as fcsv:
-                    # BOM for Excel
                     try: fcsv.write('\ufeff')
                     except Exception: pass
                     w = csv.writer(fcsv)
-                    w.writerow(["created_at","type","type_slug","unit_name","unit_slug","subject","recipients","attachments","status","error","attachments_count"])
-                    for i in range(table.rowCount()):
-                        it = lambda r,c: (table.item(r,c).text() if table.item(r,c) else '')
-                        cnt = (table.item(i,8).text() if table.item(i,8) else '')
-                        unit = it(i,2); typ = it(i,1)
-                        w.writerow([it(i,0), typ, _slugify(typ), unit, _slugify(unit), it(i,3), it(i,4), it(i,5), it(i,6), it(i,7), cnt])
+                    w.writerow(["created_at","type","unit_name","subject","recipients","attachments","status","error","attachments_count"])
+                    if cb_all_scope.isChecked():
+                        # Export full dataset via query
+                        from .db import SessionLocal as _SL
+                        from .models import EmailLog as _EL
+                        from sqlalchemy import func
+                        s = _SL()
+                        try:
+                            q = s.query(_EL)
+                            # reuse filters similar to load()
+                            t0 = type_box.currentText();
+                            if not t0.startswith("("):
+                                q = q.filter(_EL.type == t0)
+                            # type not
+                            try:
+                                tnot = type_not_box.currentText()
+                                if tnot and not tnot.startswith('('):
+                                    q = q.filter(_EL.type != tnot)
+                            except Exception:
+                                pass
+                            u_sel = unit_box.currentText().strip() if unit_box.currentIndex() > -1 else ""
+                            if u_sel and not u_sel.startswith("("):
+                                q = q.filter(_EL.unit_name == u_sel)
+                            else:
+                                u = unit_edit.text().strip();
+                                if u:
+                                    q = q.filter(_EL.unit_name.ilike(f"%{u}%"))
+                            # unit not
+                            try:
+                                unot = unit_not_edit.text().strip()
+                                if unot:
+                                    q = q.filter(~_EL.unit_name.ilike(f"%{unot}%"))
+                                unotsel = unit_not_box.currentText().strip() if unit_not_box.currentIndex() > -1 else ''
+                                if unotsel and not unotsel.startswith('('):
+                                    q = q.filter(_EL.unit_name != unotsel)
+                            except Exception:
+                                pass
+                            st0 = status_box.currentText();
+                            if only_failed.isChecked():
+                                q = q.filter(_EL.status == 'failed')
+                            elif only_success.isChecked():
+                                q = q.filter(_EL.status == 'sent')
+                            elif not st0.startswith("("):
+                                q = q.filter(_EL.status == st0)
+                            # subject filters
+                            subj = subject_search.text().strip(); subj_rx = subject_regex.text().strip(); subj_not = subject_not.text().strip(); subj_eq = subject_eq.text().strip()
+                            if subj_eq:
+                                q = q.filter(_EL.subject == subj_eq)
+                            elif subj_rx:
+                                try:
+                                    if s.bind and getattr(s.bind, 'dialect', None) and s.bind.dialect.name == 'sqlite':
+                                        q = q.filter(_EL.subject.op('REGEXP')(subj_rx))
+                                    else:
+                                        q = q.filter(_EL.subject.ilike(f"%{subj_rx}%"))
+                                except Exception:
+                                    q = q.filter(_EL.subject.ilike(f"%{subj_rx}%"))
+                            elif subj:
+                                q = q.filter(_EL.subject.ilike(f"%{subj}%"))
+                            if subj_not:
+                                q = q.filter(~_EL.subject.ilike(f"%{subj_not}%"))
+                            # recipients
+                            from sqlalchemy import or_ as _or
+                            rc = recipients_contains.text().strip(); rnot = recipients_not.text().strip(); req = recipients_eq.text().strip()
+                            if req:
+                                q = q.filter(_EL.recipients == req)
+                            elif rc:
+                                tokens = [t.strip() for t in rc.split(',') if t.strip()]
+                                if tokens:
+                                    if recipients_all_tokens.isChecked():
+                                        for tkn in tokens:
+                                            q = q.filter(_EL.recipients.ilike(f"%{tkn}%"))
+                                    else:
+                                        cond = _or(*[_EL.recipients.ilike(f"%{tkn}%") for tkn in tokens])
+                                        q = q.filter(cond)
+                                else:
+                                    q = q.filter(_EL.recipients.ilike(f"%{rc}%"))
+                            if rnot:
+                                tokens_rn = [t.strip() for t in rnot.split(',') if t.strip()]
+                                if tokens_rn:
+                                    for tkn in tokens_rn:
+                                        q = q.filter(~_EL.recipients.ilike(f"%{tkn}%"))
+                                else:
+                                    q = q.filter(~_EL.recipients.ilike(f"%{rnot}%"))
+                            # body
+                            btxt = body_search.text().strip(); bnot = body_not.text().strip()
+                            if btxt:
+                                q = q.filter(_EL.body.ilike(f"%{btxt}%"))
+                            if bnot:
+                                q = q.filter(~_EL.body.ilike(f"%{bnot}%"))
+                            if has_body_cb.isChecked():
+                                q = q.filter(_EL.body != None).filter(_EL.body != '')
+                            if no_body_cb.isChecked():
+                                q = q.filter(_or(_EL.body == None, _EL.body == ''))
+                            try:
+                                from sqlalchemy import func as _func
+                                if (body_len_min.text() or '').isdigit():
+                                    q = q.filter(_func.length(_EL.body) >= int(body_len_min.text()))
+                                if (body_len_max.text() or '').isdigit():
+                                    q = q.filter(_func.length(_EL.body) <= int(body_len_max.text()))
+                            except Exception:
+                                pass
+                            # attachments filters
+                            if has_attach_cb.isChecked():
+                                q = q.filter(_EL.attachments != None).filter(_EL.attachments != '')
+                            extv = attach_ext.text().strip(); ac = attach_contains.text().strip(); anot = attach_not.text().strip()
+                            if extv:
+                                q = q.filter(_EL.attachments.ilike(f"%{extv}%"))
+                            if ac:
+                                tokens_ac = [t.strip() for t in ac.split(',') if t.strip()]
+                                if tokens_ac:
+                                    if attach_all_tokens.isChecked():
+                                        for tkn in tokens_ac:
+                                            q = q.filter(_EL.attachments.ilike(f"%{tkn}%"))
+                                    else:
+                                        q = q.filter(_or(*[_EL.attachments.ilike(f"%{tkn}%") for tkn in tokens_ac]))
+                                else:
+                                    q = q.filter(_EL.attachments.ilike(f"%{ac}%"))
+                            if anot:
+                                tokens_not = [t.strip() for t in anot.split(',') if t.strip()]
+                                if tokens_not:
+                                    for tkn in tokens_not:
+                                        q = q.filter(~_EL.attachments.ilike(f"%{tkn}%"))
+                                else:
+                                    q = q.filter(~_EL.attachments.ilike(f"%{anot}%"))
+                            # min/max attachments
+                            try:
+                                from sqlalchemy import func as _func
+                                min_att = int(min_attachments.text()) if (min_attachments.text() or '').isdigit() else 0
+                                if min_att and min_att > 0:
+                                    q = q.filter((_func.length(_EL.attachments) - _func.length(_func.replace(_EL.attachments, ',', '')) + 1) >= min_att)
+                                max_att = int(max_attachments.text()) if (max_attachments.text() or '').isdigit() else 0
+                                if max_att and max_att > 0:
+                                    q = q.filter((_func.length(_EL.attachments) - _func.length(_func.replace(_EL.attachments, ',', '')) + 1) <= max_att)
+                            except Exception:
+                                pass
+                            # date range
+                            if e_from.isChecked():
+                                fd = from_date.date()
+                                from datetime import datetime as _dt
+                                q = q.filter(_EL.created_at >= _dt(fd.year(), fd.month(), fd.day(), 0, 0, 0))
+                            if e_to.isChecked():
+                                td = to_date.date()
+                                from datetime import datetime as _dt
+                                q = q.filter(_EL.created_at <= _dt(td.year(), td.month(), td.day(), 23, 59, 59))
+                            # write rows
+                            for r in q.order_by(_EL.created_at.desc()).all():
+                                try:
+                                    att_count = sum(1 for p in ((getattr(r,'attachments','') or '').split(',')) if p.strip())
+                                except Exception:
+                                    att_count = 0
+                                w.writerow([str(getattr(r,'created_at','')), getattr(r,'type','') or '', getattr(r,'unit_name','') or '', getattr(r,'subject','') or '', (getattr(r,'recipients','') or '')[:100], (getattr(r,'attachments','') or '')[:100], getattr(r,'status','') or '', getattr(r,'error','') or '', att_count])
+                        finally:
+                            try: s.close()
+                            except Exception: pass
+                    else:
+                        # Export current page from table
+                        for i in range(table.rowCount()):
+                            it = lambda r,c: (table.item(r,c).text() if table.item(r,c) else '')
+                            w.writerow([it(i,0), it(i,1), it(i,2), it(i,3), it(i,4), it(i,5), it(i,6), it(i,7), (table.item(i,8).text() if table.item(i,8) else '')])
                 # Audit
                 try:
                     from .db import SessionLocal as _SL
@@ -3061,19 +3203,6 @@ class MainWindow(QWidget):
                 except Exception: pass
                 try: _update_last_export_label()
                 except Exception: pass
-                try:
-                    from PySide6.QtWidgets import QMessageBox as _QMB
-                    import os, sys, subprocess
-                    if _QMB.question(dlg, "Mở thư mục", "Mở thư mục chứa file?", _QMB.Yes|_QMB.No) == _QMB.Yes:
-                        pdir = str(outp.parent)
-                        if sys.platform.startswith('win'):
-                            os.startfile(pdir)
-                        elif sys.platform == 'darwin':
-                            subprocess.Popen(['open', pdir])
-                        else:
-                            subprocess.Popen(['xdg-open', pdir])
-                except Exception:
-                    pass
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
         def copy_current_csv():
@@ -5125,7 +5254,7 @@ class MainWindow(QWidget):
                 Path('exports').mkdir(exist_ok=True)
                 ts = _dt.now().strftime('%Y%m%d_%H%M%S')
                 base = Path('exports')/f"email_history_dataset_{ts}"
-                # Build CSV from table
+                # Build CSV either from table (paged) or full dataset via query
                 csv_path = Path(str(base) + '.csv')
                 with open(csv_path, 'w', encoding='utf-8', newline='') as fcsv:
                     try: fcsv.write('\ufeff')
@@ -5143,11 +5272,72 @@ class MainWindow(QWidget):
                             return s2
                         except Exception:
                             return (s or '').strip().lower().replace(' ', '_')
-                    for i in range(table.rowCount()):
-                        it = lambda r,c: (table.item(r,c).text() if table.item(r,c) else '')
-                        cnt = (table.item(i,8).text() if table.item(i,8) else '')
-                        unit = it(i,2); typ = it(i,1)
-                        w.writerow([it(i,0), typ, _slugify(typ), unit, _slugify(unit), it(i,3), it(i,4), it(i,5), it(i,6), it(i,7), cnt])
+                    if cb_all_scope.isChecked():
+                        # build query and export full dataset
+                        from .db import SessionLocal as _SL
+                        from .models import EmailLog as _EL
+                        s = _SL()
+                        try:
+                            q = s.query(_EL)
+                            # reuse coarse filters similar to export_csv all
+                            t0 = type_box.currentText();
+                            if not t0.startswith("("):
+                                q = q.filter(_EL.type == t0)
+                            try:
+                                tnot = type_not_box.currentText()
+                                if tnot and not tnot.startswith('('):
+                                    q = q.filter(_EL.type != tnot)
+                            except Exception:
+                                pass
+                            u_sel = unit_box.currentText().strip() if unit_box.currentIndex() > -1 else ""
+                            if u_sel and not u_sel.startswith("("):
+                                q = q.filter(_EL.unit_name == u_sel)
+                            else:
+                                u = unit_edit.text().strip();
+                                if u:
+                                    q = q.filter(_EL.unit_name.ilike(f"%{u}%"))
+                            try:
+                                unot = unit_not_edit.text().strip()
+                                if unot:
+                                    q = q.filter(~_EL.unit_name.ilike(f"%{unot}%"))
+                                unotsel = unit_not_box.currentText().strip() if unit_not_box.currentIndex() > -1 else ''
+                                if unotsel and not unotsel.startswith('('):
+                                    q = q.filter(_EL.unit_name != unotsel)
+                            except Exception:
+                                pass
+                            st0 = status_box.currentText();
+                            if only_failed.isChecked():
+                                q = q.filter(_EL.status == 'failed')
+                            elif only_success.isChecked():
+                                q = q.filter(_EL.status == 'sent')
+                            elif not st0.startswith("("):
+                                q = q.filter(_EL.status == st0)
+                            # date range
+                            if e_from.isChecked():
+                                fd = from_date.date()
+                                from datetime import datetime as _dt
+                                q = q.filter(_EL.created_at >= _dt(fd.year(), fd.month(), fd.day(), 0, 0, 0))
+                            if e_to.isChecked():
+                                td = to_date.date()
+                                from datetime import datetime as _dt
+                                q = q.filter(_EL.created_at <= _dt(td.year(), td.month(), td.day(), 23, 59, 59))
+                            for r in q.order_by(_EL.created_at.desc()).all():
+                                try:
+                                    att_count = sum(1 for p in ((getattr(r,'attachments','') or '').split(',')) if p.strip())
+                                except Exception:
+                                    att_count = 0
+                                unit = getattr(r,'unit_name','') or ''
+                                typ = getattr(r,'type','') or ''
+                                w.writerow([str(getattr(r,'created_at','')), typ, _slugify(typ), unit, _slugify(unit), getattr(r,'subject','') or '', (getattr(r,'recipients','') or '')[:100], (getattr(r,'attachments','') or '')[:100], getattr(r,'status','') or '', getattr(r,'error','') or '', att_count])
+                        finally:
+                            try: s.close()
+                            except Exception: pass
+                    else:
+                        for i in range(table.rowCount()):
+                            it = lambda r,c: (table.item(r,c).text() if table.item(r,c) else '')
+                            cnt = (table.item(i,8).text() if table.item(i,8) else '')
+                            unit = it(i,2); typ = it(i,1)
+                            w.writerow([it(i,0), typ, _slugify(typ), unit, _slugify(unit), it(i,3), it(i,4), it(i,5), it(i,6), it(i,7), cnt])
                 # Filter JSON from settings
                 ukey = (self.current_user.get('username') or '').strip()
                 raw = get_setting(f"EMAIL_HISTORY_FILTER:{ukey}", '') or '{}'
@@ -5163,7 +5353,6 @@ class MainWindow(QWidget):
                 with zipfile.ZipFile(str(zip_path), 'w', compression=zipfile.ZIP_DEFLATED) as zf:
                     zf.write(csv_path, arcname=csv_path.name)
                     zf.write(json_path, arcname=json_path.name)
-                # Optionally cleanup CSV/JSON (keep for audit?) Leave as-is.
                 QMessageBox.information(dlg, "Đã xuất", str(zip_path))
                 try: _set_last_export(zip_path)
                 except Exception: pass
