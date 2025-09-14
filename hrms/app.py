@@ -1792,6 +1792,7 @@ class MainWindow(QWidget):
         attach_contains = QLineEdit(); attach_contains.setPlaceholderText("Tệp chứa… (chuỗi)")
         attach_not = QLineEdit(); attach_not.setPlaceholderText("Tệp không chứa… (chuỗi)")
         min_attachments = QLineEdit(); min_attachments.setPlaceholderText("Số tệp tối thiểu (vd: 2)")
+        max_attachments = QLineEdit(); max_attachments.setPlaceholderText("Số tệp tối đa (vd: 3)")
         error_not = QLineEdit(); error_not.setPlaceholderText("Lỗi không chứa…")
         f.addRow("Subject regex", subject_regex)
         f.addRow("Subject không chứa", subject_not)
@@ -1805,6 +1806,7 @@ class MainWindow(QWidget):
         f.addRow("Tệp chứa", attach_contains)
         f.addRow("Tệp không chứa", attach_not)
         f.addRow("Số tệp tối thiểu", min_attachments)
+        f.addRow("Số tệp tối đa", max_attachments)
         f.addRow("Lỗi chứa", error_search)
         f.addRow("Lỗi không chứa", error_not)
         h = QHBoxLayout(); h.addWidget(QLabel("Từ")); h.addWidget(from_date); h.addWidget(e_from); h.addSpacing(12); h.addWidget(QLabel("Đến")); h.addWidget(to_date); h.addWidget(e_to)
@@ -2021,7 +2023,48 @@ class MainWindow(QWidget):
                 except Exception:
                     pass
             header.sectionResized.connect(lambda *_: save_table_widths())
-            load_table_widths()
+            # Lưu/khôi phục thứ tự cột
+            try:
+                header.setSectionsMovable(True)
+            except Exception:
+                pass
+            def _order_key():
+                return f"EMAIL_HISTORY_TABLE_ORDER:{(self.current_user.get('username') or '').strip()}"
+            def save_table_order():
+                try:
+                    from .settings_service import set_setting
+                    import json as _json
+                    order = [header.logicalIndex(i) for i in range(header.count())]
+                    set_setting(_order_key(), _json.dumps(order))
+                except Exception:
+                    pass
+            def load_table_order():
+                try:
+                    from .settings_service import get_setting
+                    import json as _json
+                    raw = get_setting(_order_key(), '') or ''
+                    if not raw:
+                        return
+                    order = _json.loads(raw)
+                    if not isinstance(order, list):
+                        return
+                    n = header.count()
+                    # bring sections to desired order
+                    for visual_pos in range(min(n, len(order))):
+                        logical = int(order[visual_pos])
+                        cur_logical = header.logicalIndex(visual_pos)
+                        if cur_logical == logical:
+                            continue
+                        cur_pos = header.visualIndex(logical)
+                        if cur_pos >= 0:
+                            header.moveSection(cur_pos, visual_pos)
+                except Exception:
+                    pass
+            try:
+                header.sectionMoved.connect(lambda *_: save_table_order())
+            except Exception:
+                pass
+            load_table_widths(); load_table_order()
         except Exception:
             pass
         lay.addWidget(table)
@@ -2132,6 +2175,10 @@ class MainWindow(QWidget):
                 attach_contains.setText(obj.get('attach_contains',''))
                 attach_not.setText(obj.get('attach_not',''))
                 min_attachments.setText(str(obj.get('min_attachments','') or ''))
+                try:
+                    max_attachments.setText(str(obj.get('max_attachments','') or ''))
+                except Exception:
+                    pass
                 error_search.setText(obj.get('error',''))
                 error_not.setText(obj.get('error_not',''))
                 try:
@@ -2220,7 +2267,8 @@ class MainWindow(QWidget):
                     'attach_ext': attach_ext.text().strip(),
                     'attach_contains': attach_contains.text().strip(),
                     'attach_not': attach_not.text().strip(),
-                    'min_attachments': int(min_attachments.text()) if (min_attachments.text() or '').isdigit() else None,
+'min_attachments': int(min_attachments.text()) if (min_attachments.text() or '').isdigit() else None,
+                    'max_attachments': int(max_attachments.text()) if (max_attachments.text() or '').isdigit() else None,
                     'error': error_search.text().strip(),
                     'error_not': error_not.text().strip(),
                     'subject_starts': subject_starts.text().strip(),
@@ -2372,6 +2420,11 @@ class MainWindow(QWidget):
                 if an: parts.append(f"Tệp không chứa={an}")
                 ma = (int(min_attachments.text()) if (min_attachments.text() or '').isdigit() else 0)
                 if ma: parts.append(f"Số tệp>={ma}")
+                try:
+                    maxa = (int(max_attachments.text()) if (max_attachments.text() or '').isdigit() else 0)
+                except Exception:
+                    maxa = 0
+                if maxa: parts.append(f"Số tệp<={maxa}")
                 # date
                 from PySide6.QtCore import QDate
                 if e_from.isChecked() or e_to.isChecked():
@@ -2476,6 +2529,15 @@ class MainWindow(QWidget):
                     from sqlalchemy import func
                     q = q.filter(EmailLog.attachments != None).filter(EmailLog.attachments != '')
                     q = q.filter((func.length(EmailLog.attachments) - func.length(func.replace(EmailLog.attachments, ',', '')) + 1) >= min_att)
+                # max attachments
+                try:
+                    max_att = int(max_attachments.text()) if (max_attachments.text() or '').isdigit() else 0
+                except Exception:
+                    max_att = 0
+                if max_att and max_att > 0:
+                    from sqlalchemy import func
+                    q = q.filter(EmailLog.attachments != None).filter(EmailLog.attachments != '')
+                    q = q.filter((func.length(EmailLog.attachments) - func.length(func.replace(EmailLog.attachments, ',', '')) + 1) <= max_att)
                 # recipients filters
                 rc = recipients_contains.text().strip(); rnot = recipients_not.text().strip()
                 if rc:
