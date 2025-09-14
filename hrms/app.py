@@ -2064,6 +2064,12 @@ class MainWindow(QWidget):
         # Bảng kết quả
         table = QTableWidget(0, 9)
         table.setHorizontalHeaderLabels(["Thời gian", "Loại", "Đơn vị", "Subject", "Recipients", "Tệp đính kèm", "Trạng thái", "Lỗi", "Số tệp"])
+        try:
+            table.setAlternatingRowColors(True)
+            table.setSelectionBehavior(QTableWidget.SelectRows)
+            table.setSelectionMode(QTableWidget.ExtendedSelection)
+        except Exception:
+            pass
         # Click tiêu đề cột để sắp xếp
         try:
             hdr = table.horizontalHeader()
@@ -4583,72 +4589,100 @@ class MainWindow(QWidget):
                 from datetime import datetime as _dt
                 db2 = SessionLocal()
                 try:
-                    q = db2.query(EmailLog)
-                    t = type_box.currentText()
-                    if not t.startswith("("):
-                        q = q.filter(EmailLog.type == t)
-                    u_sel = unit_box.currentText().strip() if unit_box.currentIndex() > -1 else ""
-                    if u_sel and not u_sel.startswith("("):
-                        q = q.filter(EmailLog.unit_name == u_sel)
-                    else:
-                        u = unit_edit.text().strip()
-                        if u:
-                            q = q.filter(EmailLog.unit_name.ilike(f"%{u}%"))
-                    st = status_box.currentText()
-                    if only_failed.isChecked():
-                        q = q.filter(EmailLog.status == 'failed')
-                    elif not st.startswith("("):
-                        q = q.filter(EmailLog.status == st)
-                    subj = subject_search.text().strip(); subj_rx = subject_regex.text().strip(); subj_not = subject_not.text().strip()
-                    if subj_rx:
-                        try:
-                            if db2.bind and getattr(db2.bind, 'dialect', None) and db2.bind.dialect.name == 'sqlite':
-                                q = q.filter(EmailLog.subject.op('REGEXP')(subj_rx))
-                            else:
-                                q = q.filter(EmailLog.subject.ilike(f"%{subj_rx}%"))
-                        except Exception:
-                            q = q.filter(EmailLog.subject.ilike(f"%{subj_rx}%"))
-                    elif subj:
-                        q = q.filter(EmailLog.subject.ilike(f"%{subj}%"))
-                    if subj_not:
-                        q = q.filter(~EmailLog.subject.ilike(f"%{subj_not}%"))
-                    uidtxt = user_id_edit.text().strip();
-                    if uidtxt.isdigit():
-                        q = q.filter(EmailLog.user_id == int(uidtxt))
-                    # body filters
-                    btxt = body_search.text().strip(); bnot = body_not.text().strip()
-                    if btxt:
-                        q = q.filter(EmailLog.body.ilike(f"%{btxt}%"))
-                    if bnot:
-                        q = q.filter(~EmailLog.body.ilike(f"%{bnot}%"))
-                    # Date range
-                    from datetime import datetime as _dt2
-                    if e_from.isChecked():
-                        fd = from_date.date(); q = q.filter(EmailLog.created_at >= _dt2(fd.year(), fd.month(), fd.day(), 0, 0, 0))
-                    if e_to.isChecked():
-                        td = to_date.date(); q = q.filter(EmailLog.created_at <= _dt2(td.year(), td.month(), td.day(), 23, 59, 59))
-                    rows = q.order_by(EmailLog.created_at.desc()).all()
                     files = []
                     total_size = 0
-                    for r in rows:
-                        for part in (getattr(r,'attachments','') or '').split(','):
-                            p = part.strip()
-                            if not p:
-                                continue
-                            fp = Path(p)
-                            if fp.exists():
-                                try:
-                                    total_size += fp.stat().st_size
-                                except Exception:
-                                    pass
-                                day_str = ''
-                                try:
-                                    day_str = str(getattr(r,'created_at', None).date()) if getattr(r,'created_at', None) else ''
-                                except Exception:
+                    if cb_all_scope.isChecked():
+                        # Lấy toàn bộ dữ liệu theo bộ lọc (bỏ qua phân trang)
+                        q = db2.query(EmailLog)
+                        t = type_box.currentText()
+                        if not t.startswith("("):
+                            q = q.filter(EmailLog.type == t)
+                        u_sel = unit_box.currentText().strip() if unit_box.currentIndex() > -1 else ""
+                        if u_sel and not u_sel.startswith("("):
+                            q = q.filter(EmailLog.unit_name == u_sel)
+                        else:
+                            u = unit_edit.text().strip()
+                            if u:
+                                q = q.filter(EmailLog.unit_name.ilike(f"%{u}%"))
+                        st = status_box.currentText()
+                        if only_failed.isChecked():
+                            q = q.filter(EmailLog.status == 'failed')
+                        elif not st.startswith("("):
+                            q = q.filter(EmailLog.status == st)
+                        subj = subject_search.text().strip(); subj_rx = subject_regex.text().strip(); subj_not = subject_not.text().strip()
+                        if subj_rx:
+                            try:
+                                if db2.bind and getattr(db2.bind, 'dialect', None) and db2.bind.dialect.name == 'sqlite':
+                                    q = q.filter(EmailLog.subject.op('REGEXP')(subj_rx))
+                                else:
+                                    q = q.filter(EmailLog.subject.ilike(f"%{subj_rx}%"))
+                            except Exception:
+                                q = q.filter(EmailLog.subject.ilike(f"%{subj_rx}%"))
+                        elif subj:
+                            q = q.filter(EmailLog.subject.ilike(f"%{subj}%"))
+                        if subj_not:
+                            q = q.filter(~EmailLog.subject.ilike(f"%{subj_not}%"))
+                        uidtxt = user_id_edit.text().strip();
+                        if uidtxt.isdigit():
+                            q = q.filter(EmailLog.user_id == int(uidtxt))
+                        # body filters
+                        btxt = body_search.text().strip(); bnot = body_not.text().strip()
+                        if btxt:
+                            q = q.filter(EmailLog.body.ilike(f"%{btxt}%"))
+                        if bnot:
+                            q = q.filter(~EmailLog.body.ilike(f"%{bnot}%"))
+                        # Date range
+                        from datetime import datetime as _dt2
+                        if e_from.isChecked():
+                            fd = from_date.date(); q = q.filter(EmailLog.created_at >= _dt2(fd.year(), fd.month(), fd.day(), 0, 0, 0))
+                        if e_to.isChecked():
+                            td = to_date.date(); q = q.filter(EmailLog.created_at <= _dt2(td.year(), td.month(), td.day(), 23, 59, 59))
+                        rows = q.order_by(EmailLog.created_at.desc()).all()
+                        for r in rows:
+                            for part in (getattr(r,'attachments','') or '').split(','):
+                                p = part.strip()
+                                if not p:
+                                    continue
+                                fp = Path(p)
+                                if fp.exists():
+                                    try:
+                                        total_size += fp.stat().st_size
+                                    except Exception:
+                                        pass
                                     day_str = ''
-                                files.append((getattr(r,'unit_name','') or '', getattr(r,'type','') or 'generic', day_str, fp))
+                                    try:
+                                        day_str = str(getattr(r,'created_at', None).date()) if getattr(r,'created_at', None) else ''
+                                    except Exception:
+                                        day_str = ''
+                                    files.append((getattr(r,'unit_name','') or '', getattr(r,'type','') or 'generic', day_str, fp))
+                    else:
+                        # Lấy từ bảng đang hiển thị (ưu tiên các dòng được chọn)
+                        try:
+                            sel_rows = [ix.row() for ix in table.selectionModel().selectedRows()]
+                        except Exception:
+                            sel_rows = []
+                        if not sel_rows:
+                            sel_rows = list(range(table.rowCount()))
+                        from PySide6.QtCore import QDateTime as _QDT
+                        for i in sel_rows:
+                            unit_name = table.item(i,2).text() if table.item(i,2) else ''
+                            etype = table.item(i,1).text() if table.item(i,1) else 'generic'
+                            created = table.item(i,0).text() if table.item(i,0) else ''
+                            day_str = (created or '')[:10]
+                            attach_disp = table.item(i,5).data(Qt.UserRole) if table.item(i,5) else (table.item(i,5).text() if table.item(i,5) else '')
+                            for part in (attach_disp or '').split(','):
+                                p = part.strip()
+                                if not p:
+                                    continue
+                                fp = Path(p)
+                                if fp.exists():
+                                    try:
+                                        total_size += fp.stat().st_size
+                                    except Exception:
+                                        pass
+                                    files.append((unit_name, etype, day_str, fp))
                     if not files:
-                        QMessageBox.information(dlg, "Không có file", "Không có tệp đính kèm hợp lệ trong kết quả lọc")
+                        QMessageBox.information(dlg, "Không có file", "Không có tệp đính kèm hợp lệ để xuất")
                         return
                     # Xác nhận trước khi gom ZIP
                     def _hsz(n):
@@ -6139,6 +6173,25 @@ def quarter_window(d):
     return start, end
 
 
+def _default_current_user() -> dict:
+    try:
+        db = SessionLocal()
+        try:
+            u = db.query(User).filter(User.username == 'admin').first()
+            if u:
+                return {"id": u.id, "username": u.username, "role": u.role or 'admin', "unit_id": u.unit_id}
+            # fallback: lấy user đầu tiên nếu có
+            u = db.query(User).first()
+            if u:
+                return {"id": u.id, "username": u.username, "role": u.role or 'admin', "unit_id": u.unit_id}
+        finally:
+            db.close()
+    except Exception:
+        pass
+    # fallback cuối cùng nếu DB trống
+    return {"id": 0, "username": "admin", "role": "admin", "unit_id": None}
+
+
 def main():
     # Khởi tạo DB nếu chưa có và seed dữ liệu demo lần đầu
     init_db()
@@ -6152,6 +6205,27 @@ def main():
         print(f"[WARN] Scheduler not started: {e}")
 
     app = QApplication(sys.argv)
-    w = LoginWindow()
+
+    # Theme/Style toàn cục (đơn giản, không cần tệp ngoài)
+    try:
+        app.setStyle('Fusion')
+        # Font chung
+        f = app.font(); f.setPointSize(11); app.setFont(f)
+        # Stylesheet cơ bản cho input/button/header
+        app.setStyleSheet(
+            """
+            QWidget { font-size: 11pt; }
+            QPushButton { padding: 6px 10px; border-radius: 4px; }
+            QLineEdit, QComboBox, QDateEdit { padding: 4px 6px; }
+            QHeaderView::section { padding: 6px; background: #f4f4f4; }
+            QTableWidget { gridline-color: #dcdcdc; }
+            """
+        )
+    except Exception:
+        pass
+
+    # Bỏ đăng nhập: mở thẳng MainWindow với user mặc định
+    user_info = _default_current_user()
+    w = MainWindow(current_user=user_info)
     w.show()
     sys.exit(app.exec())
