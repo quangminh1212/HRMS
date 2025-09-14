@@ -1682,6 +1682,12 @@ class MainWindow(QWidget):
         from PySide6.QtWidgets import QDialog, QFormLayout, QTableWidget, QTableWidgetItem, QPushButton, QCheckBox, QFileDialog, QComboBox, QLabel, QHBoxLayout
         dlg = QDialog(self); dlg.setWindowTitle("Lịch sử Email")
         lay = QVBoxLayout(dlg)
+        # Cờ phân trang nhanh
+        try:
+            from .settings_service import get_setting as _get_setting_fast
+            fast_pager = str(_get_setting_fast('EMAIL_HISTORY_FAST_PAGER','0') or '0').strip().lower() in ('1','true','yes')
+        except Exception:
+            fast_pager = False
         # Bộ lọc
         f = QFormLayout();
         from PySide6.QtWidgets import QLineEdit, QComboBox, QPushButton, QDateEdit, QCheckBox
@@ -1739,6 +1745,8 @@ class MainWindow(QWidget):
         from PySide6.QtWidgets import QLineEdit as _QLE
         page_input = _QLE(); page_input.setPlaceholderText("Trang..."); btn_go = QPushButton("Đi")
         pager_bar.addWidget(QLabel("Kích thước trang")); pager_bar.addWidget(page_size_box); pager_bar.addWidget(btn_prev); pager_bar.addWidget(btn_next); pager_bar.addWidget(page_label); pager_bar.addWidget(page_input); pager_bar.addWidget(btn_go)
+        if fast_pager:
+            page_input.setEnabled(False); btn_go.setEnabled(False)
         f.addRow(pager_bar)
         # Áp dụng trên toàn bộ (bỏ qua phân trang)
         cb_all_scope = QCheckBox("Toàn bộ (bỏ qua phân trang)")
@@ -1902,43 +1910,76 @@ class MainWindow(QWidget):
                     q = q.filter(EmailLog.created_at <= _dt(td.year(), td.month(), td.day(), 23, 59, 59))
                 # Áp dụng phân trang
                 page_size = int(page_size_box.currentText()) if page_size_box.currentText().isdigit() else 100
-                state['total'] = q.count()
-                max_page = max(1, (state['total'] - 1)//page_size + 1)
-                if state['page'] >= max_page:
-                    state['page'] = max_page - 1
-                if state['page'] < 0:
-                    state['page'] = 0
                 offset = state['page'] * page_size
-                rows = q.order_by(EmailLog.created_at.desc()).limit(page_size).offset(offset).all()
                 table.setRowCount(0)
-                for r in rows:
-                    i = table.rowCount(); table.insertRow(i)
-                    it0 = QTableWidgetItem(str(getattr(r, 'created_at', '')))
-                    it0.setData(Qt.UserRole, getattr(r, 'id', None))
-                    it1 = QTableWidgetItem(getattr(r, 'type', '') or '')
-                    it2 = QTableWidgetItem(getattr(r, 'unit_name', '') or '')
-                    it3 = QTableWidgetItem(getattr(r, 'subject', '') or '')
-                    it4 = QTableWidgetItem((getattr(r, 'recipients', '') or '')[:100])
-                    it5 = QTableWidgetItem((getattr(r, 'attachments', '') or '')[:100])
-                    it6 = QTableWidgetItem(getattr(r, 'status', '') or '')
-                    it7 = QTableWidgetItem(getattr(r, 'error', '') or '')
-                    # Lưu full text ở UserRole để xem chi tiết
-                    it3.setData(Qt.UserRole, getattr(r, 'body', '') or '')
-                    it4.setData(Qt.UserRole, getattr(r, 'recipients', '') or '')
-                    it5.setData(Qt.UserRole, getattr(r, 'attachments', '') or '')
-                    it7.setData(Qt.UserRole, getattr(r, 'error', '') or '')
-                    table.setItem(i, 0, it0)
-                    table.setItem(i, 1, it1)
-                    table.setItem(i, 2, it2)
-                    table.setItem(i, 3, it3)
-                    table.setItem(i, 4, it4)
-                    table.setItem(i, 5, it5)
-                    table.setItem(i, 6, it6)
-                    table.setItem(i, 7, it7)
-                # Cập nhật pager
-                page_label.setText(f"Trang {state['page']+1}/{max_page} ({state['total']} kết quả)")
-                btn_prev.setEnabled(state['page']>0)
-                btn_next.setEnabled(state['page']<max_page-1)
+                if fast_pager:
+                    rows2 = q.order_by(EmailLog.created_at.desc()).limit(page_size+1).offset(offset).all()
+                    has_next = len(rows2) > page_size
+                    rows = rows2[:page_size]
+                    for r in rows:
+                        i = table.rowCount(); table.insertRow(i)
+                        it0 = QTableWidgetItem(str(getattr(r, 'created_at', '')))
+                        it0.setData(Qt.UserRole, getattr(r, 'id', None))
+                        it1 = QTableWidgetItem(getattr(r, 'type', '') or '')
+                        it2 = QTableWidgetItem(getattr(r, 'unit_name', '') or '')
+                        it3 = QTableWidgetItem(getattr(r, 'subject', '') or '')
+                        it4 = QTableWidgetItem((getattr(r, 'recipients', '') or '')[:100])
+                        it5 = QTableWidgetItem((getattr(r, 'attachments', '') or '')[:100])
+                        it6 = QTableWidgetItem(getattr(r, 'status', '') or '')
+                        it7 = QTableWidgetItem(getattr(r, 'error', '') or '')
+                        # Lưu full text ở UserRole để xem chi tiết
+                        it3.setData(Qt.UserRole, getattr(r, 'body', '') or '')
+                        it4.setData(Qt.UserRole, getattr(r, 'recipients', '') or '')
+                        it5.setData(Qt.UserRole, getattr(r, 'attachments', '') or '')
+                        it7.setData(Qt.UserRole, getattr(r, 'error', '') or '')
+                        table.setItem(i, 0, it0)
+                        table.setItem(i, 1, it1)
+                        table.setItem(i, 2, it2)
+                        table.setItem(i, 3, it3)
+                        table.setItem(i, 4, it4)
+                        table.setItem(i, 5, it5)
+                        table.setItem(i, 6, it6)
+                        table.setItem(i, 7, it7)
+                    page_label.setText(f"Trang {state['page']+1} (chế độ nhanh)")
+                    btn_prev.setEnabled(state['page']>0)
+                    btn_next.setEnabled(has_next)
+                else:
+                    state['total'] = q.count()
+                    max_page = max(1, (state['total'] - 1)//page_size + 1)
+                    if state['page'] >= max_page:
+                        state['page'] = max_page - 1
+                    if state['page'] < 0:
+                        state['page'] = 0
+                    offset = state['page'] * page_size
+                    rows = q.order_by(EmailLog.created_at.desc()).limit(page_size).offset(offset).all()
+                    for r in rows:
+                        i = table.rowCount(); table.insertRow(i)
+                        it0 = QTableWidgetItem(str(getattr(r, 'created_at', '')))
+                        it0.setData(Qt.UserRole, getattr(r, 'id', None))
+                        it1 = QTableWidgetItem(getattr(r, 'type', '') or '')
+                        it2 = QTableWidgetItem(getattr(r, 'unit_name', '') or '')
+                        it3 = QTableWidgetItem(getattr(r, 'subject', '') or '')
+                        it4 = QTableWidgetItem((getattr(r, 'recipients', '') or '')[:100])
+                        it5 = QTableWidgetItem((getattr(r, 'attachments', '') or '')[:100])
+                        it6 = QTableWidgetItem(getattr(r, 'status', '') or '')
+                        it7 = QTableWidgetItem(getattr(r, 'error', '') or '')
+                        # Lưu full text ở UserRole để xem chi tiết
+                        it3.setData(Qt.UserRole, getattr(r, 'body', '') or '')
+                        it4.setData(Qt.UserRole, getattr(r, 'recipients', '') or '')
+                        it5.setData(Qt.UserRole, getattr(r, 'attachments', '') or '')
+                        it7.setData(Qt.UserRole, getattr(r, 'error', '') or '')
+                        table.setItem(i, 0, it0)
+                        table.setItem(i, 1, it1)
+                        table.setItem(i, 2, it2)
+                        table.setItem(i, 3, it3)
+                        table.setItem(i, 4, it4)
+                        table.setItem(i, 5, it5)
+                        table.setItem(i, 6, it6)
+                        table.setItem(i, 7, it7)
+                    # Cập nhật pager
+                    page_label.setText(f"Trang {state['page']+1}/{max_page} ({state['total']} kết quả)")
+                    btn_prev.setEnabled(state['page']>0)
+                    btn_next.setEnabled(state['page']<max_page-1)
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
             finally:
@@ -1956,6 +1997,12 @@ class MainWindow(QWidget):
                     for i in range(table.rowCount()):
                         it = lambda r,c: (table.item(r,c).text() if table.item(r,c) else '')
                         w.writerow([it(i,0), it(i,1), it(i,2), it(i,3), it(i,4), it(i,5), it(i,6), it(i,7)])
+                # Audit
+                try:
+                    from .db import SessionLocal as _SL
+                    log_action(_SL(), self.current_user.get('id'), 'ui_email_history_export_csv', 'EmailLog', None, f"file={outp}")
+                except Exception:
+                    pass
                 QMessageBox.information(dlg, "Đã xuất", f"{outp}")
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
@@ -2046,6 +2093,12 @@ class MainWindow(QWidget):
                         w.writerow(["created_at","type","unit_name","subject","recipients","attachments","status","error"])
                         for r in rows:
                             w.writerow([str(getattr(r,'created_at','')), getattr(r,'type','') or '', getattr(r,'unit_name','') or '', getattr(r,'subject','') or '', getattr(r,'recipients','') or '', getattr(r,'attachments','') or '', getattr(r,'status','') or '', getattr(r,'error','') or ''])
+                    # Audit
+                    try:
+                        from .db import SessionLocal as _SL
+                        log_action(_SL(), self.current_user.get('id'), 'ui_email_history_export_failed_csv', 'EmailLog', None, f"file={outp}")
+                    except Exception:
+                        pass
                     QMessageBox.information(dlg, "Đã xuất", f"{outp}")
                 finally:
                     dbf.close()
@@ -2159,8 +2212,15 @@ class MainWindow(QWidget):
             if i < 0:
                 QMessageBox.information(dlg, "Chưa chọn", "Chọn một dòng trong bảng")
                 return
-            from PySide6.QtWidgets import QDialog, QFormLayout, QTextEdit
-            dd = QDialog(dlg); dd.setWindowTitle("Chi tiết Email")
+                from PySide6.QtWidgets import QDialog, QFormLayout, QTextEdit
+                dd = QDialog(dlg); dd.setWindowTitle("Chi tiết Email")
+                # Audit
+                try:
+                    from .db import SessionLocal as _SL
+                    eid = table.item(i,0).data(Qt.UserRole) if table.item(i,0) else None
+                    log_action(_SL(), self.current_user.get('id'), 'ui_email_history_view_detail', 'EmailLog', int(eid) if eid else None, '')
+                except Exception:
+                    pass
             ff = QFormLayout(dd)
             get = lambda c: (table.item(i,c).data(Qt.UserRole) if table.item(i,c) else '') or (table.item(i,c).text() if table.item(i,c) else '')
             ff.addRow("Thời gian", QLabel(table.item(i,0).text() if table.item(i,0) else ''))
@@ -2203,7 +2263,14 @@ class MainWindow(QWidget):
                     except Exception:
                         recips = None
                 from .mailer import send_email_with_attachment
-                ok = send_email_with_attachment(subject or '[HRMS] Resend', body or '', paths, to=recips)
+                # Retry params
+                try:
+                    from .settings_service import get_setting as _gs
+                    rc = int(_gs('RETRY_COUNT','2') or '2'); rd = int(_gs('RETRY_DELAY','10') or '10')
+                except Exception:
+                    rc, rd = 2, 10
+                from .mailer import send_email_with_attachment_retry as _send_retry
+                ok = _send_retry(subject or '[HRMS] Resend', body or '', paths, to=recips, retries=rc, delay=rd)
                 # Log lại với type ban đầu
                 try:
                     from .db import SessionLocal
@@ -2242,6 +2309,13 @@ class MainWindow(QWidget):
                         subprocess.Popen(['open', p])
                     else:
                         subprocess.Popen(['xdg-open', p])
+                # Audit
+                try:
+                    from .db import SessionLocal as _SL
+                    eid = table.item(i,0).data(Qt.UserRole) if table.item(i,0) else None
+                    log_action(_SL(), self.current_user.get('id'), 'ui_email_history_open_files', 'EmailLog', int(eid) if eid else None, f"count={len(files)}")
+                except Exception:
+                    pass
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_open_files.clicked.connect(open_selected_files)
@@ -2265,6 +2339,13 @@ class MainWindow(QWidget):
                 import zipfile
                 with zipfile.ZipFile(str(zips[0]), 'r') as zf:
                     infos = zf.infolist()
+                # Audit
+                try:
+                    from .db import SessionLocal as _SL
+                    eid = table.item(i,0).data(Qt.UserRole) if table.item(i,0) else None
+                    log_action(_SL(), self.current_user.get('id'), 'ui_email_history_view_zip', 'EmailLog', int(eid) if eid else None, f"zip={zips[0]}")
+                except Exception:
+                    pass
                 from PySide6.QtWidgets import QDialog as _QD, QVBoxLayout as _QV, QTableWidget as _QT, QTableWidgetItem as _QTI, QPushButton as _QP, QHBoxLayout as _QH
                 d = _QD(dlg); d.setWindowTitle(f"Nội dung ZIP: {zips[0].name}")
                 lay2 = _QV(d)
@@ -2343,6 +2424,13 @@ class MainWindow(QWidget):
                         subprocess.Popen(['open', d])
                     else:
                         subprocess.Popen(['xdg-open', d])
+                # Audit
+                try:
+                    from .db import SessionLocal as _SL
+                    eid = table.item(i,0).data(Qt.UserRole) if table.item(i,0) else None
+                    log_action(_SL(), self.current_user.get('id'), 'ui_email_history_open_folders', 'EmailLog', int(eid) if eid else None, f"count={len(folders)}")
+                except Exception:
+                    pass
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_open_folders.clicked.connect(open_selected_folders)
@@ -2355,6 +2443,13 @@ class MainWindow(QWidget):
                 from PySide6.QtWidgets import QApplication
                 txt = table.item(i,4).data(Qt.UserRole) if table.item(i,4) else (table.item(i,4).text() if table.item(i,4) else '')
                 QApplication.clipboard().setText(txt or '')
+                # Audit
+                try:
+                    from .db import SessionLocal as _SL
+                    eid = table.item(i,0).data(Qt.UserRole) if table.item(i,0) else None
+                    log_action(_SL(), self.current_user.get('id'), 'ui_email_history_copy_recipients', 'EmailLog', int(eid) if eid else None, '')
+                except Exception:
+                    pass
                 QMessageBox.information(dlg, "Đã copy", "Recipients đã được copy vào clipboard")
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
@@ -2371,6 +2466,12 @@ class MainWindow(QWidget):
                     subprocess.Popen(['xdg-open', p])
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
+            # Audit
+            try:
+                from .db import SessionLocal as _SL
+                log_action(_SL(), self.current_user.get('id'), 'ui_email_history_open_exports', 'EmailLog', None, '')
+            except Exception:
+                pass
         btn_open_exports.clicked.connect(open_exports)
         def delete_selected():
             i = table.currentRow()
@@ -2385,6 +2486,11 @@ class MainWindow(QWidget):
                 from .db import SessionLocal
                 from .models import EmailLog
                 s = SessionLocal(); s.query(EmailLog).filter(EmailLog.id==eid).delete(); s.commit(); s.close()
+                # Audit
+                try:
+                    log_action(SessionLocal(), self.current_user.get('id'), 'ui_email_history_delete', 'EmailLog', int(eid), '')
+                except Exception:
+                    pass
                 table.removeRow(i)
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
@@ -2407,6 +2513,11 @@ class MainWindow(QWidget):
                 for eid in ids:
                     s.query(EmailLog).filter(EmailLog.id==eid).delete()
                 s.commit(); s.close()
+                # Audit
+                try:
+                    log_action(SessionLocal(), self.current_user.get('id'), 'ui_email_history_delete_all', 'EmailLog', None, f"count={len(ids)}")
+                except Exception:
+                    pass
                 load()
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
@@ -2449,11 +2560,19 @@ class MainWindow(QWidget):
                         # Xác nhận số lượng
                         from PySide6.QtWidgets import QMessageBox as _QMB, QProgressDialog as _QPD
                         cnt = q.count()
-                        if _QMB.question(dlg, "Xác nhận", f"Sẽ gửi lại {cnt} bản ghi phù hợp. Tiếp tục?", _QMB.Yes|_QMB.No) != _QMB.Yes:
-                            return
-                        total = cnt
-                        pr = _QPD("Đang gửi lại...", "Hủy", 0, cnt, dlg); pr.setWindowModality(Qt.WindowModal)
-                        rows = q.order_by(EmailLog.created_at.desc()).all()
+                        if fast_pager:
+                            if _QMB.question(dlg, "Xác nhận", "Sẽ gửi lại toàn bộ bản ghi phù hợp (không tính trước). Tiếp tục?", _QMB.Yes|_QMB.No) != _QMB.Yes:
+                                return
+                            pr = _QPD("Đang gửi lại...", "Hủy", 0, 0, dlg); pr.setWindowModality(Qt.WindowModal)
+                            rows = q.order_by(EmailLog.created_at.desc()).all()
+                            total = len(rows)
+                        else:
+                            cnt = q.count()
+                            if _QMB.question(dlg, "Xác nhận", f"Sẽ gửi lại {cnt} bản ghi phù hợp. Tiếp tục?", _QMB.Yes|_QMB.No) != _QMB.Yes:
+                                return
+                            total = cnt
+                            pr = _QPD("Đang gửi lại...", "Hủy", 0, cnt, dlg); pr.setWindowModality(Qt.WindowModal)
+                            rows = q.order_by(EmailLog.created_at.desc()).all()
                         idx = 0
                         for r in rows:
                             if pr.wasCanceled():
@@ -2471,9 +2590,16 @@ class MainWindow(QWidget):
                                         pp = Path(p)
                                         if pp.exists():
                                             paths.append(str(pp))
-                                from .mailer import send_email_with_attachment, get_recipients_for_unit
+                                from .mailer import get_recipients_for_unit
+                                # Retry params
+                                try:
+                                    from .settings_service import get_setting as _gs
+                                    rc = int(_gs('RETRY_COUNT','2') or '2'); rd = int(_gs('RETRY_DELAY','10') or '10')
+                                except Exception:
+                                    rc, rd = 2, 10
+                                from .mailer import send_email_with_attachment_retry as _send_retry
                                 recips = get_recipients_for_unit(unit_name) if t in ('salary_due','bhxh_monthly','contracts_expiring') and unit_name else None
-                                ok = send_email_with_attachment(subject or '[HRMS] Resend', body or '', paths, to=recips)
+                                ok = _send_retry(subject or '[HRMS] Resend', body or '', paths, to=recips, retries=rc, delay=rd)
                                 # Log lại
                                 try:
                                     s = _SL(); from .models import EmailLog as _EL
@@ -2520,7 +2646,14 @@ class MainWindow(QWidget):
                                 except Exception:
                                     recips = None
                             from .mailer import send_email_with_attachment
-                            ok = send_email_with_attachment(subject or '[HRMS] Resend', body or '', paths, to=recips)
+                            # Retry params
+                            try:
+                                from .settings_service import get_setting as _gs
+                                rc = int(_gs('RETRY_COUNT','2') or '2'); rd = int(_gs('RETRY_DELAY','10') or '10')
+                            except Exception:
+                                rc, rd = 2, 10
+                            from .mailer import send_email_with_attachment_retry as _send_retry
+                            ok = _send_retry(subject or '[HRMS] Resend', body or '', paths, to=recips, retries=rc, delay=rd)
                             # Log lại
                             try:
                                 from .db import SessionLocal
@@ -2676,11 +2809,30 @@ class MainWindow(QWidget):
                             name = patt.replace('{type}', t).replace('{unit}', safe_unit).replace('{ts}', ts)
                             zip_path = _P('exports')/name
                             if create_zip(file_list, str(zip_path)):
-                                ok = send_email_with_attachment(subject, body + "\n(Đính kèm ZIP)", [str(zip_path)], to=recips)
+                                # Retry params
+                                try:
+                                    from .settings_service import get_setting as _gs
+                                    rc = int(_gs('RETRY_COUNT','2') or '2'); rd = int(_gs('RETRY_DELAY','10') or '10')
+                                except Exception:
+                                    rc, rd = 2, 10
+                                from .mailer import send_email_with_attachment_retry as _send_retry
+                                ok = _send_retry(subject, body + "\n(Đính kèm ZIP)", [str(zip_path)], to=recips, retries=rc, delay=rd)
                             else:
-                                ok = send_email_with_attachment(subject, body, file_list, to=recips)
+                                try:
+                                    from .settings_service import get_setting as _gs
+                                    rc = int(_gs('RETRY_COUNT','2') or '2'); rd = int(_gs('RETRY_DELAY','10') or '10')
+                                except Exception:
+                                    rc, rd = 2, 10
+                                from .mailer import send_email_with_attachment_retry as _send_retry
+                                ok = _send_retry(subject, body, file_list, to=recips, retries=rc, delay=rd)
                         else:
-                            ok = send_email_with_attachment(subject, body, file_list, to=recips)
+                            try:
+                                from .settings_service import get_setting as _gs
+                                rc = int(_gs('RETRY_COUNT','2') or '2'); rd = int(_gs('RETRY_DELAY','10') or '10')
+                            except Exception:
+                                rc, rd = 2, 10
+                            from .mailer import send_email_with_attachment_retry as _send_retry
+                            ok = _send_retry(subject, body, file_list, to=recips, retries=rc, delay=rd)
                     except Exception:
                         ok = False
                     # Log lại
