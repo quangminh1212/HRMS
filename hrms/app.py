@@ -1912,8 +1912,8 @@ class MainWindow(QWidget):
         # Saved filters UI
         saved_filters_combo = QComboBox(); saved_filters_combo.addItem("(Chưa có)")
         btn_apply_saved = QPushButton("Áp dụng")
-        btn_save_filter_as = QPushButton("Lưu tên…"); btn_save_and_default = QPushButton("Lưu+Mặc định"); btn_overwrite_saved = QPushButton("Ghi đè"); btn_load_saved = QPushButton("Tải"); btn_delete_saved = QPushButton("Xoá"); btn_rename_saved = QPushButton("Đổi tên"); btn_dup_saved = QPushButton("Nhân bản"); btn_set_default = QPushButton("Mặc định"); btn_clear_default = QPushButton("Bỏ mặc định"); btn_export_current = QPushButton("Export chọn"); btn_copy_current = QPushButton("Copy JSON"); btn_import_clip = QPushButton("Nhập clipboard"); btn_export_saved = QPushButton("Export JSON"); btn_import_saved = QPushButton("Nhập JSON")
-        row_saved = QHBoxLayout(); row_saved.addWidget(QLabel("Bộ lọc đã lưu")); row_saved.addWidget(saved_filters_combo); row_saved.addWidget(btn_apply_saved); row_saved.addWidget(btn_save_filter_as); row_saved.addWidget(btn_save_and_default); row_saved.addWidget(btn_overwrite_saved); row_saved.addWidget(btn_load_saved); row_saved.addWidget(btn_delete_saved); row_saved.addWidget(btn_rename_saved); row_saved.addWidget(btn_dup_saved); row_saved.addWidget(btn_set_default); row_saved.addWidget(btn_clear_default); row_saved.addWidget(btn_export_current); row_saved.addWidget(btn_copy_current); row_saved.addWidget(btn_import_clip); row_saved.addWidget(btn_export_saved); row_saved.addWidget(btn_import_saved)
+        btn_save_filter_as = QPushButton("Lưu tên…"); btn_save_and_default = QPushButton("Lưu+Mặc định"); btn_overwrite_saved = QPushButton("Ghi đè"); btn_load_saved = QPushButton("Tải"); btn_delete_saved = QPushButton("Xoá"); btn_rename_saved = QPushButton("Đổi tên"); btn_dup_saved = QPushButton("Nhân bản"); btn_set_default = QPushButton("Mặc định"); btn_clear_default = QPushButton("Bỏ mặc định"); btn_export_current = QPushButton("Export chọn"); btn_copy_current = QPushButton("Copy JSON"); btn_import_clip = QPushButton("Nhập clipboard"); btn_export_saved = QPushButton("Export JSON"); btn_import_saved = QPushButton("Nhập JSON"); btn_load_current_json = QPushButton("Tải JSON")
+        row_saved = QHBoxLayout(); row_saved.addWidget(QLabel("Bộ lọc đã lưu")); row_saved.addWidget(saved_filters_combo); row_saved.addWidget(btn_apply_saved); row_saved.addWidget(btn_save_filter_as); row_saved.addWidget(btn_save_and_default); row_saved.addWidget(btn_overwrite_saved); row_saved.addWidget(btn_load_saved); row_saved.addWidget(btn_delete_saved); row_saved.addWidget(btn_rename_saved); row_saved.addWidget(btn_dup_saved); row_saved.addWidget(btn_set_default); row_saved.addWidget(btn_clear_default); row_saved.addWidget(btn_export_current); row_saved.addWidget(btn_copy_current); row_saved.addWidget(btn_import_clip); row_saved.addWidget(btn_export_saved); row_saved.addWidget(btn_import_saved); row_saved.addWidget(btn_load_current_json)
         # tooltips
         try:
             saved_filters_combo.setToolTip("Chọn một bộ lọc đã lưu")
@@ -1932,6 +1932,7 @@ class MainWindow(QWidget):
             btn_import_clip.setToolTip("Nhập bộ lọc từ JSON trong clipboard")
             btn_export_saved.setToolTip("Xuất tất cả bộ lọc đã lưu ra JSON")
             btn_import_saved.setToolTip("Nhập nhiều bộ lọc từ JSON")
+            btn_load_current_json.setToolTip("Tải JSON làm bộ lọc hiện tại (không lưu)")
         except Exception:
             pass
         f.addRow(row_saved)
@@ -3533,6 +3534,23 @@ class MainWindow(QWidget):
         btn_import_clip.clicked.connect(import_saved_filters_from_clipboard)
         btn_export_saved.clicked.connect(export_saved_filters)
         btn_import_saved.clicked.connect(import_saved_filters)
+        def load_current_filter_from_json():
+            try:
+                from PySide6.QtWidgets import QFileDialog
+                import json as _json
+                file_path, _ = QFileDialog.getOpenFileName(dlg, "Chọn file JSON", "", "JSON Files (*.json)")
+                if not file_path:
+                    return
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    obj = _json.load(f)
+                from .settings_service import set_setting
+                user_name_key = (self.current_user.get('username') or '').strip()
+                set_setting(f"EMAIL_HISTORY_FILTER:{user_name_key}", _json.dumps(obj, ensure_ascii=False))
+                load_filter(); state['page'] = 0; load()
+                QMessageBox.information(dlg, "Đã tải", "Đã tải JSON vào bộ lọc hiện tại")
+            except Exception as ex:
+                QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_load_current_json.clicked.connect(load_current_filter_from_json)
         # chọn trên combobox sẽ tự tải bộ lọc
         try:
             saved_filters_combo.currentTextChanged.connect(lambda _ : load_saved_filter())
@@ -3793,7 +3811,7 @@ class MainWindow(QWidget):
                     tabs.addTab(tbl1, "Theo đơn vị")
                     tabs.addTab(tbl2, "Theo ngày")
                     # Nút copy CSV và Export CSV
-                    bar = _QH(); btn_copy = _QP("Copy CSV"); btn_export = _QP("Export CSV"); bar.addWidget(btn_copy); bar.addWidget(btn_export)
+                    bar = _QH(); btn_copy = _QP("Copy CSV"); btn_export = _QP("Export CSV"); btn_copy_json = _QP("Copy JSON"); btn_export_json = _QP("Export JSON"); bar.addWidget(btn_copy); bar.addWidget(btn_export); bar.addWidget(btn_copy_json); bar.addWidget(btn_export_json)
                     lay2.addLayout(bar)
                     def do_copy_csv():
                         try:
@@ -3818,6 +3836,25 @@ class MainWindow(QWidget):
                         except Exception as ex2:
                             QMessageBox.critical(d, "Lỗi", str(ex2))
                     btn_copy.clicked.connect(do_copy_csv)
+                    def do_copy_json():
+                        try:
+                            import json
+                            from PySide6.QtWidgets import QApplication
+                            cur = tabs.currentWidget()
+                            rows = []
+                            if isinstance(cur, _QT):
+                                headers = [cur.horizontalHeaderItem(c).text() if cur.horizontalHeaderItem(c) else '' for c in range(cur.columnCount())]
+                                for r in range(cur.rowCount()):
+                                    row = {}
+                                    for c in range(cur.columnCount()):
+                                        it = cur.item(r,c)
+                                        row[headers[c]] = (it.text() if it else '')
+                                    rows.append(row)
+                            QApplication.clipboard().setText(json.dumps(rows, ensure_ascii=False, indent=2))
+                            QMessageBox.information(d, "Đã copy", "Đã copy JSON vào clipboard")
+                        except Exception as ex2:
+                            QMessageBox.critical(d, "Lỗi", str(ex2))
+                    btn_copy_json.clicked.connect(do_copy_json)
                     def do_export_csv():
                         try:
                             import csv
@@ -3841,6 +3878,29 @@ class MainWindow(QWidget):
                         except Exception as ex2:
                             QMessageBox.critical(d, "Lỗi", str(ex2))
                     btn_export.clicked.connect(do_export_csv)
+                    def do_export_json():
+                        try:
+                            import json
+                            from datetime import datetime as _dt
+                            from pathlib import Path
+                            Path('exports').mkdir(exist_ok=True)
+                            cur = tabs.currentWidget()
+                            rows = []
+                            if isinstance(cur, _QT):
+                                headers = [cur.horizontalHeaderItem(c).text() if cur.horizontalHeaderItem(c) else '' for c in range(cur.columnCount())]
+                                for r in range(cur.rowCount()):
+                                    row = {}
+                                    for c in range(cur.columnCount()):
+                                        it = cur.item(r,c)
+                                        row[headers[c]] = (it.text() if it else '')
+                                    rows.append(row)
+                            outp = Path('exports')/f"email_stats_{('units' if tabs.currentIndex()==0 else 'days')}_{_dt.now().strftime('%Y%m%d_%H%M%S')}.json"
+                            with open(outp, 'w', encoding='utf-8') as fj:
+                                json.dump(rows, fj, ensure_ascii=False, indent=2)
+                            QMessageBox.information(d, "Đã xuất", str(outp))
+                        except Exception as ex2:
+                            QMessageBox.critical(d, "Lỗi", str(ex2))
+                    btn_export_json.clicked.connect(do_export_json)
                     # Audit
                     try:
                         log_action(_SL(), self.current_user.get('id'), 'ui_email_history_stats_detail', 'EmailLog', None, '')
@@ -3946,6 +4006,33 @@ class MainWindow(QWidget):
         zip_name_tpl = _QLE2(); zip_name_tpl.setPlaceholderText("Tên file ZIP (vd: email_attachments_{ts}.zip)")
         row_zip_opts = QHBoxLayout(); row_zip_opts.addWidget(zip_group_by_day); row_zip_opts.addWidget(zip_include_manifest); row_zip_opts.addWidget(QLabel("Tên ZIP")); row_zip_opts.addWidget(zip_name_tpl)
         f.addRow(row_zip_opts)
+        # load zip opts from settings
+        try:
+            from .settings_service import get_setting as _gs
+            ukey = (self.current_user.get('username') or '').strip()
+            zip_group_by_day.setChecked(((str(_gs(f"EMAIL_HISTORY_ZIP_GROUP_BY_DAY:{ukey}", '0') or '0')).strip().lower() in ('1','true','yes')))
+            zip_include_manifest.setChecked(((str(_gs(f"EMAIL_HISTORY_ZIP_INCLUDE_MANIFEST:{ukey}", '0') or '0')).strip().lower() in ('1','true','yes')))
+            tpl = _gs(f"EMAIL_HISTORY_ZIP_NAME_TPL:{ukey}", '') or ''
+            if tpl.strip():
+                zip_name_tpl.setText(tpl)
+        except Exception:
+            pass
+        # save zip opts on change
+        def _save_zip_opts():
+            try:
+                from .settings_service import set_setting as _ss
+                ukey = (self.current_user.get('username') or '').strip()
+                _ss(f"EMAIL_HISTORY_ZIP_GROUP_BY_DAY:{ukey}", '1' if zip_group_by_day.isChecked() else '0')
+                _ss(f"EMAIL_HISTORY_ZIP_INCLUDE_MANIFEST:{ukey}", '1' if zip_include_manifest.isChecked() else '0')
+                _ss(f"EMAIL_HISTORY_ZIP_NAME_TPL:{ukey}", zip_name_tpl.text().strip())
+            except Exception:
+                pass
+        zip_group_by_day.toggled.connect(lambda _ : _save_zip_opts())
+        zip_include_manifest.toggled.connect(lambda _ : _save_zip_opts())
+        try:
+            zip_name_tpl.editingFinished.connect(lambda : _save_zip_opts())
+        except Exception:
+            pass
         def export_attachments_zip():
             try:
                 from .db import SessionLocal
