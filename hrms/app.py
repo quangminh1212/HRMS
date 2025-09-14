@@ -1782,9 +1782,13 @@ class MainWindow(QWidget):
         f.addRow("Tiêu đề", subject_search)
         subject_regex = QLineEdit(); subject_regex.setPlaceholderText("Subject regex…")
         subject_not = QLineEdit(); subject_not.setPlaceholderText("Subject không chứa…")
+        recipients_contains = QLineEdit(); recipients_contains.setPlaceholderText("Recipients chứa…")
+        recipients_not = QLineEdit(); recipients_not.setPlaceholderText("Recipients không chứa…")
         error_not = QLineEdit(); error_not.setPlaceholderText("Lỗi không chứa…")
         f.addRow("Subject regex", subject_regex)
         f.addRow("Subject không chứa", subject_not)
+        f.addRow("Recipients chứa", recipients_contains)
+        f.addRow("Recipients không chứa", recipients_not)
         f.addRow("Lỗi chứa", error_search)
         f.addRow("Lỗi không chứa", error_not)
         h = QHBoxLayout(); h.addWidget(QLabel("Từ")); h.addWidget(from_date); h.addWidget(e_from); h.addSpacing(12); h.addWidget(QLabel("Đến")); h.addWidget(to_date); h.addWidget(e_to)
@@ -1917,6 +1921,8 @@ class MainWindow(QWidget):
                 subject_search.setText(obj.get('subject',''))
                 subject_regex.setText(obj.get('subject_regex',''))
                 subject_not.setText(obj.get('subject_not',''))
+                recipients_contains.setText(obj.get('recipients_contains',''))
+                recipients_not.setText(obj.get('recipients_not',''))
                 error_search.setText(obj.get('error',''))
                 error_not.setText(obj.get('error_not',''))
                 try:
@@ -1998,6 +2004,8 @@ class MainWindow(QWidget):
                     'subject': subject_search.text().strip(),
                     'subject_regex': subject_regex.text().strip(),
                     'subject_not': subject_not.text().strip(),
+                    'recipients_contains': recipients_contains.text().strip(),
+                    'recipients_not': recipients_not.text().strip(),
                     'error': error_search.text().strip(),
                     'error_not': error_not.text().strip(),
                     'has_attachments': has_attach_cb.isChecked(),
@@ -2136,6 +2144,12 @@ class MainWindow(QWidget):
                 if has_attach_cb.isChecked():
                     from sqlalchemy import or_
                     q = q.filter(EmailLog.attachments != None).filter(EmailLog.attachments != '')
+                # recipients filters
+                rc = recipients_contains.text().strip(); rnot = recipients_not.text().strip()
+                if rc:
+                    q = q.filter(EmailLog.recipients.ilike(f"%{rc}%"))
+                if rnot:
+                    q = q.filter(~EmailLog.recipients.ilike(f"%{rnot}%"))
                 uidtxt = user_id_edit.text().strip();
                 if uidtxt.isdigit():
                     q = q.filter(EmailLog.user_id == int(uidtxt))
@@ -2230,7 +2244,31 @@ class MainWindow(QWidget):
                 from datetime import datetime as _dt
                 from pathlib import Path
                 Path('exports').mkdir(exist_ok=True)
-                outp = Path('exports')/f"email_logs_{_dt.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                # build filename from preset or date range + type/status
+                def sanitize(s: str) -> str:
+                    return "".join(ch if ch.isalnum() or ch in ('-','_') else '_' for ch in s)[:50]
+                preset_name = date_preset.currentText() if date_preset.currentIndex() >= 0 else ''
+                if preset_name and not preset_name.startswith('('):
+                    base = sanitize(preset_name)
+                else:
+                    try:
+                        fd = from_date.date() if e_from.isChecked() else None
+                        td = to_date.date() if e_to.isChecked() else None
+                        if fd and td:
+                            base = f"{fd.toString('yyyyMMdd')}_{td.toString('yyyyMMdd')}"
+                        elif fd:
+                            base = f"{fd.toString('yyyyMMdd')}_to"
+                        elif td:
+                            base = f"to_{td.toString('yyyyMMdd')}"
+                        else:
+                            base = _dt.now().strftime('%Y%m%d_%H%M%S')
+                    except Exception:
+                        base = _dt.now().strftime('%Y%m%d_%H%M%S')
+                t = type_box.currentText(); st = status_box.currentText()
+                if t.startswith('('): t = 'all'
+                if st.startswith('('): st = 'all'
+                name = f"email_logs_{sanitize(t)}_{sanitize(st)}_{base}.csv"
+                outp = Path('exports')/name
                 with open(outp, 'w', encoding='utf-8', newline='') as fcsv:
                     w = csv.writer(fcsv)
                     w.writerow(["created_at","type","unit_name","subject","recipients","attachments","status","error"])
@@ -2389,6 +2427,12 @@ class MainWindow(QWidget):
                         q = q.filter(~_EL.error.ilike(f"%{err_not}%"))
                     if has_attach_cb.isChecked():
                         q = q.filter(_EL.attachments != None).filter(_EL.attachments != '')
+                    # recipients filters
+                    rc = recipients_contains.text().strip(); rnot = recipients_not.text().strip()
+                    if rc:
+                        q = q.filter(_EL.recipients.ilike(f"%{rc}%"))
+                    if rnot:
+                        q = q.filter(~_EL.recipients.ilike(f"%{rnot}%"))
                     uidtxt = user_id_edit.text().strip()
                     if uidtxt.isdigit():
                         q = q.filter(_EL.user_id == int(uidtxt))
@@ -2609,6 +2653,12 @@ class MainWindow(QWidget):
                         q = q.filter(~EmailLog.error.ilike(f"%{err_not}%"))
                     if has_attach_cb.isChecked():
                         q = q.filter(EmailLog.attachments != None).filter(EmailLog.attachments != '')
+                    # recipients filters
+                    rc = recipients_contains.text().strip(); rnot = recipients_not.text().strip()
+                    if rc:
+                        q = q.filter(EmailLog.recipients.ilike(f"%{rc}%"))
+                    if rnot:
+                        q = q.filter(~EmailLog.recipients.ilike(f"%{rnot}%"))
                     uidtxt = user_id_edit.text().strip()
                     if uidtxt.isdigit():
                         q = q.filter(EmailLog.user_id == int(uidtxt))
@@ -3101,6 +3151,12 @@ class MainWindow(QWidget):
                             q = q.filter(~EmailLog.error.ilike(f"%{err_not}%"))
                         if has_attach_cb.isChecked():
                             q = q.filter(EmailLog.attachments != None).filter(EmailLog.attachments != '')
+                        # recipients filters
+                        rc = recipients_contains.text().strip(); rnot = recipients_not.text().strip()
+                        if rc:
+                            q = q.filter(EmailLog.recipients.ilike(f"%{rc}%"))
+                        if rnot:
+                            q = q.filter(~EmailLog.recipients.ilike(f"%{rnot}%"))
                         uidtxt = user_id_edit.text().strip()
                         if uidtxt.isdigit():
                             q = q.filter(EmailLog.user_id == int(uidtxt))
