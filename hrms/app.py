@@ -1875,8 +1875,26 @@ class MainWindow(QWidget):
         f.addRow("", cb_all_scope)
         # Saved filters UI
         saved_filters_combo = QComboBox(); saved_filters_combo.addItem("(Chưa có)")
+        btn_apply_saved = QPushButton("Áp dụng")
         btn_save_filter_as = QPushButton("Lưu tên…"); btn_overwrite_saved = QPushButton("Ghi đè"); btn_load_saved = QPushButton("Tải"); btn_delete_saved = QPushButton("Xoá"); btn_rename_saved = QPushButton("Đổi tên"); btn_dup_saved = QPushButton("Nhân bản"); btn_set_default = QPushButton("Mặc định"); btn_clear_default = QPushButton("Bỏ mặc định"); btn_export_current = QPushButton("Export chọn"); btn_export_saved = QPushButton("Export JSON"); btn_import_saved = QPushButton("Nhập JSON")
-        row_saved = QHBoxLayout(); row_saved.addWidget(QLabel("Bộ lọc đã lưu")); row_saved.addWidget(saved_filters_combo); row_saved.addWidget(btn_save_filter_as); row_saved.addWidget(btn_overwrite_saved); row_saved.addWidget(btn_load_saved); row_saved.addWidget(btn_delete_saved); row_saved.addWidget(btn_rename_saved); row_saved.addWidget(btn_dup_saved); row_saved.addWidget(btn_set_default); row_saved.addWidget(btn_clear_default); row_saved.addWidget(btn_export_current); row_saved.addWidget(btn_export_saved); row_saved.addWidget(btn_import_saved)
+        row_saved = QHBoxLayout(); row_saved.addWidget(QLabel("Bộ lọc đã lưu")); row_saved.addWidget(saved_filters_combo); row_saved.addWidget(btn_apply_saved); row_saved.addWidget(btn_save_filter_as); row_saved.addWidget(btn_overwrite_saved); row_saved.addWidget(btn_load_saved); row_saved.addWidget(btn_delete_saved); row_saved.addWidget(btn_rename_saved); row_saved.addWidget(btn_dup_saved); row_saved.addWidget(btn_set_default); row_saved.addWidget(btn_clear_default); row_saved.addWidget(btn_export_current); row_saved.addWidget(btn_export_saved); row_saved.addWidget(btn_import_saved)
+        # tooltips
+        try:
+            saved_filters_combo.setToolTip("Chọn một bộ lọc đã lưu")
+            btn_apply_saved.setToolTip("Áp dụng bộ lọc đang chọn")
+            btn_save_filter_as.setToolTip("Lưu bộ lọc hiện tại với tên mới")
+            btn_overwrite_saved.setToolTip("Ghi đè bộ lọc đang chọn bằng cấu hình hiện tại")
+            btn_load_saved.setToolTip("Tải bộ lọc đang chọn vào màn hình")
+            btn_delete_saved.setToolTip("Xoá bộ lọc đang chọn")
+            btn_rename_saved.setToolTip("Đổi tên bộ lọc đang chọn")
+            btn_dup_saved.setToolTip("Nhân bản bộ lọc đang chọn sang tên mới")
+            btn_set_default.setToolTip("Đặt bộ lọc đang chọn làm mặc định")
+            btn_clear_default.setToolTip("Bỏ thiết lập mặc định")
+            btn_export_current.setToolTip("Xuất bộ lọc đang chọn ra JSON")
+            btn_export_saved.setToolTip("Xuất tất cả bộ lọc đã lưu ra JSON")
+            btn_import_saved.setToolTip("Nhập nhiều bộ lọc từ JSON")
+        except Exception:
+            pass
         f.addRow(row_saved)
 
         btn_resend = QPushButton("Gửi lại")
@@ -2601,6 +2619,19 @@ class MainWindow(QWidget):
                 except Exception:
                     pass
                 QMessageBox.information(dlg, "Đã xuất", f"{outp}")
+                try:
+                    from PySide6.QtWidgets import QMessageBox as _QMB
+                    import os, sys, subprocess
+                    if _QMB.question(dlg, "Mở thư mục", "Mở thư mục chứa file?", _QMB.Yes|_QMB.No) == _QMB.Yes:
+                        pdir = str(outp.parent)
+                        if sys.platform.startswith('win'):
+                            os.startfile(pdir)
+                        elif sys.platform == 'darwin':
+                            subprocess.Popen(['open', pdir])
+                        else:
+                            subprocess.Popen(['xdg-open', pdir])
+                except Exception:
+                    pass
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
         def copy_current_csv():
@@ -2936,11 +2967,40 @@ class MainWindow(QWidget):
                 with open(p, 'w', encoding='utf-8') as f:
                     _json.dump(obj, f, ensure_ascii=False, indent=2)
                 QMessageBox.information(dlg, "Đã xuất", str(p))
+            
+                try:
+                    from PySide6.QtWidgets import QMessageBox as _QMB
+                    import os, sys, subprocess
+                    from pathlib import Path
+                    if _QMB.question(dlg, "Mở thư mục", "Mở thư mục chứa file?", _QMB.Yes|_QMB.No) == _QMB.Yes:
+                        pdir = str(Path(p).parent)
+                        if sys.platform.startswith('win'):
+                            os.startfile(pdir)
+                        elif sys.platform == 'darwin':
+                            subprocess.Popen(['open', pdir])
+                        else:
+                            subprocess.Popen(['xdg-open', pdir])
+                except Exception:
+                    pass
+                try:
+                    from PySide6.QtWidgets import QMessageBox as _QMB
+                    import os, sys, subprocess
+                    from pathlib import Path
+                    if _QMB.question(dlg, "Mở thư mục", "Mở thư mục chứa file?", _QMB.Yes|_QMB.No) == _QMB.Yes:
+                        pdir = str(Path(p).parent)
+                        if sys.platform.startswith('win'):
+                            os.startfile(pdir)
+                        elif sys.platform == 'darwin':
+                            subprocess.Popen(['open', pdir])
+                        else:
+                            subprocess.Popen(['xdg-open', pdir])
+                except Exception:
+                    pass
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
         def import_saved_filters():
             try:
-                from PySide6.QtWidgets import QFileDialog
+                from PySide6.QtWidgets import QFileDialog, QMessageBox as _QMB
                 import json as _json
                 file_path, _ = QFileDialog.getOpenFileName(dlg, "Chọn file JSON", "", "JSON Files (*.json)")
                 if not file_path:
@@ -2954,13 +3014,27 @@ class MainWindow(QWidget):
                 if names_raw.strip():
                     try: names = _json.loads(names_raw)
                     except Exception: names = []
+                # hỏi ghi đè hay giữ nguyên
+                overwrite = (_QMB.question(dlg, "Trùng tên", "Ghi đè nếu bộ lọc đã tồn tại?", _QMB.Yes|_QMB.No) == _QMB.Yes)
+                added = 0; updated = 0; skipped = 0
                 for n, val in (data or {}).items():
-                    set_setting(f"EMAIL_HISTORY_SAVED_FILTER:{user_name_key}:{n}", _json.dumps(val, ensure_ascii=False) if not isinstance(val, str) else val)
+                    key = f"EMAIL_HISTORY_SAVED_FILTER:{user_name_key}:{n}"
+                    exists = bool((get_setting(key, '') or '').strip())
+                    if exists and not overwrite:
+                        skipped += 1
+                        if n not in names:
+                            names.append(n)
+                        continue
+                    set_setting(key, _json.dumps(val, ensure_ascii=False) if not isinstance(val, str) else val)
+                    if exists:
+                        updated += 1
+                    else:
+                        added += 1
                     if n not in names:
                         names.append(n)
                 set_setting(f"EMAIL_HISTORY_SAVED_LIST:{user_name_key}", _json.dumps(names, ensure_ascii=False))
                 refresh_saved_combo()
-                QMessageBox.information(dlg, "Đã nhập", f"Đã nhập {len(data or {})} bộ lọc")
+                QMessageBox.information(dlg, "Đã nhập", f"Thêm mới: {added}\nCập nhật: {updated}\nBỏ qua: {skipped}")
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
         def rename_saved_filter():
@@ -3088,6 +3162,7 @@ class MainWindow(QWidget):
                 QMessageBox.information(dlg, "Đã xuất", str(p))
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
+        btn_apply_saved.clicked.connect(load_saved_filter)
         btn_save_filter_as.clicked.connect(save_filter_as)
         btn_overwrite_saved.clicked.connect(overwrite_saved_filter)
         btn_load_saved.clicked.connect(load_saved_filter)
@@ -3480,6 +3555,19 @@ class MainWindow(QWidget):
                     except Exception:
                         pass
                     QMessageBox.information(dlg, "Đã xuất", f"{outp}")
+                    try:
+                        from PySide6.QtWidgets import QMessageBox as _QMB
+                        import os, sys, subprocess
+                        if _QMB.question(dlg, "Mở thư mục", "Mở thư mục chứa file?", _QMB.Yes|_QMB.No) == _QMB.Yes:
+                            pdir = str(outp.parent)
+                            if sys.platform.startswith('win'):
+                                os.startfile(pdir)
+                            elif sys.platform == 'darwin':
+                                subprocess.Popen(['open', pdir])
+                            else:
+                                subprocess.Popen(['xdg-open', pdir])
+                    except Exception:
+                        pass
                 finally:
                     dbf.close()
             except Exception as ex:
@@ -3586,6 +3674,19 @@ class MainWindow(QWidget):
                             except Exception:
                                 continue
                     QMessageBox.information(dlg, "Đã xuất", f"{zip_path}")
+                    try:
+                        from PySide6.QtWidgets import QMessageBox as _QMB
+                        import os, sys, subprocess
+                        pdir = str(Path(zip_path).parent)
+                        if _QMB.question(dlg, "Mở thư mục", "Mở thư mục chứa file?", _QMB.Yes|_QMB.No) == _QMB.Yes:
+                            if sys.platform.startswith('win'):
+                                os.startfile(pdir)
+                            elif sys.platform == 'darwin':
+                                subprocess.Popen(['open', pdir])
+                            else:
+                                subprocess.Popen(['xdg-open', pdir])
+                    except Exception:
+                        pass
                     # Audit + Log export
                     try:
                         from .db import SessionLocal as _SL
