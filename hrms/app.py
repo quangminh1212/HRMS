@@ -1334,10 +1334,12 @@ class MainWindow(QWidget):
         contract_alert_days = QLineEdit(get_setting('CONTRACT_ALERT_DAYS','30') or '30')
         export_ttl_days = QLineEdit(get_setting('EXPORT_TTL_DAYS','30') or '30')
         email_log_ttl = QLineEdit(get_setting('EMAIL_LOG_TTL_DAYS','365') or '365')
+        email_history_fast_pager = QLineEdit(get_setting('EMAIL_HISTORY_FAST_PAGER','0') or '0')
         f.addRow("EMAIL_SUBJECT_PREFIX", subject_prefix)
         f.addRow("UNIT_EMAILS", unit_emails)
         f.addRow("UNIT_EMAILS_FALLBACK_ENABLED (1/0)", unit_emails_fallback)
         f.addRow("SEND_SUMMARY_ZIP (1/0)", summary_zip)
+        f.addRow("EMAIL_HISTORY_FAST_PAGER (1/0)", email_history_fast_pager)
         f.addRow("CONTRACT_ALERT_DAYS", contract_alert_days)
         f.addRow("RETRY_COUNT", QLineEdit(get_setting('RETRY_COUNT','2') or '2'))
         f.addRow("RETRY_DELAY", QLineEdit(get_setting('RETRY_DELAY','10') or '10'))
@@ -1366,6 +1368,7 @@ class MainWindow(QWidget):
             set_setting('UNIT_EMAILS', unit_emails.text())
             set_setting('UNIT_EMAILS_FALLBACK_ENABLED', (unit_emails_fallback.text() or '0'))
             set_setting('SEND_SUMMARY_ZIP', (summary_zip.text() or '0'))
+            set_setting('EMAIL_HISTORY_FAST_PAGER', (email_history_fast_pager.text() or '0'))
             set_setting('CONTRACT_ALERT_DAYS', (contract_alert_days.text() or '30'))
             # RETRY_COUNT/DELAY: đọc từ form theo label
             try:
@@ -1748,6 +1751,22 @@ class MainWindow(QWidget):
         if fast_pager:
             page_input.setEnabled(False); btn_go.setEnabled(False)
         f.addRow(pager_bar)
+        # Chế độ nhanh (có thể đổi tại màn hình)
+        cb_fast_pager = QCheckBox("Chế độ nhanh (không tính tổng)")
+        cb_fast_pager.setChecked(bool(fast_pager))
+        def _toggle_fast():
+            try:
+                page_input.setEnabled(not cb_fast_pager.isChecked()); btn_go.setEnabled(not cb_fast_pager.isChecked())
+            except Exception:
+                pass
+            state['page'] = 0
+            try:
+                save_filter()
+            except Exception:
+                pass
+            load()
+        cb_fast_pager.toggled.connect(lambda _ : _toggle_fast())
+        f.addRow("", cb_fast_pager)
         # Áp dụng trên toàn bộ (bỏ qua phân trang)
         cb_all_scope = QCheckBox("Toàn bộ (bỏ qua phân trang)")
         f.addRow("", cb_all_scope)
@@ -1778,7 +1797,13 @@ class MainWindow(QWidget):
                 from .settings_service import get_setting
                 key = f"EMAIL_HISTORY_FILTER:{(self.current_user.get('username') or '').strip()}"
                 raw = get_setting(key, '') or ''
-                if not raw: return
+                if not raw:
+                    # nếu không có filter đã lưu, giữ mặc định từ settings cho fast pager
+                    try:
+                        cb_fast_pager.setChecked(bool(fast_pager))
+                    except Exception:
+                        pass
+                    return
                 import json
                 obj = json.loads(raw)
                 # type
@@ -1824,6 +1849,12 @@ class MainWindow(QWidget):
                     cb_all_scope.setChecked(bool(obj.get('all_scope', False)))
                 except Exception:
                     pass
+                # fast pager
+                try:
+                    if 'fast_pager' in obj:
+                        cb_fast_pager.setChecked(bool(obj.get('fast_pager', False)))
+                except Exception:
+                    pass
                 # group zip checkbox
                 try:
                     if hasattr(resend_grouped_by_unit, '__zip_cb'):
@@ -1865,6 +1896,7 @@ class MainWindow(QWidget):
                     'all_scope': cb_all_scope.isChecked(),
                     'zip_when_group': (getattr(resend_grouped_by_unit, '__zip_cb').isChecked() if hasattr(resend_grouped_by_unit, '__zip_cb') else False),
                     'page_size': page_size_box.currentText(),
+                    'fast_pager': bool(cb_fast_pager.isChecked()),
                 }
                 import json
                 set_setting(key, json.dumps(obj, ensure_ascii=False))
@@ -1873,6 +1905,11 @@ class MainWindow(QWidget):
         load_filter()
         # Tải dữ liệu
         def load():
+            nonlocal fast_pager
+            try:
+                fast_pager = bool(cb_fast_pager.isChecked())
+            except Exception:
+                pass
             from .db import SessionLocal
             from .models import EmailLog
             db = SessionLocal()
