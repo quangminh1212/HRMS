@@ -1780,6 +1780,8 @@ class MainWindow(QWidget):
         f.addRow("", only_failed)
         f.addRow("", has_attach_cb)
         f.addRow("Tiêu đề", subject_search)
+        subject_regex = QLineEdit(); subject_regex.setPlaceholderText("Subject regex…")
+        f.addRow("Subject regex", subject_regex)
         f.addRow("Lỗi chứa", error_search)
         h = QHBoxLayout(); h.addWidget(QLabel("Từ")); h.addWidget(from_date); h.addWidget(e_from); h.addSpacing(12); h.addWidget(QLabel("Đến")); h.addWidget(to_date); h.addWidget(e_to)
         f.addRow("Thời gian", h)
@@ -1909,6 +1911,7 @@ class MainWindow(QWidget):
                     status_box.setCurrentText(st)
                 only_failed.setChecked(bool(obj.get('only_failed', False)))
                 subject_search.setText(obj.get('subject',''))
+                subject_regex.setText(obj.get('subject_regex',''))
                 error_search.setText(obj.get('error',''))
                 try:
                     has_attach_cb.setChecked(bool(obj.get('has_attachments', False)))
@@ -1987,6 +1990,7 @@ class MainWindow(QWidget):
                     'status': status_box.currentText(),
                     'only_failed': only_failed.isChecked(),
                     'subject': subject_search.text().strip(),
+                    'subject_regex': subject_regex.text().strip(),
                     'error': error_search.text().strip(),
                     'has_attachments': has_attach_cb.isChecked(),
                     'from_date': qdate_to_str(from_date.date()) if e_from.isChecked() else None,
@@ -2099,8 +2103,16 @@ class MainWindow(QWidget):
                     q = q.filter(EmailLog.status == 'failed')
                 elif not st.startswith("("):
                     q = q.filter(EmailLog.status == st)
-                subj = subject_search.text().strip();
-                if subj:
+                subj = subject_search.text().strip(); subj_rx = subject_regex.text().strip();
+                if subj_rx:
+                    try:
+                        if db.bind and getattr(db.bind, 'dialect', None) and db.bind.dialect.name == 'sqlite':
+                            q = q.filter(EmailLog.subject.op('REGEXP')(subj_rx))
+                        else:
+                            q = q.filter(EmailLog.subject.ilike(f"%{subj_rx}%"))
+                    except Exception:
+                        q = q.filter(EmailLog.subject.ilike(f"%{subj_rx}%"))
+                elif subj:
                     q = q.filter(EmailLog.subject.ilike(f"%{subj}%"))
                 errtxt = error_search.text().strip();
                 if errtxt:
@@ -2341,8 +2353,16 @@ class MainWindow(QWidget):
                         q = q.filter(_EL.status == 'failed')
                     elif not st.startswith("("):
                         q = q.filter(_EL.status == st)
-                    subj = subject_search.text().strip()
-                    if subj:
+                    subj = subject_search.text().strip(); subj_rx = subject_regex.text().strip()
+                    if subj_rx:
+                        try:
+                            if s.bind and getattr(s.bind, 'dialect', None) and s.bind.dialect.name == 'sqlite':
+                                q = q.filter(_EL.subject.op('REGEXP')(subj_rx))
+                            else:
+                                q = q.filter(_EL.subject.ilike(f"%{subj_rx}%"))
+                        except Exception:
+                            q = q.filter(_EL.subject.ilike(f"%{subj_rx}%"))
+                    elif subj:
                         q = q.filter(_EL.subject.ilike(f"%{subj}%"))
                     errtxt = error_search.text().strip()
                     if errtxt:
@@ -2612,8 +2632,16 @@ class MainWindow(QWidget):
                         q = q.filter(EmailLog.status == 'failed')
                     elif not st.startswith("("):
                         q = q.filter(EmailLog.status == st)
-                    subj = subject_search.text().strip()
-                    if subj:
+                    subj = subject_search.text().strip(); subj_rx = subject_regex.text().strip()
+                    if subj_rx:
+                        try:
+                            if db2.bind and getattr(db2.bind, 'dialect', None) and db2.bind.dialect.name == 'sqlite':
+                                q = q.filter(EmailLog.subject.op('REGEXP')(subj_rx))
+                            else:
+                                q = q.filter(EmailLog.subject.ilike(f"%{subj_rx}%"))
+                        except Exception:
+                            q = q.filter(EmailLog.subject.ilike(f"%{subj_rx}%"))
+                    elif subj:
                         q = q.filter(EmailLog.subject.ilike(f"%{subj}%"))
                     uidtxt = user_id_edit.text().strip()
                     if uidtxt.isdigit():
@@ -3028,8 +3056,16 @@ class MainWindow(QWidget):
                             q = q.filter(EmailLog.status == 'failed')
                         elif not st.startswith("("):
                             q = q.filter(EmailLog.status == st)
-                        subj = subject_search.text().strip()
-                        if subj:
+                        subj = subject_search.text().strip(); subj_rx = subject_regex.text().strip()
+                        if subj_rx:
+                            try:
+                                if s3.bind and getattr(s3.bind, 'dialect', None) and s3.bind.dialect.name == 'sqlite':
+                                    q = q.filter(EmailLog.subject.op('REGEXP')(subj_rx))
+                                else:
+                                    q = q.filter(EmailLog.subject.ilike(f"%{subj_rx}%"))
+                            except Exception:
+                                q = q.filter(EmailLog.subject.ilike(f"%{subj_rx}%"))
+                        elif subj:
                             q = q.filter(EmailLog.subject.ilike(f"%{subj}%"))
                         errtxt = error_search.text().strip()
                         if errtxt:
