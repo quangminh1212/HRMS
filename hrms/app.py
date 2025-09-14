@@ -1817,6 +1817,8 @@ class MainWindow(QWidget):
         sort_asc_cb = QCheckBox("Sắp xếp tăng dần")
         sort_field = QComboBox(); sort_field.addItems(["Thời gian","Subject","Recipients","Error","Số tệp","Đơn vị","Loại","Trạng thái"])
         sort_field.currentTextChanged.connect(lambda _ : (save_filter(), state.__setitem__('page', 0), load()))
+        sort_field2 = QComboBox(); sort_field2.addItems(["(Không)","Thời gian","Subject","Recipients","Error","Số tệp","Đơn vị","Loại","Trạng thái"])
+        sort_field2.currentTextChanged.connect(lambda _ : (save_filter(), state.__setitem__('page', 0), load()))
         def _on_my_only():
             try:
                 uid = self.current_user.get('id')
@@ -1837,6 +1839,7 @@ class MainWindow(QWidget):
         sort_asc_cb.toggled.connect(lambda _ : (save_filter(), state.__setitem__('page', 0), load()))
         f.addRow("", my_only_cb)
         f.addRow("Sắp xếp theo", sort_field)
+        f.addRow("Sắp xếp 2", sort_field2)
         f.addRow("", sort_asc_cb)
         # Phân trang
         pager_bar = QHBoxLayout()
@@ -1885,12 +1888,12 @@ class MainWindow(QWidget):
             hb.addWidget(b)
         f.addRow(hb)
         # Thanh thống kê
-        stats_bar = QHBoxLayout(); btn_stats = QPushButton("Thống kê"); btn_stats_detail = QPushButton("Thống kê chi tiết"); btn_copy_stats = QPushButton("Copy"); stats_label = QLabel("")
+        stats_bar = QHBoxLayout(); btn_stats = QPushButton("Thống kê"); btn_stats_detail = QPushButton("Thống kê chi tiết"); btn_copy_stats = QPushButton("Copy"); btn_export_stats = QPushButton("Export TK"); stats_label = QLabel("")
         try:
             stats_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         except Exception:
             pass
-        stats_bar.addWidget(btn_stats); stats_bar.addWidget(btn_stats_detail); stats_bar.addWidget(btn_copy_stats); stats_bar.addWidget(stats_label)
+        stats_bar.addWidget(btn_stats); stats_bar.addWidget(btn_stats_detail); stats_bar.addWidget(btn_copy_stats); stats_bar.addWidget(btn_export_stats); stats_bar.addWidget(stats_label)
         f.addRow(stats_bar)
         # Nhãn tóm tắt bộ lọc
         filter_summary_label = QLabel("")
@@ -1930,6 +1933,12 @@ class MainWindow(QWidget):
                     sf = obj.get('sort_field')
                     if sf and sf in [sort_field.itemText(i) for i in range(sort_field.count())]:
                         sort_field.setCurrentText(sf)
+                except Exception:
+                    pass
+                try:
+                    sf2 = obj.get('sort_field2')
+                    if sf2 and sf2 in [sort_field2.itemText(i) for i in range(sort_field2.count())]:
+                        sort_field2.setCurrentText(sf2)
                 except Exception:
                     pass
                 # options
@@ -2073,6 +2082,7 @@ class MainWindow(QWidget):
                     'page_size': page_size_box.currentText(),
                     'fast_pager': bool(cb_fast_pager.isChecked()),
                     'sort_field': sort_field.currentText(),
+                    'sort_field2': sort_field2.currentText(),
                 }
                 import json
                 set_setting(key, json.dumps(obj, ensure_ascii=False))
@@ -2221,6 +2231,10 @@ class MainWindow(QWidget):
                     sort_key = sort_field.currentText().strip()
                 except Exception:
                     sort_key = "Thời gian"
+                try:
+                    sort_key2 = sort_field2.currentText().strip()
+                except Exception:
+                    sort_key2 = "(Không)"
                 t = type_box.currentText();
                 if not t.startswith("("):
                     q = q.filter(EmailLog.type == t)
@@ -2308,26 +2322,31 @@ class MainWindow(QWidget):
                 from sqlalchemy import func
                 att_count_expr = (func.length(EmailLog.attachments) - func.length(func.replace(EmailLog.attachments, ',', '')) + 1)
                 att_count_expr = func.coalesce(att_count_expr, 0)
-                if sort_key == 'Thời gian':
-                    order_expr = EmailLog.created_at.asc() if sort_asc else EmailLog.created_at.desc()
-                elif sort_key == 'Subject':
-                    order_expr = EmailLog.subject.asc() if sort_asc else EmailLog.subject.desc()
-                elif sort_key == 'Recipients':
-                    order_expr = EmailLog.recipients.asc() if sort_asc else EmailLog.recipients.desc()
-                elif sort_key == 'Error':
-                    order_expr = EmailLog.error.asc() if sort_asc else EmailLog.error.desc()
-                elif sort_key == 'Số tệp':
-                    order_expr = att_count_expr.asc() if sort_asc else att_count_expr.desc()
-                elif sort_key == 'Đơn vị':
-                    order_expr = EmailLog.unit_name.asc() if sort_asc else EmailLog.unit_name.desc()
-                elif sort_key == 'Loại':
-                    order_expr = EmailLog.type.asc() if sort_asc else EmailLog.type.desc()
-                elif sort_key == 'Trạng thái':
-                    order_expr = EmailLog.status.asc() if sort_asc else EmailLog.status.desc()
-                else:
-                    order_expr = EmailLog.created_at.desc()
+                def make_order_expr(key: str, asc: bool):
+                    if key == 'Thời gian':
+                        return EmailLog.created_at.asc() if asc else EmailLog.created_at.desc()
+                    if key == 'Subject':
+                        return EmailLog.subject.asc() if asc else EmailLog.subject.desc()
+                    if key == 'Recipients':
+                        return EmailLog.recipients.asc() if asc else EmailLog.recipients.desc()
+                    if key == 'Error':
+                        return EmailLog.error.asc() if asc else EmailLog.error.desc()
+                    if key == 'Số tệp':
+                        return att_count_expr.asc() if asc else att_count_expr.desc()
+                    if key == 'Đơn vị':
+                        return EmailLog.unit_name.asc() if asc else EmailLog.unit_name.desc()
+                    if key == 'Loại':
+                        return EmailLog.type.asc() if asc else EmailLog.type.desc()
+                    if key == 'Trạng thái':
+                        return EmailLog.status.asc() if asc else EmailLog.status.desc()
+                    return EmailLog.created_at.desc()
+                order_exprs = [make_order_expr(sort_key, sort_asc)]
+                if sort_key2 and sort_key2 != '(Không)':
+                    order_exprs.append(make_order_expr(sort_key2, sort_asc))
+                # luôn fallback theo thời gian để ổn định
+                order_exprs.append(EmailLog.created_at.desc())
                 if fast_pager:
-                    rows2 = q.order_by(order_expr, EmailLog.created_at.desc()).limit(page_size+1).offset(offset).all()
+                    rows2 = q.order_by(*order_exprs).limit(page_size+1).offset(offset).all()
                     has_next = len(rows2) > page_size
                     rows = rows2[:page_size]
                     for r in rows:
@@ -2374,7 +2393,7 @@ class MainWindow(QWidget):
                     if state['page'] < 0:
                         state['page'] = 0
                     offset = state['page'] * page_size
-                    rows = q.order_by(order_expr, EmailLog.created_at.desc()).limit(page_size).offset(offset).all()
+                    rows = q.order_by(*order_exprs).limit(page_size).offset(offset).all()
                     for r in rows:
                         i = table.rowCount(); table.insertRow(i)
                         it0 = QTableWidgetItem(str(getattr(r, 'created_at', '')))
@@ -2485,6 +2504,85 @@ class MainWindow(QWidget):
         btn_copy_csv.clicked.connect(copy_current_csv)
         # Xuất nhanh
         btn_quick_export.clicked.connect(export_csv)
+        # Export thống kê gọn
+        def export_stats_csv():
+            try:
+                from .db import SessionLocal as _SL
+                from .models import EmailLog as _EL
+                from sqlalchemy import func
+                s = _SL()
+                try:
+                    q = s.query(_EL)
+                    t = type_box.currentText()
+                    if not t.startswith("("):
+                        q = q.filter(_EL.type == t)
+                    u_sel = unit_box.currentText().strip() if unit_box.currentIndex() > -1 else ""
+                    if u_sel and not u_sel.startswith("("):
+                        q = q.filter(_EL.unit_name == u_sel)
+                    else:
+                        u = unit_edit.text().strip()
+                        if u:
+                            q = q.filter(_EL.unit_name.ilike(f"%{u}%"))
+                    st = status_box.currentText()
+                    if only_failed.isChecked():
+                        q = q.filter(_EL.status == 'failed')
+                    elif not st.startswith("("):
+                        q = q.filter(_EL.status == st)
+                    subj = subject_search.text().strip(); subj_rx = subject_regex.text().strip(); subj_not = subject_not.text().strip()
+                    if subj_rx:
+                        try:
+                            if s.bind and getattr(s.bind, 'dialect', None) and s.bind.dialect.name == 'sqlite':
+                                q = q.filter(_EL.subject.op('REGEXP')(subj_rx))
+                            else:
+                                q = q.filter(_EL.subject.ilike(f"%{subj_rx}%"))
+                        except Exception:
+                            q = q.filter(_EL.subject.ilike(f"%{subj_rx}%"))
+                    elif subj:
+                        q = q.filter(_EL.subject.ilike(f"%{subj}%"))
+                    if subj_not:
+                        q = q.filter(~_EL.subject.ilike(f"%{subj_not}%"))
+                    rc = recipients_contains.text().strip(); rn = recipients_not.text().strip()
+                    if rc: q = q.filter(_EL.recipients.ilike(f"%{rc}%"))
+                    if rn: q = q.filter(~_EL.recipients.ilike(f"%{rn}%"))
+                    b = body_search.text().strip(); bn = body_not.text().strip()
+                    if b: q = q.filter(_EL.body.ilike(f"%{b}%"))
+                    if bn: q = q.filter(~_EL.body.ilike(f"%{bn}%"))
+                    ax = attach_ext.text().strip(); ac = attach_contains.text().strip(); an = attach_not.text().strip()
+                    if ax: q = q.filter(_EL.attachments.ilike(f"%{ax}%"))
+                    if ac: q = q.filter(_EL.attachments.ilike(f"%{ac}%"))
+                    if an: q = q.filter(~_EL.attachments.ilike(f"%{an}%"))
+                    ma = (int(min_attachments.text()) if (min_attachments.text() or '').isdigit() else 0)
+                    if ma:
+                        from sqlalchemy import func as _func
+                        q = q.filter((_func.length(_EL.attachments) - _func.length(_func.replace(_EL.attachments, ',', '')) + 1) >= ma)
+                    # Date range
+                    from datetime import datetime as _dt2
+                    if e_from.isChecked():
+                        fd = from_date.date(); q = q.filter(_EL.created_at >= _dt2(fd.year(), fd.month(), fd.day(), 0, 0, 0))
+                    if e_to.isChecked():
+                        td = to_date.date(); q = q.filter(_EL.created_at <= _dt2(td.year(), td.month(), td.day(), 23, 59, 59))
+                    # Build summary
+                    by_status = s.query(_EL.status, func.count(1)).filter(q._criterion if getattr(q, '_criterion', None) is not None else True).group_by(_EL.status).all()
+                    by_type = s.query(_EL.type, func.count(1)).filter(q._criterion if getattr(q, '_criterion', None) is not None else True).group_by(_EL.type).all()
+                    # Write CSV
+                    import csv
+                    from datetime import datetime as _dt
+                    from pathlib import Path
+                    Path('exports').mkdir(exist_ok=True)
+                    outp = Path('exports')/f"email_stats_summary_{_dt.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                    with open(outp, 'w', encoding='utf-8', newline='') as fcsv:
+                        w = csv.writer(fcsv)
+                        w.writerow(["group","key","count"])
+                        for k, v in by_status:
+                            w.writerow(["status", k or '', v])
+                        for k, v in by_type:
+                            w.writerow(["type", k or '', v])
+                    QMessageBox.information(dlg, "Đã xuất", str(outp))
+                finally:
+                    s.close()
+            except Exception as ex3:
+                QMessageBox.critical(dlg, "Lỗi", str(ex3))
+        btn_export_stats.clicked.connect(export_stats_csv)
         def copy_selected_row():
             try:
                 i = table.currentRow()
