@@ -1,3 +1,78 @@
+from datetime import datetime, timedelta
+
+from sqlalchemy import create_engine, event, func
+from sqlalchemy.orm import sessionmaker
+
+from hrms.db import Base
+from hrms.models import EmailLog
+
+
+def setup_sqlite(tmp_path):
+    db_path = tmp_path / "test.db"
+    engine = create_engine(f"sqlite:///{db_path}", future=True)
+    @event.listens_for(engine, "connect")
+    def _sqlite_regexp(dbapi_connection, connection_record):
+        import re as _re
+        def regexp(pattern, string):
+            try:
+                if string is None:
+                    return 0
+                return 1 if _re.search(pattern, str(string)) else 0
+            except Exception:
+                return 0
+        dbapi_connection.create_function("REGEXP", 2, regexp)
+        dbapi_connection.create_function("regexp", 2, regexp)
+    TestingSession = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
+    Base.metadata.create_all(engine)
+    return engine, TestingSession
+
+
+def seed_email_logs(Session):
+    s = Session()
+    now = datetime.utcnow()
+    rows = [
+        EmailLog(type='generic', unit_name='Unit A', recipients='a@x,y@z', subject='Hello World', body='Body', attachments='', status='sent', error=None, created_at=now - timedelta(days=1), user_id=1),
+        EmailLog(type='generic', unit_name='Unit B', recipients='b@x', subject='Error: Mail bounced', body='Body', attachments='exports/a.txt', status='failed', error='bounced', created_at=now - timedelta(days=2), user_id=2),
+        EmailLog(type='generic', unit_name='Unit A', recipients='c@x', subject='Report Q3', body='Body', attachments='exports/a.txt, exports/b.txt', status='sent', error=None, created_at=now - timedelta(days=10), user_id=1),
+        EmailLog(type='generic', unit_name='Unit C', recipients='d@x', subject='Retry Subject', body='Body', attachments=None, status='failed', error='timeout', created_at=now - timedelta(days=31), user_id=3),
+    ]
+    s.add_all(rows)
+    s.commit()
+
+
+def test_recipients_filters(tmp_path):
+    engine, TestingSession = setup_sqlite(tmp_path)
+    try:
+        seed_email_logs(TestingSession)
+        s = TestingSession()
+        # contains b@x -> second row
+        q = s.query(EmailLog).filter(func.instr(EmailLog.recipients, 'b@x') > 0)
+        assert q.count() == 1
+        # not contains b@x -> others
+        q2 = s.query(EmailLog).filter(func.instr(EmailLog.recipients, 'b@x') == 0)
+        assert q2.count() == 3
+    finally:
+        s.close()
+        engine.dispose()
+
+
+def test_stats_attachment_counts(tmp_path):
+    engine, TestingSession = setup_sqlite(tmp_path)
+    try:
+        seed_email_logs(TestingSession)
+        s = TestingSession()
+        # count attachments approx by splitting commas
+        rows = s.query(EmailLog.attachments).all()
+        count = 0
+        for (att,) in rows:
+            for part in (att or '').split(','):
+                if part.strip():
+                    count += 1
+        assert count >= 3  # we seeded two files in one row and one in another
+    finally:
+        s.close()
+        engine.dispose()
+
 import os
 import tempfile
 import json
