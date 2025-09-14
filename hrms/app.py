@@ -1790,6 +1790,13 @@ class MainWindow(QWidget):
                     cb_all_scope.setChecked(bool(obj.get('all_scope', False)))
                 except Exception:
                     pass
+                # page size
+                try:
+                    ps = str(obj.get('page_size','') or '')
+                    if ps and ps in [page_size_box.itemText(i) for i in range(page_size_box.count())]:
+                        page_size_box.setCurrentText(ps)
+                except Exception:
+                    pass
             except Exception:
                 pass
         def save_filter():
@@ -1816,6 +1823,8 @@ class MainWindow(QWidget):
                     'subj_prefix': getattr(resend_grouped_by_unit, '__subj_prefix').text() if hasattr(resend_grouped_by_unit, '__subj_prefix') else None,
                     'subj_suffix': getattr(resend_grouped_by_unit, '__subj_suffix').text() if hasattr(resend_grouped_by_unit, '__subj_suffix') else None,
                     'all_scope': cb_all_scope.isChecked(),
+                    'zip_when_group': (getattr(resend_grouped_by_unit, '__zip_cb').isChecked() if hasattr(resend_grouped_by_unit, '__zip_cb') else False),
+                    'page_size': page_size_box.currentText(),
                 }
                 import json
                 set_setting(key, json.dumps(obj, ensure_ascii=False))
@@ -2144,7 +2153,7 @@ class MainWindow(QWidget):
                 import zipfile
                 with zipfile.ZipFile(str(zips[0]), 'r') as zf:
                     infos = zf.infolist()
-                from PySide6.QtWidgets import QDialog as _QD, QVBoxLayout as _QV, QTableWidget as _QT, QTableWidgetItem as _QTI
+                from PySide6.QtWidgets import QDialog as _QD, QVBoxLayout as _QV, QTableWidget as _QT, QTableWidgetItem as _QTI, QPushButton as _QP, QHBoxLayout as _QH
                 d = _QD(dlg); d.setWindowTitle(f"Nội dung ZIP: {zips[0].name}")
                 lay2 = _QV(d)
                 t = _QT(0, 3); t.setHorizontalHeaderLabels(["Tên", "Kích thước", "Nén"]) ; lay2.addWidget(t)
@@ -2153,7 +2162,46 @@ class MainWindow(QWidget):
                     t.setItem(j, 0, _QTI(inf.filename))
                     t.setItem(j, 1, _QTI(str(inf.file_size)))
                     t.setItem(j, 2, _QTI(str(inf.compress_size)))
-                d.resize(600, 400); d.exec()
+                # Nút thao tác
+                bar = _QH(); btn_open = _QP("Mở mục đã chọn"); btn_extract_all = _QP("Giải nén tất cả")
+                bar.addWidget(btn_open); bar.addWidget(btn_extract_all); lay2.addLayout(bar)
+                def do_open_selected():
+                    try:
+                        row = t.currentRow()
+                        if row < 0:
+                            return
+                        name = t.item(row,0).text() if t.item(row,0) else ''
+                        if not name:
+                            return
+                        # extract to temp and open
+                        import os, sys, subprocess
+                        import zipfile as _zf
+                        out_dir = Path('temp')/'zipview'/zips[0].stem
+                        out_dir.mkdir(parents=True, exist_ok=True)
+                        with _zf.ZipFile(str(zips[0]), 'r') as _zz:
+                            _zz.extract(name, str(out_dir))
+                        target = out_dir/name
+                        if sys.platform.startswith('win'):
+                            os.startfile(str(target))
+                        elif sys.platform == 'darwin':
+                            subprocess.Popen(['open', str(target)])
+                        else:
+                            subprocess.Popen(['xdg-open', str(target)])
+                    except Exception as ex2:
+                        QMessageBox.critical(d, "Lỗi", str(ex2))
+                def do_extract_all():
+                    try:
+                        import zipfile as _zf
+                        out_dir = Path('temp')/'zipview'/zips[0].stem
+                        out_dir.mkdir(parents=True, exist_ok=True)
+                        with _zf.ZipFile(str(zips[0]), 'r') as _zz:
+                            _zz.extractall(str(out_dir))
+                        QMessageBox.information(d, "Đã giải nén", str(out_dir))
+                    except Exception as ex3:
+                        QMessageBox.critical(d, "Lỗi", str(ex3))
+                btn_open.clicked.connect(do_open_selected)
+                btn_extract_all.clicked.connect(do_extract_all)
+                d.resize(700, 450); d.exec()
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
         btn_view_zip.clicked.connect(view_zip_contents)

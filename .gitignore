@@ -42,3 +42,6 @@ data/*.db
 data/**/*.db
 data/*.sqlite
 data/**/*.sqlite
+
+# Temp extracted files
+temp/
