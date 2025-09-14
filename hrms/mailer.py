@@ -72,9 +72,10 @@ def get_recipients_for_unit(unit_name: str) -> List[str]:
             e = (e or '').strip()
             if not e or not pat.match(e):
                 continue
-            if e.lower() in seen:
+            e_lower = e.lower()
+            if e_lower in seen:
                 continue
-            seen.add(e.lower()); out.append(e)
+            seen.add(e_lower); out.append(e_lower)
         return out
     try:
         # Ưu tiên DB
