@@ -1759,6 +1759,9 @@ class MainWindow(QWidget):
                 except Exception: pass
         reload_units()
         status_box = QComboBox(); status_box.addItems(["(Tất cả)", "sent", "failed"])
+        # Nút nhanh đặt trạng thái
+        from PySide6.QtWidgets import QPushButton as _PB2, QHBoxLayout as _HB2
+        _row_status = _HB2(); _row_status.addWidget(status_box); _btn_sent = _PB2("Sent"); _btn_failed = _PB2("Failed"); _row_status.addWidget(_btn_sent); _row_status.addWidget(_btn_failed)
         only_failed = QCheckBox("Chỉ lỗi")
         only_success = QCheckBox("Chỉ thành công")
         has_attach_cb = QCheckBox("Chỉ có đính kèm")
@@ -1781,7 +1784,7 @@ class MainWindow(QWidget):
         _btn_reload_units.clicked.connect(reload_units)
         _unit_row.addWidget(_btn_reload_units)
         f.addRow("Chọn đơn vị", _unit_row)
-        f.addRow("Trạng thái", status_box)
+        f.addRow("Trạng thái", _row_status)
         f.addRow("", only_failed)
         f.addRow("", only_success)
         f.addRow("", has_attach_cb)
@@ -1876,6 +1879,31 @@ class MainWindow(QWidget):
             state['page'] = 0; load()
         only_success.toggled.connect(lambda _ : _sync_status_toggles())
         only_failed.toggled.connect(lambda _ : _sync_status_toggles())
+        def _on_status_changed():
+            try:
+                only_failed.blockSignals(True); only_success.blockSignals(True)
+                only_failed.setChecked(False); only_success.setChecked(False)
+            except Exception:
+                pass
+            finally:
+                try: only_failed.blockSignals(False); only_success.blockSignals(False)
+                except Exception: pass
+            try:
+                save_filter()
+            except Exception:
+                pass
+            state['page'] = 0; load()
+        try:
+            status_box.currentTextChanged.connect(lambda _ : _on_status_changed())
+        except Exception:
+            pass
+        def _set_status(name: str):
+            try:
+                status_box.setCurrentText(name)
+            except Exception:
+                pass
+        _btn_sent.clicked.connect(lambda : _set_status('sent'))
+        _btn_failed.clicked.connect(lambda : _set_status('failed'))
         f.addRow("Sắp xếp theo", sort_field)
         f.addRow("Sắp xếp 2", sort_field2)
         f.addRow("", sort_asc_cb)
@@ -2834,6 +2862,9 @@ class MainWindow(QWidget):
                 name = f"email_logs_{sanitize(t)}_{sanitize(st)}_{base}.csv"
                 outp = Path('exports')/name
                 with open(outp, 'w', encoding='utf-8', newline='') as fcsv:
+                    # BOM for Excel
+                    try: fcsv.write('\ufeff')
+                    except Exception: pass
                     w = csv.writer(fcsv)
                     w.writerow(["created_at","type","unit_name","subject","recipients","attachments","status","error","attachments_count"])
                     for i in range(table.rowCount()):
@@ -3813,6 +3844,74 @@ class MainWindow(QWidget):
                     # Nút copy CSV và Export CSV
                     bar = _QH(); btn_copy = _QP("Copy CSV"); btn_export = _QP("Export CSV"); btn_copy_json = _QP("Copy JSON"); btn_export_json = _QP("Export JSON"); bar.addWidget(btn_copy); bar.addWidget(btn_export); bar.addWidget(btn_copy_json); bar.addWidget(btn_export_json)
                     lay2.addLayout(bar)
+                    def do_copy_pivot():
+                        try:
+                            import csv, io
+                            cur = tabs.currentWidget()
+                            if not isinstance(cur, _QT):
+                                return
+                            # build pivot by Status
+                            statuses = set()
+                            rows = []
+                            for r in range(cur.rowCount()):
+                                key0 = cur.item(r,0).text() if cur.item(r,0) else ''
+                                key1 = cur.item(r,1).text() if cur.item(r,1) else ''
+                                st = cur.item(r,2).text() if cur.item(r,2) else ''
+                                cnt = cur.item(r,3).text() if cur.item(r,3) else '0'
+                                statuses.add(st)
+                                rows.append((key0, key1, st, int(cnt or '0')))
+                            statuses = sorted(list(statuses))
+                            # aggregate
+                            from collections import defaultdict
+                            data = defaultdict(lambda: {s:0 for s in statuses})
+                            for k0,k1,st,c in rows:
+                                data[(k0,k1)][st] += c
+                            buf = io.StringIO()
+                            w = csv.writer(buf)
+                            w.writerow([cur.horizontalHeaderItem(0).text(), cur.horizontalHeaderItem(1).text()] + statuses)
+                            for (k0,k1), d in data.items():
+                                w.writerow([k0,k1] + [d.get(s,0) for s in statuses])
+                            QApplication.clipboard().setText(buf.getvalue())
+                            QMessageBox.information(d, "Đã copy", "Đã copy Pivot CSV vào clipboard")
+                        except Exception as ex2:
+                            QMessageBox.critical(d, "Lỗi", str(ex2))
+                    def do_export_pivot():
+                        try:
+                            import csv
+                            from datetime import datetime as _dt
+                            from pathlib import Path
+                            cur = tabs.currentWidget()
+                            if not isinstance(cur, _QT):
+                                return
+                            statuses = set()
+                            rows = []
+                            for r in range(cur.rowCount()):
+                                key0 = cur.item(r,0).text() if cur.item(r,0) else ''
+                                key1 = cur.item(r,1).text() if cur.item(r,1) else ''
+                                st = cur.item(r,2).text() if cur.item(r,2) else ''
+                                cnt = cur.item(r,3).text() if cur.item(r,3) else '0'
+                                statuses.add(st)
+                                rows.append((key0, key1, st, int(cnt or '0')))
+                            statuses = sorted(list(statuses))
+                            from collections import defaultdict
+                            data = defaultdict(lambda: {s:0 for s in statuses})
+                            for k0,k1,st,c in rows:
+                                data[(k0,k1)][st] += c
+                            Path('exports').mkdir(exist_ok=True)
+                            outp = Path('exports')/f"email_stats_pivot_{('units' if tabs.currentIndex()==0 else 'days')}_{_dt.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                            with open(outp, 'w', encoding='utf-8', newline='') as fcsv:
+                                try: fcsv.write('\ufeff')
+                                except Exception: pass
+                                w = csv.writer(fcsv)
+                                w.writerow([cur.horizontalHeaderItem(0).text(), cur.horizontalHeaderItem(1).text()] + statuses)
+                                for (k0,k1), d in data.items():
+                                    w.writerow([k0,k1] + [d.get(s,0) for s in statuses])
+                            QMessageBox.information(d, "Đã xuất", str(outp))
+                        except Exception as ex2:
+                            QMessageBox.critical(d, "Lỗi", str(ex2))
+                    btn_export_pivot = _QP("Export Pivot"); btn_copy_pivot = _QP("Copy Pivot"); bar.addWidget(btn_copy_pivot); bar.addWidget(btn_export_pivot)
+                    btn_copy_pivot.clicked.connect(do_copy_pivot)
+                    btn_export_pivot.clicked.connect(do_export_pivot)
                     def do_copy_csv():
                         try:
                             cur = tabs.currentWidget()
@@ -3865,6 +3964,9 @@ class MainWindow(QWidget):
                             fname = 'email_stats_units' if cur is tbl1 else 'email_stats_days'
                             outp = Path('exports')/f"{fname}_{_dt.now().strftime('%Y%m%d_%H%M%S')}.csv"
                             with open(outp, 'w', encoding='utf-8', newline='') as fcsv:
+                                # BOM for Excel
+                                try: fcsv.write('\ufeff')
+                                except Exception: pass
                                 w = csv.writer(fcsv)
                                 headers = [cur.horizontalHeaderItem(c).text() if cur.horizontalHeaderItem(c) else '' for c in range(cur.columnCount())]
                                 w.writerow(headers)
@@ -3970,6 +4072,9 @@ class MainWindow(QWidget):
                         q = q.filter(EmailLog.user_id == int(uidtxt))
                     rows = q.order_by(EmailLog.created_at.desc()).all()
                     with open(outp, 'w', encoding='utf-8', newline='') as fcsv:
+                        # BOM for Excel
+                        try: fcsv.write('\ufeff')
+                        except Exception: pass
                         w = csv.writer(fcsv)
                         w.writerow(["created_at","type","unit_name","subject","recipients","attachments","status","error"])
                         for r in rows:
@@ -4753,6 +4858,9 @@ class MainWindow(QWidget):
                     Path('exports').mkdir(exist_ok=True)
                     outp = Path('exports')/f"attachment_list_{_dt.now().strftime('%Y%m%d_%H%M%S')}.csv"
                     with open(outp, 'w', encoding='utf-8', newline='') as fcsv:
+                        # BOM for Excel
+                        try: fcsv.write('\ufeff')
+                        except Exception: pass
                         w = csv.writer(fcsv)
                         w.writerow(["day","unit","type","path","size_bytes"])
                         for row in data:
