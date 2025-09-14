@@ -1714,6 +1714,9 @@ class MainWindow(QWidget):
         btn_prev = QPushButton("◀ Trước"); btn_next = QPushButton("Sau ▶"); page_label = QLabel("Trang 1/1")
         pager_bar.addWidget(QLabel("Kích thước trang")); pager_bar.addWidget(page_size_box); pager_bar.addWidget(btn_prev); pager_bar.addWidget(btn_next); pager_bar.addWidget(page_label)
         f.addRow(pager_bar)
+        # Áp dụng trên toàn bộ (bỏ qua phân trang)
+        cb_all_scope = QCheckBox("Toàn bộ (bỏ qua phân trang)")
+        f.addRow("", cb_all_scope)
         btn_resend = QPushButton("Gửi lại")
         btn_resend_all = QPushButton("Gửi lại tất cả (lọc)")
         btn_resend_group = QPushButton("Gửi lại theo nhóm (đơn vị)")
@@ -1772,6 +1775,21 @@ class MainWindow(QWidget):
                     e_to.setChecked(True)
                 uid = obj.get('user_id')
                 user_id_edit.setText(str(uid) if uid is not None else '')
+                # group resend fields
+                try:
+                    if 'zip_pattern' in obj and hasattr(resend_grouped_by_unit, '__zip_pattern'):
+                        resend_grouped_by_unit.__zip_pattern.setText(obj.get('zip_pattern') or resend_grouped_by_unit.__zip_pattern.text())
+                    if 'subj_prefix' in obj and hasattr(resend_grouped_by_unit, '__subj_prefix'):
+                        resend_grouped_by_unit.__subj_prefix.setText(obj.get('subj_prefix') or '')
+                    if 'subj_suffix' in obj and hasattr(resend_grouped_by_unit, '__subj_suffix'):
+                        resend_grouped_by_unit.__subj_suffix.setText(obj.get('subj_suffix') or '')
+                except Exception:
+                    pass
+                # all scope
+                try:
+                    cb_all_scope.setChecked(bool(obj.get('all_scope', False)))
+                except Exception:
+                    pass
             except Exception:
                 pass
         def save_filter():
@@ -1794,6 +1812,10 @@ class MainWindow(QWidget):
                     'from_date': qdate_to_str(from_date.date()) if e_from.isChecked() else None,
                     'to_date': qdate_to_str(to_date.date()) if e_to.isChecked() else None,
                     'user_id': (int(user_id_edit.text()) if user_id_edit.text().isdigit() else None),
+                    'zip_pattern': getattr(resend_grouped_by_unit, '__zip_pattern').text() if hasattr(resend_grouped_by_unit, '__zip_pattern') else None,
+                    'subj_prefix': getattr(resend_grouped_by_unit, '__subj_prefix').text() if hasattr(resend_grouped_by_unit, '__subj_prefix') else None,
+                    'subj_suffix': getattr(resend_grouped_by_unit, '__subj_suffix').text() if hasattr(resend_grouped_by_unit, '__subj_suffix') else None,
+                    'all_scope': cb_all_scope.isChecked(),
                 }
                 import json
                 set_setting(key, json.dumps(obj, ensure_ascii=False))
@@ -1999,6 +2021,13 @@ class MainWindow(QWidget):
                             except Exception:
                                 continue
                     QMessageBox.information(dlg, "Đã xuất", f"{zip_path}")
+                    # Log export
+                    try:
+                        from .db import SessionLocal as _SL
+                        from .models import EmailLog as _EL
+                        s = _SL(); s.add(_EL(type='export_zip', unit_name=None, recipients='', subject='Export attachments ZIP', body='Filtered attachments ZIP', attachments=str(zip_path), status='exported', user_id=self.current_user.get('id'))); s.commit(); s.close()
+                    except Exception:
+                        pass
                 finally:
                     db2.close()
             except Exception as ex:
@@ -2225,42 +2254,106 @@ class MainWindow(QWidget):
         def resend_all_filtered():
             try:
                 total = 0; sent = 0; failed = 0
-                for i in range(table.rowCount()):
-                    total += 1
+                if cb_all_scope.isChecked():
+                    from .db import SessionLocal as _SL
+                    from .models import EmailLog
+                    s3 = _SL()
                     try:
-                        t = table.item(i,1).text() if table.item(i,1) else ''
-                        unit_name = table.item(i,2).text() if table.item(i,2) else ''
-                        subject = table.item(i,3).text() if table.item(i,3) else ''
-                        body = table.item(i,3).data(Qt.UserRole) if table.item(i,3) else ''
-                        attach_disp = table.item(i,5).data(Qt.UserRole) if table.item(i,5) else (table.item(i,5).text() if table.item(i,5) else '')
-                        paths = []
-                        from pathlib import Path
-                        for part in (attach_disp or '').split(','):
-                            p = part.strip()
-                            if p:
-                                pp = Path(p)
-                                if pp.exists():
-                                    paths.append(str(pp))
-                        recips = None
-                        if t in ('salary_due','bhxh_monthly','contracts_expiring') and unit_name:
+                        q = s3.query(EmailLog)
+                        t = type_box.currentText()
+                        if not t.startswith("("):
+                            q = q.filter(EmailLog.type == t)
+                        u_sel = unit_box.currentText().strip() if unit_box.currentIndex() > -1 else ""
+                        if u_sel and not u_sel.startswith("("):
+                            q = q.filter(EmailLog.unit_name == u_sel)
+                        else:
+                            u = unit_edit.text().strip()
+                            if u:
+                                q = q.filter(EmailLog.unit_name.ilike(f"%{u}%"))
+                        st = status_box.currentText()
+                        if only_failed.isChecked():
+                            q = q.filter(EmailLog.status == 'failed')
+                        elif not st.startswith("("):
+                            q = q.filter(EmailLog.status == st)
+                        subj = subject_search.text().strip()
+                        if subj:
+                            q = q.filter(EmailLog.subject.ilike(f"%{subj}%"))
+                        uidtxt = user_id_edit.text().strip()
+                        if uidtxt.isdigit():
+                            q = q.filter(EmailLog.user_id == int(uidtxt))
+                        from datetime import datetime as _dt2
+                        if e_from.isChecked():
+                            fd = from_date.date(); q = q.filter(EmailLog.created_at >= _dt2(fd.year(), fd.month(), fd.day(), 0, 0, 0))
+                        if e_to.isChecked():
+                            td = to_date.date(); q = q.filter(EmailLog.created_at <= _dt2(td.year(), td.month(), td.day(), 23, 59, 59))
+                        rows = q.order_by(EmailLog.created_at.desc()).all()
+                        for r in rows:
                             try:
-                                from .mailer import get_recipients_for_unit
-                                recips = get_recipients_for_unit(unit_name)
+                                t = getattr(r,'type','') or ''
+                                unit_name = getattr(r,'unit_name','') or ''
+                                subject = getattr(r,'subject','') or ''
+                                body = getattr(r,'body','') or ''
+                                paths = []
+                                from pathlib import Path
+                                for part in (getattr(r,'attachments','') or '').split(','):
+                                    p = part.strip()
+                                    if p:
+                                        pp = Path(p)
+                                        if pp.exists():
+                                            paths.append(str(pp))
+                                from .mailer import send_email_with_attachment, get_recipients_for_unit
+                                recips = get_recipients_for_unit(unit_name) if t in ('salary_due','bhxh_monthly','contracts_expiring') and unit_name else None
+                                ok = send_email_with_attachment(subject or '[HRMS] Resend', body or '', paths, to=recips)
+                                # Log lại
+                                try:
+                                    s = _SL(); from .models import EmailLog as _EL
+                                    s.add(_EL(type=t or 'generic', unit_name=(unit_name or None), recipients='', subject=subject or '[HRMS] Resend', body=(body or '')[:1000], attachments=', '.join(paths), status='sent' if ok else 'failed', user_id=self.current_user.get('id'))); s.commit(); s.close()
+                                except Exception:
+                                    pass
+                                if ok: sent += 1
+                                else: failed += 1
                             except Exception:
-                                recips = None
-                        from .mailer import send_email_with_attachment
-                        ok = send_email_with_attachment(subject or '[HRMS] Resend', body or '', paths, to=recips)
-                        # Log lại
+                                failed += 1
+                    finally:
+                        try: s3.close()
+                        except Exception: pass
+                else:
+                    for i in range(table.rowCount()):
+                        total += 1
                         try:
-                            from .db import SessionLocal
-                            from .models import EmailLog
-                            s = SessionLocal(); s.add(EmailLog(type=t or 'generic', unit_name=(unit_name or None), recipients='', subject=subject or '[HRMS] Resend', body=(body or '')[:1000], attachments=', '.join(paths), status='sent' if ok else 'failed', user_id=self.current_user.get('id'))); s.commit(); s.close()
+                            t = table.item(i,1).text() if table.item(i,1) else ''
+                            unit_name = table.item(i,2).text() if table.item(i,2) else ''
+                            subject = table.item(i,3).text() if table.item(i,3) else ''
+                            body = table.item(i,3).data(Qt.UserRole) if table.item(i,3) else ''
+                            attach_disp = table.item(i,5).data(Qt.UserRole) if table.item(i,5) else (table.item(i,5).text() if table.item(i,5) else '')
+                            paths = []
+                            from pathlib import Path
+                            for part in (attach_disp or '').split(','):
+                                p = part.strip()
+                                if p:
+                                    pp = Path(p)
+                                    if pp.exists():
+                                        paths.append(str(pp))
+                            recips = None
+                            if t in ('salary_due','bhxh_monthly','contracts_expiring') and unit_name:
+                                try:
+                                    from .mailer import get_recipients_for_unit
+                                    recips = get_recipients_for_unit(unit_name)
+                                except Exception:
+                                    recips = None
+                            from .mailer import send_email_with_attachment
+                            ok = send_email_with_attachment(subject or '[HRMS] Resend', body or '', paths, to=recips)
+                            # Log lại
+                            try:
+                                from .db import SessionLocal
+                                from .models import EmailLog
+                                s = SessionLocal(); s.add(EmailLog(type=t or 'generic', unit_name=(unit_name or None), recipients='', subject=subject or '[HRMS] Resend', body=(body or '')[:1000], attachments=', '.join(paths), status='sent' if ok else 'failed', user_id=self.current_user.get('id'))); s.commit(); s.close()
+                            except Exception:
+                                pass
+                            if ok: sent += 1
+                            else: failed += 1
                         except Exception:
-                            pass
-                        if ok: sent += 1
-                        else: failed += 1
-                    except Exception:
-                        failed += 1
+                            failed += 1
                 QMessageBox.information(dlg, "Kết quả", f"Tổng: {total}\nThành công: {sent}\nThất bại: {failed}")
             except Exception as ex:
                 QMessageBox.critical(dlg, "Lỗi", str(ex))
@@ -2271,22 +2364,69 @@ class MainWindow(QWidget):
                 allowed = {'salary_due','bhxh_monthly','contracts_expiring'}
                 groups = {}
                 from pathlib import Path
-                for i in range(table.rowCount()):
-                    t = table.item(i,1).text() if table.item(i,1) else ''
-                    if t not in allowed: continue
-                    unit_name = table.item(i,2).text() if table.item(i,2) else ''
-                    if not unit_name: continue
-                    attach_disp = table.item(i,5).data(Qt.UserRole) if table.item(i,5) else (table.item(i,5).text() if table.item(i,5) else '')
-                    paths = []
-                    for part in (attach_disp or '').split(','):
-                        p = part.strip()
-                        if p and Path(p).exists():
-                            paths.append(str(Path(p)))
-                    if not paths: continue
-                    key = (t, unit_name)
-                    groups.setdefault(key, set())
-                    for p in paths:
-                        groups[key].add(p)
+                if cb_all_scope.isChecked():
+                    from .db import SessionLocal as _SL
+                    from .models import EmailLog
+                    s4 = _SL()
+                    try:
+                        q = s4.query(EmailLog)
+                        t = type_box.currentText()
+                        if not t.startswith("("):
+                            q = q.filter(EmailLog.type == t)
+                        u_sel = unit_box.currentText().strip() if unit_box.currentIndex() > -1 else ""
+                        if u_sel and not u_sel.startswith("("):
+                            q = q.filter(EmailLog.unit_name == u_sel)
+                        else:
+                            u = unit_edit.text().strip()
+                            if u:
+                                q = q.filter(EmailLog.unit_name.ilike(f"%{u}%"))
+                        st = status_box.currentText()
+                        if only_failed.isChecked():
+                            q = q.filter(EmailLog.status == 'failed')
+                        elif not st.startswith("("):
+                            q = q.filter(EmailLog.status == st)
+                        subj = subject_search.text().strip()
+                        if subj:
+                            q = q.filter(EmailLog.subject.ilike(f"%{subj}%"))
+                        uidtxt = user_id_edit.text().strip()
+                        if uidtxt.isdigit():
+                            q = q.filter(EmailLog.user_id == int(uidtxt))
+                        from datetime import datetime as _dt2
+                        if e_from.isChecked():
+                            fd = from_date.date(); q = q.filter(EmailLog.created_at >= _dt2(fd.year(), fd.month(), fd.day(), 0, 0, 0))
+                        if e_to.isChecked():
+                            td = to_date.date(); q = q.filter(EmailLog.created_at <= _dt2(td.year(), td.month(), td.day(), 23, 59, 59))
+                        rows = q.order_by(EmailLog.created_at.desc()).all()
+                        for r in rows:
+                            t = getattr(r,'type','') or ''
+                            if t not in allowed: continue
+                            unit_name = getattr(r,'unit_name','') or ''
+                            if not unit_name: continue
+                            for part in (getattr(r,'attachments','') or '').split(','):
+                                p = part.strip()
+                                if p and Path(p).exists():
+                                    key = (t, unit_name)
+                                    groups.setdefault(key, set()).add(str(Path(p)))
+                    finally:
+                        try: s4.close()
+                        except Exception: pass
+                else:
+                    for i in range(table.rowCount()):
+                        t = table.item(i,1).text() if table.item(i,1) else ''
+                        if t not in allowed: continue
+                        unit_name = table.item(i,2).text() if table.item(i,2) else ''
+                        if not unit_name: continue
+                        attach_disp = table.item(i,5).data(Qt.UserRole) if table.item(i,5) else (table.item(i,5).text() if table.item(i,5) else '')
+                        paths = []
+                        for part in (attach_disp or '').split(','):
+                            p = part.strip()
+                            if p and Path(p).exists():
+                                paths.append(str(Path(p)))
+                        if not paths: continue
+                        key = (t, unit_name)
+                        groups.setdefault(key, set())
+                        for p in paths:
+                            groups[key].add(p)
                 if not groups:
                     QMessageBox.information(dlg, "Không có dữ liệu", "Không có nhóm hợp lệ để gửi lại")
                     return
