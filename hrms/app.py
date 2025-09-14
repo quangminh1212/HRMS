@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import (
     QApplication, QWidget, QLineEdit, QPushButton, QVBoxLayout, QLabel,
-    QListWidget, QMessageBox, QHBoxLayout, QComboBox, QDialog, QFormLayout
+    QListWidget, QMessageBox, QHBoxLayout, QComboBox, QDialog, QFormLayout,
+    QCheckBox
 )
 from PySide6.QtCore import Qt, QTimer
 import sys
@@ -102,16 +103,32 @@ class MainWindow(QWidget):
         self.btn_prev = QPushButton("◀ Trước")
         self.btn_next = QPushButton("Sau ▶")
         self.page_label = QLabel("Trang 1/1")
+        self.cb_person_fast = QCheckBox("Chế độ nhanh")
+        # default from settings
+        try:
+            from .settings_service import get_setting as _getset
+            self.cb_person_fast.setChecked(((str(_getset('PERSON_LIST_FAST_PAGER','0') or '0')).strip().lower() in ('1','true','yes')))
+        except Exception:
+            pass
         pager_layout.addWidget(QLabel("Kích thước trang"))
         pager_layout.addWidget(self.page_size_box)
         pager_layout.addWidget(self.btn_prev)
         pager_layout.addWidget(self.btn_next)
         pager_layout.addWidget(self.page_label)
+        pager_layout.addWidget(self.cb_person_fast)
         self.current_page = 0
         self.total_count = 0
         self.btn_prev.clicked.connect(self.go_prev_page)
         self.btn_next.clicked.connect(self.go_next_page)
         self.page_size_box.currentTextChanged.connect(lambda _: self.reset_to_first_page())
+        def _on_toggle_person_fast():
+            try:
+                from .settings_service import set_setting as _ss
+                _ss('PERSON_LIST_FAST_PAGER', '1' if self.cb_person_fast.isChecked() else '0')
+            except Exception:
+                pass
+            self.reset_to_first_page()
+        self.cb_person_fast.toggled.connect(lambda _ : _on_toggle_person_fast())
         btn_layout = QHBoxLayout()
         self.btn_export = QPushButton("Xuất trích ngang")
         self.btn_export.clicked.connect(self.export_selected)
@@ -225,6 +242,10 @@ class MainWindow(QWidget):
 
     def go_next_page(self):
         page_size = int(self.page_size_box.currentText()) if self.page_size_box.currentText().isdigit() else 50
+        if getattr(self, 'cb_person_fast', None) and self.cb_person_fast.isChecked():
+            self.current_page += 1
+            self.on_search(self.search.text())
+            return
         max_page = max(0, (self.total_count - 1) // page_size)
         if self.current_page < max_page:
             self.current_page += 1
@@ -271,24 +292,38 @@ class MainWindow(QWidget):
             st = self.filter_status.currentText()
             if st and not st.startswith("--"):
                 q = q.filter(Person.status.ilike(f"%{st}%"))
-            # Đếm tổng số kết quả trước khi phân trang
-            self.total_count = q.count()
+            # Phân trang theo chế độ
             page_size = int(self.page_size_box.currentText()) if self.page_size_box.currentText().isdigit() else 50
             offset = self.current_page * page_size
-            # Nếu offset vượt quá tổng, đưa về trang cuối
-            if offset >= max(0, self.total_count):
-                self.current_page = max(0, (self.total_count - 1) // page_size) if self.total_count > 0 else 0
-                offset = self.current_page * page_size
-            people = q.order_by(Person.full_name).limit(page_size).offset(offset).all()
-            # Cập nhật danh sách
-            self.list.clear()
-            for p in people:
-                self.list.addItem(f"{p.full_name} - {p.code}")
-            # Cập nhật pager label và nút
-            total_pages = max(1, (self.total_count - 1) // page_size + 1) if self.total_count > 0 else 1
-            self.page_label.setText(f"Trang {self.current_page+1}/{total_pages} ({self.total_count} kết quả)")
-            self.btn_prev.setEnabled(self.current_page > 0)
-            self.btn_next.setEnabled(self.current_page < total_pages - 1)
+            if getattr(self, 'cb_person_fast', None) and self.cb_person_fast.isChecked():
+                rows2 = q.order_by(Person.full_name, Person.id).limit(page_size+1).offset(offset).all()
+                people = rows2[:page_size]
+                has_next = len(rows2) > page_size
+                # Cập nhật danh sách
+                self.list.clear()
+                for p in people:
+                    self.list.addItem(f"{p.full_name} - {p.code}")
+                # Label và nút
+                self.page_label.setText(f"Trang {self.current_page+1} (chế độ nhanh)")
+                self.btn_prev.setEnabled(self.current_page > 0)
+                self.btn_next.setEnabled(has_next)
+            else:
+                # Đếm tổng số kết quả trước khi phân trang
+                self.total_count = q.count()
+                # Nếu offset vượt quá tổng, đưa về trang cuối
+                if offset >= max(0, self.total_count):
+                    self.current_page = max(0, (self.total_count - 1) // page_size) if self.total_count > 0 else 0
+                    offset = self.current_page * page_size
+                people = q.order_by(Person.full_name).limit(page_size).offset(offset).all()
+                # Cập nhật danh sách
+                self.list.clear()
+                for p in people:
+                    self.list.addItem(f"{p.full_name} - {p.code}")
+                # Cập nhật pager label và nút
+                total_pages = max(1, (self.total_count - 1) // page_size + 1) if self.total_count > 0 else 1
+                self.page_label.setText(f"Trang {self.current_page+1}/{total_pages} ({self.total_count} kết quả)")
+                self.btn_prev.setEnabled(self.current_page > 0)
+                self.btn_next.setEnabled(self.current_page < total_pages - 1)
         except Exception as e:
             QMessageBox.critical(self, "Lỗi", str(e))
         finally:
@@ -1340,6 +1375,8 @@ class MainWindow(QWidget):
         f.addRow("UNIT_EMAILS_FALLBACK_ENABLED (1/0)", unit_emails_fallback)
         f.addRow("SEND_SUMMARY_ZIP (1/0)", summary_zip)
         f.addRow("EMAIL_HISTORY_FAST_PAGER (1/0)", email_history_fast_pager)
+        person_list_fast_pager = QLineEdit(get_setting('PERSON_LIST_FAST_PAGER','0') or '0')
+        f.addRow("PERSON_LIST_FAST_PAGER (1/0)", person_list_fast_pager)
         f.addRow("CONTRACT_ALERT_DAYS", contract_alert_days)
         f.addRow("RETRY_COUNT", QLineEdit(get_setting('RETRY_COUNT','2') or '2'))
         f.addRow("RETRY_DELAY", QLineEdit(get_setting('RETRY_DELAY','10') or '10'))
@@ -1370,6 +1407,7 @@ class MainWindow(QWidget):
             set_setting('SEND_SUMMARY_ZIP', (summary_zip.text() or '0'))
             set_setting('EMAIL_HISTORY_FAST_PAGER', (email_history_fast_pager.text() or '0'))
             set_setting('CONTRACT_ALERT_DAYS', (contract_alert_days.text() or '30'))
+            set_setting('PERSON_LIST_FAST_PAGER', (person_list_fast_pager.text() or '0'))
             # RETRY_COUNT/DELAY: đọc từ form theo label
             try:
                 from PySide6.QtWidgets import QLineEdit
@@ -1722,13 +1760,15 @@ class MainWindow(QWidget):
         reload_units()
         status_box = QComboBox(); status_box.addItems(["(Tất cả)", "sent", "failed"])
         only_failed = QCheckBox("Chỉ lỗi")
+        has_attach_cb = QCheckBox("Chỉ có đính kèm")
         subject_search = QLineEdit(); subject_search.setPlaceholderText("Tìm tiêu đề…")
+        error_search = QLineEdit(); error_search.setPlaceholderText("Lỗi chứa…")
         from_date = QDateEdit(); from_date.setCalendarPopup(True)
         to_date = QDateEdit(); to_date.setCalendarPopup(True)
         e_from = QCheckBox("Áp dụng"); e_to = QCheckBox("Áp dụng")
         btn_refresh = QPushButton("Làm mới"); btn_export = QPushButton("Export CSV"); btn_view = QPushButton("Xem chi tiết"); btn_save_filter = QPushButton("Lưu bộ lọc"); btn_reset_filter = QPushButton("Reset bộ lọc"); btn_export_zip = QPushButton("Export ZIP")
         # Preset nhanh cho khoảng thời gian
-        date_preset = QComboBox(); date_preset.addItems(["(Tuỳ chỉnh)", "7 ngày", "30 ngày", "90 ngày", "Tháng này", "Quý này", "Năm nay"])
+        date_preset = QComboBox(); date_preset.addItems(["(Tuỳ chỉnh)", "7 ngày", "30 ngày", "90 ngày", "Tuần này", "Tháng này", "Tháng trước", "Quý này", "Quý trước", "Năm nay", "Năm trước"])
         f.addRow("Loại", type_box)
         f.addRow("Đơn vị", unit_edit)
         from PySide6.QtWidgets import QHBoxLayout as _HB, QPushButton as _PB
@@ -1738,7 +1778,9 @@ class MainWindow(QWidget):
         f.addRow("Chọn đơn vị", _unit_row)
         f.addRow("Trạng thái", status_box)
         f.addRow("", only_failed)
+        f.addRow("", has_attach_cb)
         f.addRow("Tiêu đề", subject_search)
+        f.addRow("Lỗi chứa", error_search)
         h = QHBoxLayout(); h.addWidget(QLabel("Từ")); h.addWidget(from_date); h.addWidget(e_from); h.addSpacing(12); h.addWidget(QLabel("Đến")); h.addWidget(to_date); h.addWidget(e_to)
         f.addRow("Thời gian", h)
         f.addRow("Khoảng thời gian", date_preset)
@@ -1834,6 +1876,11 @@ class MainWindow(QWidget):
                     status_box.setCurrentText(st)
                 only_failed.setChecked(bool(obj.get('only_failed', False)))
                 subject_search.setText(obj.get('subject',''))
+                error_search.setText(obj.get('error',''))
+                try:
+                    has_attach_cb.setChecked(bool(obj.get('has_attachments', False)))
+                except Exception:
+                    pass
                 # dates
                 from PySide6.QtCore import QDate
                 preset = obj.get('date_preset')
@@ -1907,6 +1954,8 @@ class MainWindow(QWidget):
                     'status': status_box.currentText(),
                     'only_failed': only_failed.isChecked(),
                     'subject': subject_search.text().strip(),
+                    'error': error_search.text().strip(),
+                    'has_attachments': has_attach_cb.isChecked(),
                     'from_date': qdate_to_str(from_date.date()) if e_from.isChecked() else None,
                     'to_date': qdate_to_str(to_date.date()) if e_to.isChecked() else None,
                     'date_preset': date_preset.currentText() if 'date_preset' in locals() else None,
@@ -1936,18 +1985,38 @@ class MainWindow(QWidget):
                     start = today - _td(days=29); end = today
                 elif name == '90 ngày':
                     start = today - _td(days=89); end = today
+                elif name == 'Tuần này':
+                    start = today - _td(days=today.weekday()); end = start + _td(days=6)
                 elif name == 'Tháng này':
                     start = _date(today.year, today.month, 1)
                     from calendar import monthrange
                     end = _date(today.year, today.month, monthrange(today.year, today.month)[1])
+                elif name == 'Tháng trước':
+                    year = today.year if today.month > 1 else today.year - 1
+                    month = today.month - 1 if today.month > 1 else 12
+                    start = _date(year, month, 1)
+                    from calendar import monthrange as _mr
+                    end = _date(year, month, _mr(year, month)[1])
                 elif name == 'Quý này':
                     try:
                         s, e = quarter_window(today)
                         start, end = s, e
                     except Exception:
                         return
+                elif name == 'Quý trước':
+                    q = (today.month - 1)//3 + 1
+                    if q == 1:
+                        year = today.year - 1; qprev = 4
+                    else:
+                        year = today.year; qprev = q - 1
+                    sm = 3*(qprev-1) + 1
+                    from calendar import monthrange as _mr2
+                    start = _date(year, sm, 1)
+                    end = _date(year, sm+2, _mr2(year, sm+2)[1])
                 elif name == 'Năm nay':
                     start = _date(today.year, 1, 1); end = _date(today.year, 12, 31)
+                elif name == 'Năm trước':
+                    start = _date(today.year-1, 1, 1); end = _date(today.year-1, 12, 31)
                 else:
                     return
                 from_date.setDate(QDate(start.year, start.month, start.day))
@@ -1990,6 +2059,12 @@ class MainWindow(QWidget):
                 subj = subject_search.text().strip();
                 if subj:
                     q = q.filter(EmailLog.subject.ilike(f"%{subj}%"))
+                errtxt = error_search.text().strip();
+                if errtxt:
+                    q = q.filter(EmailLog.error.ilike(f"%{errtxt}%"))
+                if has_attach_cb.isChecked():
+                    from sqlalchemy import or_
+                    q = q.filter(EmailLog.attachments != None).filter(EmailLog.attachments != '')
                 uidtxt = user_id_edit.text().strip();
                 if uidtxt.isdigit():
                     q = q.filter(EmailLog.user_id == int(uidtxt))
@@ -2199,6 +2274,11 @@ class MainWindow(QWidget):
                     subj = subject_search.text().strip()
                     if subj:
                         q = q.filter(_EL.subject.ilike(f"%{subj}%"))
+                    errtxt = error_search.text().strip()
+                    if errtxt:
+                        q = q.filter(_EL.error.ilike(f"%{errtxt}%"))
+                    if has_attach_cb.isChecked():
+                        q = q.filter(_EL.attachments != None).filter(_EL.attachments != '')
                     uidtxt = user_id_edit.text().strip()
                     if uidtxt.isdigit():
                         q = q.filter(_EL.user_id == int(uidtxt))
@@ -2390,6 +2470,11 @@ class MainWindow(QWidget):
                     subj = subject_search.text().strip()
                     if subj:
                         q = q.filter(EmailLog.subject.ilike(f"%{subj}%"))
+                    errtxt = error_search.text().strip()
+                    if errtxt:
+                        q = q.filter(EmailLog.error.ilike(f"%{errtxt}%"))
+                    if has_attach_cb.isChecked():
+                        q = q.filter(EmailLog.attachments != None).filter(EmailLog.attachments != '')
                     uidtxt = user_id_edit.text().strip()
                     if uidtxt.isdigit():
                         q = q.filter(EmailLog.user_id == int(uidtxt))
@@ -2855,6 +2940,11 @@ class MainWindow(QWidget):
                         subj = subject_search.text().strip()
                         if subj:
                             q = q.filter(EmailLog.subject.ilike(f"%{subj}%"))
+                        errtxt = error_search.text().strip()
+                        if errtxt:
+                            q = q.filter(EmailLog.error.ilike(f"%{errtxt}%"))
+                        if has_attach_cb.isChecked():
+                            q = q.filter(EmailLog.attachments != None).filter(EmailLog.attachments != '')
                         uidtxt = user_id_edit.text().strip()
                         if uidtxt.isdigit():
                             q = q.filter(EmailLog.user_id == int(uidtxt))
