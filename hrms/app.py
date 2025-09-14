@@ -1770,6 +1770,7 @@ class MainWindow(QWidget):
         no_attach_cb = QCheckBox("Không có đính kèm")
         no_error_cb = QCheckBox("Không có lỗi")
         subject_search = QLineEdit(); subject_search.setPlaceholderText("Tìm tiêu đề…")
+        subject_eq = QLineEdit(); subject_eq.setPlaceholderText("Subject bằng…")
         error_search = QLineEdit(); error_search.setPlaceholderText("Lỗi chứa…")
         from_date = QDateEdit(); from_date.setCalendarPopup(True)
         to_date = QDateEdit(); to_date.setCalendarPopup(True)
@@ -1793,11 +1794,13 @@ class MainWindow(QWidget):
         f.addRow("", no_attach_cb)
         f.addRow("", no_error_cb)
         f.addRow("Tiêu đề", subject_search)
+        f.addRow("Subject bằng", subject_eq)
         subject_regex = QLineEdit(); subject_regex.setPlaceholderText("Subject regex…")
         subject_not = QLineEdit(); subject_not.setPlaceholderText("Subject không chứa…")
         subject_starts = QLineEdit(); subject_starts.setPlaceholderText("Subject bắt đầu với…")
         subject_ends = QLineEdit(); subject_ends.setPlaceholderText("Subject kết thúc với…")
         recipients_contains = QLineEdit(); recipients_contains.setPlaceholderText("Recipients chứa…")
+        recipients_eq = QLineEdit(); recipients_eq.setPlaceholderText("Recipients bằng…")
         recipients_not = QLineEdit(); recipients_not.setPlaceholderText("Recipients không chứa…")
         body_search = QLineEdit(); body_search.setPlaceholderText("Body chứa…")
         body_not = QLineEdit(); body_not.setPlaceholderText("Body không chứa…")
@@ -1812,6 +1815,7 @@ class MainWindow(QWidget):
         f.addRow("Subject bắt đầu", subject_starts)
         f.addRow("Subject kết thúc", subject_ends)
         f.addRow("Recipients chứa", recipients_contains)
+        f.addRow("Recipients bằng", recipients_eq)
         f.addRow("Recipients không chứa", recipients_not)
         f.addRow("Body chứa", body_search)
         f.addRow("Body không chứa", body_not)
@@ -2243,9 +2247,11 @@ class MainWindow(QWidget):
                 subject_search.setText(obj.get('subject',''))
                 subject_regex.setText(obj.get('subject_regex',''))
                 subject_not.setText(obj.get('subject_not',''))
+                subject_eq.setText(obj.get('subject_eq',''))
                 subject_starts.setText(obj.get('subject_starts',''))
                 subject_ends.setText(obj.get('subject_ends',''))
                 recipients_contains.setText(obj.get('recipients_contains',''))
+                recipients_eq.setText(obj.get('recipients_eq',''))
                 recipients_not.setText(obj.get('recipients_not',''))
                 body_search.setText(obj.get('body',''))
                 body_not.setText(obj.get('body_not',''))
@@ -2352,10 +2358,12 @@ class MainWindow(QWidget):
                     'status': status_box.currentText(),
 'only_failed': only_failed.isChecked(),
                     'only_success': only_success.isChecked(),
-                    'subject': subject_search.text().strip(),
+'subject': subject_search.text().strip(),
+                    'subject_eq': subject_eq.text().strip(),
                     'subject_regex': subject_regex.text().strip(),
                     'subject_not': subject_not.text().strip(),
-                    'recipients_contains': recipients_contains.text().strip(),
+'recipients_contains': recipients_contains.text().strip(),
+                    'recipients_eq': recipients_eq.text().strip(),
                     'recipients_not': recipients_not.text().strip(),
                     'body': body_search.text().strip(),
                     'body_not': body_not.text().strip(),
@@ -2504,12 +2512,15 @@ class MainWindow(QWidget):
                 elif not st0.startswith('('): parts.append(f"Trạng thái={st0}")
                 subj0 = subject_search.text().strip()
                 if subj0: parts.append(f"Tiêu đề chứa={subj0}")
+                seq = subject_eq.text().strip()
+                if seq: parts.append(f"Tiêu đề bằng={seq}")
                 sr = subject_regex.text().strip()
                 if sr: parts.append("Tiêu đề=regex")
                 sn = subject_not.text().strip()
                 if sn: parts.append(f"Tiêu đề không chứa={sn}")
-                rc = recipients_contains.text().strip(); rn = recipients_not.text().strip()
+                rc = recipients_contains.text().strip(); rn = recipients_not.text().strip(); req = recipients_eq.text().strip()
                 if rc: parts.append(f"Recipients chứa={rc}")
+                if req: parts.append(f"Recipients bằng={req}")
                 if rn: parts.append(f"Recipients không chứa={rn}")
                 b = body_search.text().strip(); bn = body_not.text().strip()
                 if b: parts.append(f"Body chứa={b}")
@@ -2589,8 +2600,10 @@ class MainWindow(QWidget):
                     q = q.filter(EmailLog.status == 'sent')
                 elif not st.startswith("("):
                     q = q.filter(EmailLog.status == st)
-                subj = subject_search.text().strip(); subj_rx = subject_regex.text().strip(); subj_not = subject_not.text().strip()
-                if subj_rx:
+                subj = subject_search.text().strip(); subj_rx = subject_regex.text().strip(); subj_not = subject_not.text().strip(); subj_eq = subject_eq.text().strip()
+                if subj_eq:
+                    q = q.filter(EmailLog.subject == subj_eq)
+                elif subj_rx:
                     try:
                         if db.bind and getattr(db.bind, 'dialect', None) and db.bind.dialect.name == 'sqlite':
                             q = q.filter(EmailLog.subject.op('REGEXP')(subj_rx))
@@ -2656,8 +2669,10 @@ class MainWindow(QWidget):
                     q = q.filter(EmailLog.attachments != None).filter(EmailLog.attachments != '')
                     q = q.filter((func.length(EmailLog.attachments) - func.length(func.replace(EmailLog.attachments, ',', '')) + 1) <= max_att)
                 # recipients filters
-                rc = recipients_contains.text().strip(); rnot = recipients_not.text().strip()
-                if rc:
+                rc = recipients_contains.text().strip(); rnot = recipients_not.text().strip(); req = recipients_eq.text().strip()
+                if req:
+                    q = q.filter(EmailLog.recipients == req)
+                elif rc:
                     q = q.filter(EmailLog.recipients.ilike(f"%{rc}%"))
                 if rnot:
                     q = q.filter(~EmailLog.recipients.ilike(f"%{rnot}%"))
@@ -2861,16 +2876,27 @@ class MainWindow(QWidget):
                 if st.startswith('('): st = 'all'
                 name = f"email_logs_{sanitize(t)}_{sanitize(st)}_{base}.csv"
                 outp = Path('exports')/name
+                def _slugify(s: str) -> str:
+                    try:
+                        import unicodedata, re
+                        s2 = unicodedata.normalize('NFKD', s)
+                        s2 = ''.join(c for c in s2 if not unicodedata.combining(c))
+                        s2 = s2.lower()
+                        s2 = re.sub(r"[^a-z0-9]+", "_", s2).strip('_')
+                        return s2
+                    except Exception:
+                        return (s or '').strip().lower().replace(' ', '_')
                 with open(outp, 'w', encoding='utf-8', newline='') as fcsv:
                     # BOM for Excel
                     try: fcsv.write('\ufeff')
                     except Exception: pass
                     w = csv.writer(fcsv)
-                    w.writerow(["created_at","type","unit_name","subject","recipients","attachments","status","error","attachments_count"])
+                    w.writerow(["created_at","type","type_slug","unit_name","unit_slug","subject","recipients","attachments","status","error","attachments_count"])
                     for i in range(table.rowCount()):
                         it = lambda r,c: (table.item(r,c).text() if table.item(r,c) else '')
                         cnt = (table.item(i,8).text() if table.item(i,8) else '')
-                        w.writerow([it(i,0), it(i,1), it(i,2), it(i,3), it(i,4), it(i,5), it(i,6), it(i,7), cnt])
+                        unit = it(i,2); typ = it(i,1)
+                        w.writerow([it(i,0), typ, _slugify(typ), unit, _slugify(unit), it(i,3), it(i,4), it(i,5), it(i,6), it(i,7), cnt])
                 # Audit
                 try:
                     from .db import SessionLocal as _SL
@@ -2899,11 +2925,12 @@ class MainWindow(QWidget):
                 from PySide6.QtWidgets import QApplication
                 buf = io.StringIO()
                 w = csv.writer(buf)
-                w.writerow(["created_at","type","unit_name","subject","recipients","attachments","status","error","attachments_count"])
+                w.writerow(["created_at","type","type_slug","unit_name","unit_slug","subject","recipients","attachments","status","error","attachments_count"])
                 for i in range(table.rowCount()):
                     it = lambda r,c: (table.item(r,c).text() if table.item(r,c) else '')
                     cnt = (table.item(i,8).text() if table.item(i,8) else '')
-                    w.writerow([it(i,0), it(i,1), it(i,2), it(i,3), it(i,4), it(i,5), it(i,6), it(i,7), cnt])
+                    unit = it(i,2); typ = it(i,1)
+                    w.writerow([it(i,0), typ, _slugify(typ), unit, _slugify(unit), it(i,3), it(i,4), it(i,5), it(i,6), it(i,7), cnt])
                 QApplication.clipboard().setText(buf.getvalue())
                 # Audit
                 try:
@@ -4108,34 +4135,49 @@ class MainWindow(QWidget):
         from PySide6.QtWidgets import QLineEdit as _QLE2
         zip_group_by_day = QCheckBox("Gom theo ngày")
         zip_include_manifest = QCheckBox("Kèm manifest CSV")
+        zip_per_type = QCheckBox("Theo loại")
         zip_name_tpl = _QLE2(); zip_name_tpl.setPlaceholderText("Tên file ZIP (vd: email_attachments_{ts}.zip)")
-        row_zip_opts = QHBoxLayout(); row_zip_opts.addWidget(zip_group_by_day); row_zip_opts.addWidget(zip_include_manifest); row_zip_opts.addWidget(QLabel("Tên ZIP")); row_zip_opts.addWidget(zip_name_tpl)
+        row_zip_opts = QHBoxLayout(); row_zip_opts.addWidget(zip_group_by_day); row_zip_opts.addWidget(zip_include_manifest); row_zip_opts.addWidget(zip_per_type); row_zip_opts.addWidget(QLabel("Tên ZIP")); row_zip_opts.addWidget(zip_name_tpl)
         f.addRow(row_zip_opts)
         # load zip opts from settings
-        try:
-            from .settings_service import get_setting as _gs
+        def _zip_key(prefix: str) -> str:
             ukey = (self.current_user.get('username') or '').strip()
-            zip_group_by_day.setChecked(((str(_gs(f"EMAIL_HISTORY_ZIP_GROUP_BY_DAY:{ukey}", '0') or '0')).strip().lower() in ('1','true','yes')))
-            zip_include_manifest.setChecked(((str(_gs(f"EMAIL_HISTORY_ZIP_INCLUDE_MANIFEST:{ukey}", '0') or '0')).strip().lower() in ('1','true','yes')))
-            tpl = _gs(f"EMAIL_HISTORY_ZIP_NAME_TPL:{ukey}", '') or ''
-            if tpl.strip():
-                zip_name_tpl.setText(tpl)
-        except Exception:
-            pass
+            if zip_per_type.isChecked():
+                tval = type_box.currentText().strip()
+                if tval and not tval.startswith('('):
+                    return f"{prefix}_BY_TYPE:{ukey}:{tval}"
+            return f"{prefix}:{ukey}"
+        def _load_zip_opts():
+            try:
+                from .settings_service import get_setting as _gs
+                zip_group_by_day.setChecked(((str(_gs(_zip_key('EMAIL_HISTORY_ZIP_GROUP_BY_DAY'), '0') or '0')).strip().lower() in ('1','true','yes')))
+                zip_include_manifest.setChecked(((str(_gs(_zip_key('EMAIL_HISTORY_ZIP_INCLUDE_MANIFEST'), '0') or '0')).strip().lower() in ('1','true','yes')))
+                tpl = _gs(_zip_key('EMAIL_HISTORY_ZIP_NAME_TPL'), '') or ''
+                if tpl.strip():
+                    zip_name_tpl.setText(tpl)
+            except Exception:
+                pass
+        _load_zip_opts()
         # save zip opts on change
         def _save_zip_opts():
             try:
                 from .settings_service import set_setting as _ss
-                ukey = (self.current_user.get('username') or '').strip()
-                _ss(f"EMAIL_HISTORY_ZIP_GROUP_BY_DAY:{ukey}", '1' if zip_group_by_day.isChecked() else '0')
-                _ss(f"EMAIL_HISTORY_ZIP_INCLUDE_MANIFEST:{ukey}", '1' if zip_include_manifest.isChecked() else '0')
-                _ss(f"EMAIL_HISTORY_ZIP_NAME_TPL:{ukey}", zip_name_tpl.text().strip())
+                _ss(_zip_key('EMAIL_HISTORY_ZIP_GROUP_BY_DAY'), '1' if zip_group_by_day.isChecked() else '0')
+                _ss(_zip_key('EMAIL_HISTORY_ZIP_INCLUDE_MANIFEST'), '1' if zip_include_manifest.isChecked() else '0')
+                _ss(_zip_key('EMAIL_HISTORY_ZIP_NAME_TPL'), zip_name_tpl.text().strip())
             except Exception:
                 pass
         zip_group_by_day.toggled.connect(lambda _ : _save_zip_opts())
         zip_include_manifest.toggled.connect(lambda _ : _save_zip_opts())
         try:
             zip_name_tpl.editingFinished.connect(lambda : _save_zip_opts())
+        except Exception:
+            pass
+        def _on_zip_config_changed():
+            _load_zip_opts()
+        try:
+            zip_per_type.toggled.connect(lambda _ : _on_zip_config_changed())
+            type_box.currentTextChanged.connect(lambda _ : (zip_per_type.isChecked() and _on_zip_config_changed()))
         except Exception:
             pass
         def export_attachments_zip():
